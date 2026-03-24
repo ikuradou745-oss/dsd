@@ -316,9 +316,10 @@
 
   <script type="module">
     // ========== Firebase 構成と初期化 ==========
+    // query と limitToLast の読み込みを追加修正
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
-    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ",
@@ -333,7 +334,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    // const analytics = getAnalytics(app); // エラー回避のため一旦コメントアウト
+    // const analytics = getAnalytics(app);
 
     // ========== 定数とマスターデータ ==========
     const ICONS = ["😀","😂","😇","😍","😎","🤔","😐","🙄","😴","😷","🤠","🤡","👽","🤖","👻","💀","👹","👺","💩","🐱","🐶","🦊","🐼","🐨","🐸","🐵","🦄","🦉","🦇","🦖"];
@@ -378,9 +379,9 @@
     const state = {
       userId: null,
       userData: null,
-      usersCache: {}, // { id: { name, icon, friendCode, isOnline } }
-      friends: [], // array of userIds
-      chats: [], // array of chat objects
+      usersCache: {},
+      friends: [],
+      chats: [],
       currentChatId: null,
       voiceRoomId: null,
       voiceRoomHost: null,
@@ -388,7 +389,8 @@
       recognition: null,
       isMicOn: true,
       pendingInvitation: null,
-      activeListeners: {} // unsubscribe functions
+      activeListeners: {},
+      readMessageIds: new Set() // 音声読み上げの重複防止用フラグ
     };
 
     // ========== ユーティリティ関数 ==========
@@ -410,16 +412,26 @@
       return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
     };
 
-    const setupListeners = (path, callback) => {
-      const dbRef = ref(db, path);
+    // クエリとパスの両方に対応できるように修正
+    const setupListeners = (pathOrQuery, callback, customKey) => {
+      let dbRef;
+      let key;
+      if (typeof pathOrQuery === 'string') {
+        dbRef = ref(db, pathOrQuery);
+        key = customKey || pathOrQuery;
+      } else {
+        dbRef = pathOrQuery;
+        key = customKey || "custom_query_" + Date.now();
+      }
       const unsubscribe = onValue(dbRef, callback);
-      state.activeListeners[path] = unsubscribe;
+      state.activeListeners[key] = unsubscribe;
+      return key;
     };
 
-    const clearListener = (path) => {
-      if (state.activeListeners[path]) {
-        state.activeListeners[path]();
-        delete state.activeListeners[path];
+    const clearListener = (key) => {
+      if (state.activeListeners[key]) {
+        state.activeListeners[key]();
+        delete state.activeListeners[key];
       }
     };
 
@@ -466,10 +478,9 @@
         const vs = senderData.voiceSettings || VOICE_PRESETS[0];
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ja-JP';
-        // Web Speech APIの限界により、pitch, rate, volumeのみ実反映。他はダミー値からpitch等に微補正をかける
+        
         let finalPitch = parseFloat(vs.pitch);
         let finalRate = parseFloat(vs.rate);
-        // Brightness, Bassによる微調整 (お遊び要素)
         finalPitch += (vs.brightness - 50) * 0.005;
         finalPitch -= (vs.bass - 50) * 0.005;
         
@@ -498,7 +509,6 @@
             return;
           }
         }
-        // 初回
         document.getElementById('init-screen').classList.remove('hidden');
       },
 
@@ -548,7 +558,6 @@
       },
 
       initUI: () => {
-        // 設定のアイコン生成
         const iconCont = document.getElementById('icon-selector-container');
         ICONS.forEach(icon => {
           const div = document.createElement('div');
@@ -562,7 +571,6 @@
           iconCont.appendChild(div);
         });
 
-        // 設定の音声プリセット生成
         const presetSel = document.getElementById('voice-preset');
         VOICE_PRESETS.forEach((p, idx) => {
           const opt = document.createElement('option');
@@ -571,7 +579,6 @@
           presetSel.appendChild(opt);
         });
 
-        // 設定の音声スライダー生成
         const sliderCont = document.getElementById('voice-sliders');
         VOICE_PARAMS.forEach(param => {
           const row = document.createElement('div');
@@ -622,7 +629,6 @@
           await update(ref(db, `friendships/${state.userId}`), { [foundUid]: true });
           await update(ref(db, `friendships/${foundUid}`), { [state.userId]: true });
           
-          // 1on1チャットルームの作成確認
           const chatsSnap = await get(ref(db, 'chats'));
           let chatExists = false;
           chatsSnap.forEach(c => {
@@ -751,7 +757,6 @@
               if (c.members && c.members[state.userId]) chats.push(c);
             });
           }
-          // Sort by lastUpdated desc
           chats.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
           state.chats = chats;
           appController.renderChatList();
@@ -797,11 +802,12 @@
         if (type === 'group') leaveBtn.classList.remove('hidden');
         else leaveBtn.classList.add('hidden');
 
-        appController.renderChatList(); // update active state
+        appController.renderChatList();
         
-        // Listen messages for this chat (limit to 100)
+        // 修正ポイント：100メッセージ制限付きクエリを正しくセット
         clearListener('currentMessages');
         const msgsRef = query(ref(db, `chats/${chatId}/messages`), limitToLast(100));
+        
         setupListeners(msgsRef, async (snap) => {
           const hist = document.getElementById('message-history');
           hist.innerHTML = '';
@@ -825,8 +831,7 @@
             }
             hist.scrollTop = hist.scrollHeight;
           }
-        });
-        state.activeListeners['currentMessages'] = state.activeListeners[msgsRef.toString()]; // hacky tracking
+        }, 'currentMessages');
       },
 
       sendMessage: async () => {
@@ -838,14 +843,12 @@
 
         input.value = '';
         
-        // Push message
         await push(ref(db, `chats/${state.currentChatId}/messages`), {
           sender: state.userId,
           text: text,
           timestamp: serverTimestamp()
         });
         
-        // Update lastUpdated
         await update(ref(db, `chats/${state.currentChatId}`), {
           lastUpdated: serverTimestamp()
         });
@@ -940,8 +943,8 @@
 
         state.voiceRoomId = roomId;
         state.voiceRoomHost = state.userId;
+        state.readMessageIds.clear(); // 部屋を作ったら読み上げ記録リセット
         
-        // 招待を送信
         invitees.forEach(async (fid) => {
           await push(ref(db, `invitations/${fid}`), {
             from: state.userId,
@@ -960,7 +963,6 @@
             document.getElementById('invitation-toast').classList.add('hidden');
             return;
           }
-          // 最新の招待を取得
           let latestInv = null;
           let latestKey = null;
           snap.forEach(child => {
@@ -968,7 +970,7 @@
             latestKey = child.key;
           });
 
-          if (latestInv && !state.voiceRoomId) { // 既に部屋にいない場合
+          if (latestInv && !state.voiceRoomId) {
             const fromUser = await getUserData(latestInv.from);
             state.pendingInvitation = { id: latestKey, ...latestInv };
             document.getElementById('invitation-text').innerText = `${fromUser.name} さんからボイチャの招待が来ています！`;
@@ -981,14 +983,13 @@
         if (!state.pendingInvitation) return;
         const roomId = state.pendingInvitation.roomId;
         
-        // 部屋に参加
         await update(ref(db, `voiceRooms/${roomId}/members`), { [state.userId]: true });
-        
-        // 招待を削除
         await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`));
         document.getElementById('invitation-toast').classList.add('hidden');
         
         state.voiceRoomId = roomId;
+        state.readMessageIds.clear(); // 部屋に入ったら読み上げ記録リセット
+        
         appController.switchView('voice');
         appController.enterVoiceRoom();
       },
@@ -1012,10 +1013,8 @@
           try { state.recognition.start(); } catch(e){}
         }
 
-        // 部屋情報監視
         setupListeners(`voiceRooms/${state.voiceRoomId}`, (snap) => {
           if (!snap.exists()) {
-            // 部屋が解散された
             if (state.voiceRoomId) {
               alert("部屋が解散されました");
               appController.leaveVoiceRoom(true);
@@ -1034,8 +1033,10 @@
           }
         });
 
-        // テキストログ監視
+        // 修正ポイント：100件クエリと読み上げ判定の改善
+        clearListener('vcMessages');
         const logRef = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), limitToLast(100));
+        
         setupListeners(logRef, async (snap) => {
           const logArea = document.getElementById('vc-text-log');
           if (!snap.exists()) {
@@ -1046,7 +1047,6 @@
           const msgs = [];
           snap.forEach(c => { msgs.push({id: c.key, ...c.val()}); });
           
-          // 最新のメッセージを取得
           const latest = msgs[msgs.length - 1];
           
           if (latest) {
@@ -1059,13 +1059,11 @@
                </div>
              `;
              
-             // 自分が送信したものでなければ読み上げ
-             // 一度読み上げたものを二重再生しないための簡易フラグ
-             if (latest.sender !== state.userId && !latest.readByMe) {
-                latest.readByMe = true; // 厳密にはローカルの別構造に保存すべきだが簡易的に
+             // 読み上げフラグの厳密な判定
+             if (latest.sender !== state.userId && !state.readMessageIds.has(latest.id)) {
+                state.readMessageIds.add(latest.id);
                 playTTS(latest.text, latest.sender);
                 
-                // しゃべっているリングエフェクト
                 const mEl = document.getElementById(`vc-m-${latest.sender}`);
                 if (mEl) {
                   mEl.classList.add('speaking-ring');
@@ -1073,7 +1071,7 @@
                 }
              }
           }
-        });
+        }, 'vcMessages');
       },
 
       renderVoiceMembers: async (members) => {
@@ -1089,7 +1087,6 @@
               <div style="font-size: 24px;">${uData.icon}</div>
               <div>${escapeHTML(uData.name)} ${uid === state.voiceRoomHost ? '👑' : ''}</div>
             `;
-            // ホストならキックボタン追加
             if (state.voiceRoomHost === state.userId && uid !== state.userId) {
               html += `<button class="danger-btn kick-btn" onclick="appController.kickUser('${uid}')">キック</button>`;
             }
@@ -1104,7 +1101,6 @@
         
         if (state.voiceRoomId) {
           await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${state.userId}`));
-          // 誰もいなくなったら部屋削除はCloud Functions等でやるのが理想だが今回はクライアントで簡易処理
           const snap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`));
           if (!snap.exists()) {
             await remove(ref(db, `voiceRooms/${state.voiceRoomId}`));
@@ -1112,7 +1108,7 @@
         }
 
         clearListener(`voiceRooms/${state.voiceRoomId}`);
-        // query based listener clear needs special handling or just let it overwrite
+        clearListener('vcMessages');
         
         if (state.recognition) {
           try { state.recognition.stop(); } catch(e){}
@@ -1185,7 +1181,6 @@
       }
     };
 
-    // 音声認識で取得したテキストをDBに送信
     function sendVoiceTextMessage(text) {
       if (!state.voiceRoomId || !text) return;
       push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), {
@@ -1195,7 +1190,6 @@
       });
     }
 
-    // 起動
     window.onload = appController.init;
 
   </script>
