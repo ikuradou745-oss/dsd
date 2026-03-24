@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forcord - 修正版</title>
+  <title>Forcord - 完全修正版</title>
   <style>
     :root {
       --bg-color: #202225;
@@ -302,10 +302,10 @@
 
     const ICONS = ["😀","😂","😇","😍","😎","🤔","😐","🙄","😴","😷","🤠","🤡","👽","🤖","👻","💀","👹","👺","💩","🐱","🐶","🦊","🐼","🐨","🐸","🐵","🦄","🦉","🦇","🦖"];
     const VOICE_PRESETS = [
-      { name: "標準", pitch: 1.0, rate: 1.0, volume: 1.0, brightness: 50, roughness: 50, echo: 0, reverb: 0, metallic: 0, breath: 50, bass: 50 },
-      { name: "女性", pitch: 1.5, rate: 1.1, volume: 1.0, brightness: 70, roughness: 30, echo: 0, reverb: 0, metallic: 0, breath: 40, bass: 30 },
-      { name: "ロボット", pitch: 1.0, rate: 0.9, volume: 1.0, brightness: 50, roughness: 0, echo: 0, reverb: 0, metallic: 100, breath: 0, bass: 50 },
-      { name: "エイリアン", pitch: 1.8, rate: 0.9, volume: 1.0, brightness: 90, roughness: 10, echo: 50, reverb: 30, metallic: 80, breath: 0, bass: 20 }
+      { name: "標準", pitch: 1.0, rate: 1.0, volume: 1.0 },
+      { name: "女性", pitch: 1.5, rate: 1.1, volume: 1.0 },
+      { name: "ロボット", pitch: 1.0, rate: 0.9, volume: 1.0 },
+      { name: "エイリアン", pitch: 1.8, rate: 0.9, volume: 1.0 }
     ];
     const VOICE_PARAMS = [
       { id: "pitch", name: "音程", min: 0.1, max: 2.0, step: 0.1 },
@@ -316,12 +316,13 @@
     const state = {
       userId: null, userData: null, usersCache: {}, friends: [], chats: [], currentChatId: null,
       voiceRoomId: null, voiceRoomHost: null, recognition: null, isMicOn: false,
-      pendingInvitation: null, activeListeners: {}, messageListenerKey: null, voiceListenerKey: null
+      pendingInvitation: null, activeListeners: {}, messageListenerKey: null, voiceListenerKey: null,
+      voiceMessages: []
     };
 
     const generateUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); });
     const generateFriendCode = () => { let c = ''; for (let i = 0; i < 8; i++) c += 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]; return c; };
-    const escapeHTML = (s) => s ? s.replace(/[&<>]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[t])) : '';
+    const escapeHTML = (s) => s ? String(s).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])) : '';
     const getUserData = async (uid) => { if (state.usersCache[uid]) return state.usersCache[uid]; const snap = await get(ref(db, `users/${uid}`)); if (snap.exists()) { state.usersCache[uid] = snap.val(); return snap.val(); } return null; };
 
     const playTTS = (text, voiceSettings) => {
@@ -398,7 +399,7 @@
         alert("フレンド追加しました");
         document.getElementById('friend-code-input').value = '';
       },
-      listenFriends: () => { onValue(ref(db, `friendships/${state.userId}`), async (snap) => { state.friends = []; const list = document.getElementById('home-friend-list'); list.innerHTML = ''; if (!snap.exists()) return; for (const fid of Object.keys(snap.val())) { state.friends.push(fid); const u = await getUserData(fid); if (u) list.innerHTML += `<div class="friend-item"><div class="friend-info"><div class="friend-icon">${u.icon}</div><div><div class="friend-name">${escapeHTML(u.name)}</div><div>${u.friendCode}</div></div></div><button class="danger-btn" onclick="appController.removeFriend('${fid}')">削除</button></div>`; } }); },
+      listenFriends: () => { onValue(ref(db, `friendships/${state.userId}`), async (snap) => { state.friends = []; const list = document.getElementById('home-friend-list'); list.innerHTML = ''; if (!snap.exists()) return; for (const fid of Object.keys(snap.val())) { state.friends.push(fid); const u = await getUserData(fid); if (u) list.innerHTML += `<div class="friend-item"><div class="friend-info"><div class="friend-icon">${escapeHTML(u.icon)}</div><div><div class="friend-name">${escapeHTML(u.name)}</div><div>${escapeHTML(u.friendCode)}</div></div></div><button class="danger-btn" onclick="appController.removeFriend('${fid}')">削除</button></div>`; } }); },
       removeFriend: async (fid) => { if (confirm("削除しますか？")) { await remove(ref(db, `friendships/${state.userId}/${fid}`)); await remove(ref(db, `friendships/${fid}/${state.userId}`)); } },
       updateProfile: async () => { const newName = document.getElementById('setting-name').value.trim(); if (newName) state.userData.name = newName; await update(ref(db, `users/${state.userId}`), { name: state.userData.name, icon: state.userData.icon }); alert("更新しました"); },
       applyVoicePreset: () => { const idx = document.getElementById('voice-preset').value; const p = VOICE_PRESETS[idx]; VOICE_PARAMS.forEach(param => { const el = document.getElementById(`vs-${param.id}`); if (el) { el.value = p[param.id]; document.getElementById(`val-${param.id}`).innerText = p[param.id]; } }); },
@@ -406,31 +407,90 @@
       testVoice: () => { const vs = {}; VOICE_PARAMS.forEach(p => vs[p.id] = document.getElementById(`vs-${p.id}`).value); playTTS("これはテスト音声です", vs); },
       initSpeech: () => { if ('webkitSpeechRecognition' in window) { state.recognition = new webkitSpeechRecognition(); state.recognition.lang = 'ja-JP'; state.recognition.interimResults = false; state.recognition.continuous = true; state.recognition.onresult = (e) => { if (!state.isMicOn || !state.voiceRoomId) return; const text = e.results[e.results.length - 1][0].transcript.trim(); if (text) push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() }); }; state.recognition.onerror = (e) => console.log("音声認識エラー:", e); state.recognition.onend = () => { if (state.isMicOn && state.voiceRoomId) setTimeout(() => { try { state.recognition.start(); } catch(e) {} }, 100); }; } },
       
-      loadTodayUsers: async () => { const snap = await get(ref(db, 'onlineStatus')); const list = document.getElementById('today-users-list'); list.innerHTML = ''; snap.forEach(child => { if (child.key !== state.userId && child.val().online === true && !state.friends.includes(child.key)) { getUserData(child.key).then(u => { if (u) list.innerHTML += `<div class="today-user-item"><div class="user-info"><div class="user-icon">${u.icon}</div><div>${escapeHTML(u.name)}</div></div><button class="connect-btn" onclick="appController.sendConnectRequest('${child.key}')">つながる</button></div>`; }); } }); if (!list.children.length) list.innerHTML = '<div>オンラインユーザーはいません</div>'; },
+      loadTodayUsers: async () => { const snap = await get(ref(db, 'onlineStatus')); const list = document.getElementById('today-users-list'); list.innerHTML = ''; snap.forEach(child => { if (child.key !== state.userId && child.val().online === true && !state.friends.includes(child.key)) { getUserData(child.key).then(u => { if (u) list.innerHTML += `<div class="today-user-item"><div class="user-info"><div class="user-icon">${escapeHTML(u.icon)}</div><div>${escapeHTML(u.name)}</div></div><button class="connect-btn" onclick="appController.sendConnectRequest('${child.key}')">つながる</button></div>`; }); } }); if (!list.children.length) list.innerHTML = '<div>オンラインユーザーはいません</div>'; },
       sendConnectRequest: async (uid) => { await push(ref(db, `connectRequests/${uid}`), { from: state.userId, timestamp: serverTimestamp() }); alert("リクエストを送信しました"); },
       listenConnectRequests: () => { onValue(ref(db, `connectRequests/${state.userId}`), () => appController.loadConnectRequests()); },
-      loadConnectRequests: async () => { const snap = await get(ref(db, `connectRequests/${state.userId}`)); const list = document.getElementById('connect-requests-list'); list.innerHTML = ''; if (!snap.exists()) { list.innerHTML = '<div>リクエストはありません</div>'; return; } snap.forEach(child => { const req = child.val(); if (req.status !== 'pending') return; getUserData(req.from).then(u => { if (u) list.innerHTML += `<div class="request-item"><div class="user-info"><div class="user-icon">${u.icon}</div><div>${escapeHTML(u.name)}</div></div><div><button class="accept-btn" onclick="appController.acceptConnectRequest('${child.key}','${req.from}')">許可</button><button class="decline-btn" onclick="appController.declineConnectRequest('${child.key}')">拒否</button></div></div>`; }); }); },
+      loadConnectRequests: async () => { const snap = await get(ref(db, `connectRequests/${state.userId}`)); const list = document.getElementById('connect-requests-list'); list.innerHTML = ''; if (!snap.exists()) { list.innerHTML = '<div>リクエストはありません</div>'; return; } snap.forEach(child => { const req = child.val(); if (req.status !== 'pending') return; getUserData(req.from).then(u => { if (u) list.innerHTML += `<div class="request-item"><div class="user-info"><div class="user-icon">${escapeHTML(u.icon)}</div><div>${escapeHTML(u.name)}</div></div><div><button class="accept-btn" onclick="appController.acceptConnectRequest('${child.key}','${req.from}')">許可</button><button class="decline-btn" onclick="appController.declineConnectRequest('${child.key}')">拒否</button></div></div>`; }); }); },
       acceptConnectRequest: async (reqId, fromUid) => { await update(ref(db, `friendships/${state.userId}`), { [fromUid]: true }); await update(ref(db, `friendships/${fromUid}`), { [state.userId]: true }); await remove(ref(db, `connectRequests/${state.userId}/${reqId}`)); alert("フレンドになりました！"); },
       declineConnectRequest: async (reqId) => { await remove(ref(db, `connectRequests/${state.userId}/${reqId}`)); },
       
       listenChats: () => { onValue(ref(db, 'chats'), async (snap) => { const chats = []; snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); }); state.chats = chats.sort((a,b) => (b.lastUpdated||0) - (a.lastUpdated||0)); appController.renderChatList(); }); },
-      renderChatList: async () => { const container = document.getElementById('chat-list-container'); container.innerHTML = ''; for (const chat of state.chats) { let name = "グループ", icon = "👥"; if (chat.type === 'direct') { const other = Object.keys(chat.members).find(id => id !== state.userId); if (other) { const u = await getUserData(other); if (u) { name = u.name; icon = u.icon; } } } else name = chat.name || "グループ"; container.innerHTML += `<div class="chat-list-item ${chat.id === state.currentChatId ? 'active' : ''}" onclick="appController.openChat('${chat.id}','${escapeHTML(name)}','${chat.type}')"><div>${icon}</div><div>${escapeHTML(name)}</div></div>`; } },
-      openChat: (chatId, title, type) => { state.currentChatId = chatId; document.getElementById('chat-placeholder').style.display = 'none'; document.getElementById('chat-main-area').style.display = 'flex'; document.getElementById('chat-title-display').innerText = title; document.getElementById('group-leave-btn').classList.toggle('hidden', type !== 'group'); if (state.messageListenerKey) { state.activeListeners[state.messageListenerKey]?.(); delete state.activeListeners[state.messageListenerKey]; } const msgQuery = query(ref(db, `chats/${chatId}/messages`), orderByChild('timestamp'), limitToLast(100)); const unsubscribe = onValue(msgQuery, async (snap) => { const hist = document.getElementById('message-history'); hist.innerHTML = ''; if (snap.exists()) { const msgs = []; snap.forEach(c => msgs.push(c.val())); msgs.reverse(); for (const m of msgs) { const sender = await getUserData(m.sender); if (sender) { const isSelf = m.sender === state.userId; hist.innerHTML += `<div class="msg-row ${isSelf ? 'self' : 'other'}"><div class="message-block"><div class="msg-icon">${sender.icon}</div><div class="msg-content"><div class="msg-sender">${escapeHTML(sender.name)}</div><div class="msg-bubble">${escapeHTML(m.text)}</div></div></div></div>`; } } hist.scrollTop = hist.scrollHeight; } }); state.messageListenerKey = `chat_${chatId}`; state.activeListeners[state.messageListenerKey] = unsubscribe; },
+      renderChatList: async () => { const container = document.getElementById('chat-list-container'); container.innerHTML = ''; for (const chat of state.chats) { let name = "グループ", icon = "👥"; if (chat.type === 'direct') { const other = Object.keys(chat.members).find(id => id !== state.userId); if (other) { const u = await getUserData(other); if (u) { name = u.name; icon = u.icon; } } } else name = chat.name || "グループ"; container.innerHTML += `<div class="chat-list-item ${chat.id === state.currentChatId ? 'active' : ''}" onclick="appController.openChat('${chat.id}','${escapeHTML(name)}','${chat.type}')"><div>${escapeHTML(icon)}</div><div>${escapeHTML(name)}</div></div>`; } },
+      openChat: (chatId, title, type) => { state.currentChatId = chatId; document.getElementById('chat-placeholder').style.display = 'none'; document.getElementById('chat-main-area').style.display = 'flex'; document.getElementById('chat-title-display').innerText = title; document.getElementById('group-leave-btn').classList.toggle('hidden', type !== 'group'); if (state.messageListenerKey) { state.activeListeners[state.messageListenerKey]?.(); delete state.activeListeners[state.messageListenerKey]; } const msgQuery = query(ref(db, `chats/${chatId}/messages`), orderByChild('timestamp')); const unsubscribe = onValue(msgQuery, async (snap) => { const hist = document.getElementById('message-history'); hist.innerHTML = ''; if (snap.exists()) { const msgs = []; snap.forEach(c => msgs.push(c.val())); for (const m of msgs) { const sender = await getUserData(m.sender); if (sender) { const isSelf = m.sender === state.userId; const msgDiv = document.createElement('div'); msgDiv.className = `msg-row ${isSelf ? 'self' : 'other'}`; msgDiv.innerHTML = `<div class="message-block"><div class="msg-icon">${escapeHTML(sender.icon)}</div><div class="msg-content"><div class="msg-sender">${escapeHTML(sender.name)}</div><div class="msg-bubble">${escapeHTML(m.text)}</div></div></div>`; hist.appendChild(msgDiv); } } hist.scrollTop = hist.scrollHeight; } }); state.messageListenerKey = `chat_${chatId}`; state.activeListeners[state.messageListenerKey] = unsubscribe; },
       sendMessage: async () => { if (!state.currentChatId) return; const input = document.getElementById('message-input'); const text = input.value.trim(); if (!text) return; input.value = ''; await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() }); await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() }); },
-      openGroupModal: async () => { document.getElementById('group-modal').classList.remove('hidden'); const list = document.getElementById('group-friend-select'); list.innerHTML = ''; for (const fid of state.friends) { const u = await getUserData(fid); if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="friend-checkbox"><span>${u.icon} ${escapeHTML(u.name)}</span></div>`; } },
+      openGroupModal: async () => { document.getElementById('group-modal').classList.remove('hidden'); const list = document.getElementById('group-friend-select'); list.innerHTML = ''; for (const fid of state.friends) { const u = await getUserData(fid); if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="friend-checkbox"><span>${escapeHTML(u.icon)} ${escapeHTML(u.name)}</span></div>`; } },
       createGroup: async () => { const name = document.getElementById('group-name-input').value.trim() || "新規グループ"; const checks = document.querySelectorAll('.friend-checkbox:checked'); if (checks.length === 0) return alert("メンバーを選択してください"); const members = { [state.userId]: true }; checks.forEach(c => members[c.value] = true); await set(push(ref(db, 'chats')), { type: 'group', name: name, members: members, lastUpdated: serverTimestamp() }); document.getElementById('group-modal').classList.add('hidden'); },
       leaveGroup: async () => { if (state.currentChatId && confirm("退会しますか？")) { await remove(ref(db, `chats/${state.currentChatId}/members/${state.userId}`)); document.getElementById('chat-main-area').style.display = 'none'; document.getElementById('chat-placeholder').style.display = 'flex'; state.currentChatId = null; } },
       
-      updateOnlineFriendsList: async () => { const snap = await get(ref(db, 'onlineStatus')); const onlines = snap.val() || {}; const list = document.getElementById('vc-invite-list'); list.innerHTML = ''; for (const fid of state.friends) { if (onlines[fid]?.online) { const u = await getUserData(fid); if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="vc-friend-checkbox"><span>${u.icon} ${escapeHTML(u.name)}</span></div>`; } } if (!list.children.length) list.innerHTML = '<div>オンラインフレンドはいません</div>'; },
+      updateOnlineFriendsList: async () => { const snap = await get(ref(db, 'onlineStatus')); const onlines = snap.val() || {}; const list = document.getElementById('vc-invite-list'); list.innerHTML = ''; for (const fid of state.friends) { if (onlines[fid]?.online) { const u = await getUserData(fid); if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="vc-friend-checkbox"><span>${escapeHTML(u.icon)} ${escapeHTML(u.name)}</span></div>`; } } if (!list.children.length) list.innerHTML = '<div>オンラインフレンドはいません</div>'; },
       createVoiceRoom: async () => { const checks = document.querySelectorAll('.vc-friend-checkbox:checked'); const roomRef = push(ref(db, 'voiceRooms')); const roomId = roomRef.key; await set(roomRef, { host: state.userId, members: { [state.userId]: true } }); state.voiceRoomId = roomId; state.voiceRoomHost = state.userId; checks.forEach(c => push(ref(db, `invitations/${c.value}`), { from: state.userId, roomId: roomId, timestamp: serverTimestamp() })); appController.enterVoiceRoom(); },
       listenInvitations: () => { onValue(ref(db, `invitations/${state.userId}`), async (snap) => { if (!snap.exists()) { document.getElementById('invitation-toast').classList.add('hidden'); return; } let latest; snap.forEach(c => latest = { id: c.key, ...c.val() }); if (latest && !state.voiceRoomId) { const from = await getUserData(latest.from); state.pendingInvitation = latest; document.getElementById('invitation-text').innerHTML = `${from?.name}さんからボイチャ招待！`; document.getElementById('invitation-toast').classList.remove('hidden'); } }); },
       acceptInvitation: async () => { if (!state.pendingInvitation) return; await update(ref(db, `voiceRooms/${state.pendingInvitation.roomId}/members`), { [state.userId]: true }); await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`)); document.getElementById('invitation-toast').classList.add('hidden'); state.voiceRoomId = state.pendingInvitation.roomId; appController.switchView('voice'); appController.enterVoiceRoom(); },
       declineInvitation: async () => { if (state.pendingInvitation) { await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`)); document.getElementById('invitation-toast').classList.add('hidden'); state.pendingInvitation = null; } },
-      enterVoiceRoom: () => { document.getElementById('vc-setup-area').classList.add('hidden'); document.getElementById('vc-room-area').classList.remove('hidden'); state.isMicOn = true; document.getElementById('mic-toggle-btn').innerHTML = "🎤 マイク ON"; document.getElementById('mic-toggle-btn').className = "primary-btn"; if (state.recognition) try { state.recognition.start(); } catch(e) {} if (state.voiceListenerKey) { state.activeListeners[state.voiceListenerKey]?.(); delete state.activeListeners[state.voiceListenerKey]; } const msgQuery = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), orderByChild('timestamp'), limitToLast(50)); const unsubscribe = onValue(msgQuery, async (snap) => { const logDiv = document.getElementById('vc-text-log'); logDiv.innerHTML = ''; if (snap.exists()) { const msgs = []; snap.forEach(c => msgs.push({ id: c.key, ...c.val() })); msgs.reverse(); for (const msg of msgs) { const sender = await getUserData(msg.sender); const senderName = sender ? sender.name : '不明'; logDiv.innerHTML += `<div class="vc-text-entry"><div class="vc-text-sender">${escapeHTML(senderName)}</div><div class="vc-text-message">${escapeHTML(msg.text)}</div></div>`; if (msg.sender !== state.userId && !state[`read_${msg.id}`]) { state[`read_${msg.id}`] = true; playTTS(msg.text, sender?.voiceSettings); } } logDiv.scrollTop = logDiv.scrollHeight; } }); state.voiceListenerKey = `voice_${state.voiceRoomId}`; state.activeListeners[state.voiceListenerKey] = unsubscribe; onValue(ref(db, `voiceRooms/${state.voiceRoomId}`), (snap) => { if (!snap.exists()) { appController.leaveVoiceRoom(true); return; } const data = snap.val(); state.voiceRoomHost = data.host; const members = Object.keys(data.members || {}); const container = document.getElementById('vc-member-list'); container.innerHTML = ''; members.forEach(uid => { getUserData(uid).then(u => { if (u) container.innerHTML += `<div class="vc-member-item" id="vc-m-${uid}"><div>${u.icon}</div><div>${escapeHTML(u.name)}${uid === state.voiceRoomHost ? ' 👑' : ''}</div>${state.voiceRoomHost === state.userId && uid !== state.userId ? `<button class="danger-btn kick-btn" onclick="appController.kickUser('${uid}')">キック</button>` : ''}</div>`; }); }); if (data.host === state.userId) document.getElementById('vc-invite-more-btn').classList.remove('hidden'); else document.getElementById('vc-invite-more-btn').classList.add('hidden'); }); },
+      enterVoiceRoom: () => { 
+        document.getElementById('vc-setup-area').classList.add('hidden'); 
+        document.getElementById('vc-room-area').classList.remove('hidden'); 
+        state.isMicOn = true; 
+        document.getElementById('mic-toggle-btn').innerHTML = "🎤 マイク ON"; 
+        document.getElementById('mic-toggle-btn').className = "primary-btn"; 
+        if (state.recognition) try { state.recognition.start(); } catch(e) {} 
+        if (state.voiceListenerKey) { state.activeListeners[state.voiceListenerKey]?.(); delete state.activeListeners[state.voiceListenerKey]; } 
+        
+        const msgQuery = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), orderByChild('timestamp'));
+        const unsubscribe = onValue(msgQuery, async (snap) => {
+          const logDiv = document.getElementById('vc-text-log');
+          if (!snap.exists()) { 
+            logDiv.innerHTML = '<div style="color: var(--text-muted);">メッセージがここに表示されます</div>';
+            return;
+          }
+          const msgs = [];
+          snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
+          logDiv.innerHTML = '';
+          for (const msg of msgs) {
+            const sender = await getUserData(msg.sender);
+            const senderName = sender ? sender.name : '不明';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'vc-text-entry';
+            msgDiv.innerHTML = `<div class="vc-text-sender">${escapeHTML(senderName)}</div><div class="vc-text-message">${escapeHTML(msg.text)}</div>`;
+            logDiv.appendChild(msgDiv);
+            if (msg.sender !== state.userId && !state[`read_${msg.id}`]) {
+              state[`read_${msg.id}`] = true;
+              playTTS(msg.text, sender?.voiceSettings);
+              const memberEl = document.getElementById(`vc-m-${msg.sender}`);
+              if (memberEl) { memberEl.classList.add('speaking-ring'); setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); }
+            }
+          }
+          logDiv.scrollTop = logDiv.scrollHeight;
+        });
+        state.voiceListenerKey = `voice_${state.voiceRoomId}`;
+        state.activeListeners[state.voiceListenerKey] = unsubscribe;
+        
+        onValue(ref(db, `voiceRooms/${state.voiceRoomId}`), (snap) => {
+          if (!snap.exists()) { appController.leaveVoiceRoom(true); return; }
+          const data = snap.val();
+          state.voiceRoomHost = data.host;
+          const members = Object.keys(data.members || {});
+          const container = document.getElementById('vc-member-list');
+          container.innerHTML = '';
+          members.forEach(uid => {
+            getUserData(uid).then(u => {
+              if (u) {
+                const memberDiv = document.createElement('div');
+                memberDiv.className = 'vc-member-item';
+                memberDiv.id = `vc-m-${uid}`;
+                memberDiv.innerHTML = `<div>${escapeHTML(u.icon)}</div><div>${escapeHTML(u.name)}${uid === state.voiceRoomHost ? ' 👑' : ''}</div>${state.voiceRoomHost === state.userId && uid !== state.userId ? `<button class="danger-btn kick-btn" onclick="appController.kickUser('${uid}')">キック</button>` : ''}`;
+                container.appendChild(memberDiv);
+              }
+            });
+          });
+          if (data.host === state.userId) document.getElementById('vc-invite-more-btn').classList.remove('hidden');
+          else document.getElementById('vc-invite-more-btn').classList.add('hidden');
+        });
+      },
       leaveVoiceRoom: async (forced = false) => { if (!forced && !confirm("退出しますか？")) return; if (state.voiceRoomId) { await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${state.userId}`)); const snap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`)); if (!snap.exists()) await remove(ref(db, `voiceRooms/${state.voiceRoomId}`)); } if (state.recognition) try { state.recognition.stop(); } catch(e) {} state.isMicOn = false; state.voiceRoomId = null; document.getElementById('vc-room-area').classList.add('hidden'); document.getElementById('vc-setup-area').classList.remove('hidden'); appController.updateOnlineFriendsList(); if (state.voiceListenerKey) { state.activeListeners[state.voiceListenerKey]?.(); delete state.activeListeners[state.voiceListenerKey]; } },
       kickUser: async (uid) => { if (confirm("キックしますか？")) await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${uid}`)); },
       toggleMic: () => { state.isMicOn = !state.isMicOn; const btn = document.getElementById('mic-toggle-btn'); if (state.isMicOn) { btn.innerHTML = "🎤 マイク ON"; btn.className = "primary-btn"; if (state.recognition && state.voiceRoomId) try { state.recognition.start(); } catch(e) {} } else { btn.innerHTML = "🔇 マイク OFF"; btn.className = "danger-btn"; if (state.recognition) try { state.recognition.stop(); } catch(e) {} } },
-      showInviteMoreModal: async () => { document.getElementById('invite-more-modal').classList.remove('hidden'); const snap = await get(ref(db, 'onlineStatus')); const onlines = snap.val() || {}; const roomSnap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`)); const members = roomSnap.val() || {}; const list = document.getElementById('invite-more-list'); list.innerHTML = ''; for (const fid of state.friends) { if (onlines[fid]?.online && !members[fid]) { const u = await getUserData(fid); if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="more-invite-checkbox"><span>${u.icon} ${escapeHTML(u.name)}</span></div>`; } } },
+      showInviteMoreModal: async () => { document.getElementById('invite-more-modal').classList.remove('hidden'); const snap = await get(ref(db, 'onlineStatus')); const onlines = snap.val() || {}; const roomSnap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`)); const members = roomSnap.val() || {}; const list = document.getElementById('invite-more-list'); list.innerHTML = ''; for (const fid of state.friends) { if (onlines[fid]?.online && !members[fid]) { const u = await getUserData(fid); if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="more-invite-checkbox"><span>${escapeHTML(u.icon)} ${escapeHTML(u.name)}</span></div>`; } } },
       sendMoreInvites: () => { const checks = document.querySelectorAll('.more-invite-checkbox:checked'); checks.forEach(c => push(ref(db, `invitations/${c.value}`), { from: state.userId, roomId: state.voiceRoomId, timestamp: serverTimestamp() })); document.getElementById('invite-more-modal').classList.add('hidden'); alert("招待しました"); }
     };
     window.onload = () => appController.init();
