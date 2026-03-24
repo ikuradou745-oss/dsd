@@ -51,7 +51,7 @@
     
     /* サイドナビゲーション */
     #sidebar { width: 70px; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; padding-top: 20px; gap: 15px; border-right: 1px solid var(--border-color); }
-    .nav-item { width: 50px; height: 50px; border-radius: 50%; background-color: var(--panel-bg); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: 0.3s; position: relative; }
+    .nav-item { width: 50px; height: 50px; border-radius: 50%; background-color: var(--panel-bg); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: 0.3s; position: relative; cursor: pointer; }
     .nav-item:hover, .nav-item.active { border-radius: 16px; background-color: var(--neon-blue); color: #000; box-shadow: 0 0 10px var(--neon-blue); }
     .nav-item::after { content: attr(data-tooltip); position: absolute; left: 60px; background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.2s; }
     .nav-item:hover::after { opacity: 1; }
@@ -107,14 +107,28 @@
     
     .msg-main { flex: 1; display: flex; flex-direction: column; background-color: var(--panel-bg); }
     .msg-topbar { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; }
-    .msg-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-    .message-block { display: flex; gap: 15px; }
-    .message-content { display: flex; flex-direction: column; }
-    .msg-sender { font-weight: bold; font-size: 14px; margin-bottom: 2px; color: var(--neon-blue); }
-    .msg-text { font-size: 16px; line-height: 1.4; word-break: break-all; }
+    .msg-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
     
+    /* チャット吹き出し用デザイン（自分=左/緑, 相手=右/白） */
+    .msg-row { display: flex; width: 100%; margin-bottom: 20px; }
+    .msg-row.self { justify-content: flex-start; } /* 自分は左 */
+    .msg-row.other { justify-content: flex-end; } /* 相手は右 */
+
+    .message-block { display: flex; max-width: 80%; gap: 10px; align-items: flex-start; }
+    .msg-row.other .message-block { flex-direction: row-reverse; } /* 相手の場合はアイコンを右に */
+
+    .msg-icon { font-size: 32px; width: 40px; text-align: center; line-height: 1; }
+    .msg-content { display: flex; flex-direction: column; }
+    .msg-row.other .msg-content { align-items: flex-end; } /* 相手の場合は名前などを右寄せに */
+
+    .msg-sender { font-weight: bold; font-size: 13px; margin-bottom: 4px; color: var(--text-muted); }
+    .msg-bubble { padding: 10px 15px; border-radius: 12px; font-size: 16px; font-weight: bold; color: #000; line-height: 1.4; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+    .msg-row.self .msg-bubble { background-color: #39ff14; } /* 自分の背景: 緑 */
+    .msg-row.other .msg-bubble { background-color: #ffffff; } /* 相手の背景: 白 */
+
     .msg-input-area { padding: 20px; background-color: var(--nav-bg); display: flex; gap: 10px; }
-    .msg-input-area input { flex: 1; background-color: var(--panel-bg); border: none; padding: 15px; font-size: 16px; }
+    .msg-input-area input { flex: 1; background-color: var(--panel-bg); border: none; padding: 15px; font-size: 16px; border-radius: 8px; color: white; }
 
     /* グループ作成モーダル */
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
@@ -316,7 +330,6 @@
 
   <script type="module">
     // ========== Firebase 構成と初期化 ==========
-    // query と limitToLast の読み込みを追加修正
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
     import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
@@ -334,7 +347,6 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    // const analytics = getAnalytics(app);
 
     // ========== 定数とマスターデータ ==========
     const ICONS = ["😀","😂","😇","😍","😎","🤔","😐","🙄","😴","😷","🤠","🤡","👽","🤖","👻","💀","👹","👺","💩","🐱","🐶","🦊","🐼","🐨","🐸","🐵","🦄","🦉","🦇","🦖"];
@@ -390,7 +402,7 @@
       isMicOn: true,
       pendingInvitation: null,
       activeListeners: {},
-      readMessageIds: new Set() // 音声読み上げの重複防止用フラグ
+      readMessageIds: new Set()
     };
 
     // ========== ユーティリティ関数 ==========
@@ -412,7 +424,6 @@
       return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
     };
 
-    // クエリとパスの両方に対応できるように修正
     const setupListeners = (pathOrQuery, callback, customKey) => {
       let dbRef;
       let key;
@@ -463,7 +474,7 @@
         };
         state.recognition.onend = () => {
           if (state.isMicOn && state.voiceRoomId) {
-            state.recognition.start(); // 継続
+            state.recognition.start();
           }
         };
       } else {
@@ -495,7 +506,6 @@
     // ========== メインコントローラー ==========
     window.appController = {
       
-      // --- 初期化・認証 ---
       init: async () => {
         let storedId = localStorage.getItem('forcord_uid');
         if (storedId) {
@@ -595,17 +605,22 @@
       },
 
       switchView: (viewId) => {
+        // 全画面非表示にして対象だけ表示
         document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
         document.getElementById(`${viewId}-view`).classList.remove('hidden');
         
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        event.currentTarget.classList.add('active');
+        // サイドバーのハイライト切り替え（プログラムからの呼び出しに対応するため onclick 属性で判定）
+        document.querySelectorAll('.nav-item').forEach(el => {
+          el.classList.remove('active');
+          if (el.getAttribute('onclick') && el.getAttribute('onclick').includes(`'${viewId}'`)) {
+            el.classList.add('active');
+          }
+        });
 
         if (viewId === 'home') appController.updateProfileUI();
         if (viewId === 'voice' && !state.voiceRoomId) appController.updateOnlineFriendsList();
       },
 
-      // --- ホーム・フレンド・プロフィール ---
       updateProfileUI: () => {
         document.getElementById('profile-icon-display').innerText = state.userData.icon;
         document.getElementById('profile-name-display').innerText = state.userData.name;
@@ -687,7 +702,6 @@
         }
       },
 
-      // --- 設定 ---
       populateSettings: () => {
         document.getElementById('setting-name').value = state.userData.name;
         const vs = state.userData.voiceSettings;
@@ -746,7 +760,6 @@
         window.speechSynthesis.speak(utterance);
       },
 
-      // --- メッセージ・グループ ---
       listenChats: () => {
         setupListeners('chats', async (snap) => {
           const chats = [];
@@ -792,6 +805,7 @@
         }
       },
 
+      // メッセージの表示（左右入れ替え、色の反映）
       openChat: (chatId, title, type) => {
         state.currentChatId = chatId;
         document.getElementById('chat-placeholder').style.display = 'none';
@@ -804,7 +818,6 @@
 
         appController.renderChatList();
         
-        // 修正ポイント：100メッセージ制限付きクエリを正しくセット
         clearListener('currentMessages');
         const msgsRef = query(ref(db, `chats/${chatId}/messages`), limitToLast(100));
         
@@ -818,16 +831,23 @@
             for (const m of msgs) {
               const sData = await getUserData(m.sender);
               if (!sData) continue;
-              const b = document.createElement('div');
-              b.className = 'message-block';
-              b.innerHTML = `
-                <div style="font-size: 32px; width: 40px; text-align: center;">${sData.icon}</div>
-                <div class="message-content">
-                  <div class="msg-sender">${escapeHTML(sData.name)}</div>
-                  <div class="msg-text">${escapeHTML(m.text)}</div>
+              
+              const isSelf = m.sender === state.userId; // 自分が送信したかどうかの判定
+
+              const row = document.createElement('div');
+              // 自分は左(self)、相手は右(other)のクラスを付与
+              row.className = `msg-row ${isSelf ? 'self' : 'other'}`;
+              
+              row.innerHTML = `
+                <div class="message-block">
+                  <div class="msg-icon">${sData.icon}</div>
+                  <div class="msg-content">
+                    <div class="msg-sender">${escapeHTML(sData.name)}</div>
+                    <div class="msg-bubble">${escapeHTML(m.text)}</div>
+                  </div>
                 </div>
               `;
-              hist.appendChild(b);
+              hist.appendChild(row);
             }
             hist.scrollTop = hist.scrollHeight;
           }
@@ -903,7 +923,6 @@
         }
       },
 
-      // --- ボイスチャット ---
       updateOnlineFriendsList: async () => {
         const list = document.getElementById('vc-invite-list');
         list.innerHTML = '読み込み中...';
@@ -943,7 +962,7 @@
 
         state.voiceRoomId = roomId;
         state.voiceRoomHost = state.userId;
-        state.readMessageIds.clear(); // 部屋を作ったら読み上げ記録リセット
+        state.readMessageIds.clear(); 
         
         invitees.forEach(async (fid) => {
           await push(ref(db, `invitations/${fid}`), {
@@ -988,7 +1007,7 @@
         document.getElementById('invitation-toast').classList.add('hidden');
         
         state.voiceRoomId = roomId;
-        state.readMessageIds.clear(); // 部屋に入ったら読み上げ記録リセット
+        state.readMessageIds.clear(); 
         
         appController.switchView('voice');
         appController.enterVoiceRoom();
@@ -1002,6 +1021,7 @@
       },
 
       enterVoiceRoom: () => {
+        // 直接要素を制御して確実に部屋の中のUIを表示する
         document.getElementById('vc-setup-area').classList.add('hidden');
         document.getElementById('vc-room-area').classList.remove('hidden');
         
@@ -1033,7 +1053,6 @@
           }
         });
 
-        // 修正ポイント：100件クエリと読み上げ判定の改善
         clearListener('vcMessages');
         const logRef = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), limitToLast(100));
         
@@ -1059,7 +1078,6 @@
                </div>
              `;
              
-             // 読み上げフラグの厳密な判定
              if (latest.sender !== state.userId && !state.readMessageIds.has(latest.id)) {
                 state.readMessageIds.add(latest.id);
                 playTTS(latest.text, latest.sender);
