@@ -1,1 +1,1203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forcord</title>
+  <style>
+    /* ========== ベーススタイル & 変数 ========== */
+    :root {
+      --bg-color: #202225;
+      --nav-bg: #2f3136;
+      --panel-bg: #36393f;
+      --text-main: #dcddde;
+      --text-muted: #72767d;
+      --neon-blue: #00f3ff;
+      --neon-pink: #ff00ea;
+      --neon-green: #39ff14;
+      --neon-red: #ff3333;
+      --btn-bg: #5865F2;
+      --btn-hover: #4752C4;
+      --border-color: #4f545c;
+    }
 
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+    button { cursor: pointer; border: none; outline: none; border-radius: 4px; font-weight: bold; transition: all 0.2s; }
+    input, select { background-color: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; outline: none; }
+    input:focus { border-color: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-color); }
+    ::-webkit-scrollbar-thumb { background: #202225; border-radius: 4px; }
+
+    /* ========== ユーティリティ ========== */
+    .hidden { display: none !important; }
+    .neon-text { text-shadow: 0 0 5px var(--neon-blue), 0 0 10px var(--neon-blue); color: #fff; }
+    .neon-btn { background-color: transparent; border: 1px solid var(--neon-blue); color: var(--neon-blue); box-shadow: 0 0 5px var(--neon-blue) inset, 0 0 5px var(--neon-blue); padding: 8px 16px; }
+    .neon-btn:hover { background-color: var(--neon-blue); color: #000; box-shadow: 0 0 15px var(--neon-blue) inset, 0 0 15px var(--neon-blue); }
+    .danger-btn { background-color: var(--neon-red); color: #fff; padding: 6px 12px; }
+    .danger-btn:hover { box-shadow: 0 0 10px var(--neon-red); }
+    .primary-btn { background-color: var(--btn-bg); color: white; padding: 10px 20px; }
+    .primary-btn:hover { background-color: var(--btn-hover); }
+
+    /* ========== 初回ログイン画面 ========== */
+    #init-screen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+    .init-box { background-color: var(--panel-bg); padding: 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,243,255,0.2); text-align: center; width: 400px; border: 1px solid var(--neon-blue); }
+    .init-box h1 { margin-bottom: 20px; font-size: 32px; }
+    .init-box input { width: 100%; margin-bottom: 20px; font-size: 18px; text-align: center; }
+
+    /* ========== メインレイアウト ========== */
+    #main-app { display: flex; width: 100vw; height: 100vh; }
+    
+    /* サイドナビゲーション */
+    #sidebar { width: 70px; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; padding-top: 20px; gap: 15px; border-right: 1px solid var(--border-color); }
+    .nav-item { width: 50px; height: 50px; border-radius: 50%; background-color: var(--panel-bg); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: 0.3s; position: relative; }
+    .nav-item:hover, .nav-item.active { border-radius: 16px; background-color: var(--neon-blue); color: #000; box-shadow: 0 0 10px var(--neon-blue); }
+    .nav-item::after { content: attr(data-tooltip); position: absolute; left: 60px; background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.2s; }
+    .nav-item:hover::after { opacity: 1; }
+
+    /* コンテンツエリア */
+    #content-area { flex: 1; display: flex; position: relative; background-color: var(--panel-bg); }
+    .view-section { width: 100%; height: 100%; display: flex; flex-direction: column; }
+
+    /* ========== ホーム画面 ========== */
+    #home-view { display: flex; flex-direction: row; }
+    .home-left { flex: 7; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 20px; }
+    .home-right { flex: 3; padding: 20px; background-color: var(--nav-bg); display: flex; flex-direction: column; align-items: center; }
+    
+    .section-header { font-size: 24px; margin-bottom: 20px; border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px; display: inline-block; }
+    
+    .add-friend-box { display: flex; gap: 10px; margin-bottom: 30px; }
+    .add-friend-box input { flex: 1; }
+    
+    .friend-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .friend-item { display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid transparent; transition: 0.2s; }
+    .friend-item:hover { border-color: var(--neon-pink); box-shadow: 0 0 10px rgba(255,0,234,0.3); }
+    .friend-info { display: flex; align-items: center; gap: 15px; }
+    .friend-icon { font-size: 32px; width: 50px; height: 50px; background-color: var(--panel-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--neon-blue); }
+    .friend-details { display: flex; flex-direction: column; }
+    .friend-name { font-weight: bold; font-size: 18px; }
+    .friend-code-display { font-size: 12px; color: var(--text-muted); }
+
+    .profile-card { background-color: var(--bg-color); padding: 30px; border-radius: 12px; text-align: center; width: 100%; border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(57,255,20,0.1); }
+    .profile-icon { font-size: 64px; margin-bottom: 10px; }
+    .profile-name { font-size: 28px; margin-bottom: 5px; font-weight: bold; }
+    .profile-code { font-size: 16px; color: var(--neon-green); background: rgba(57,255,20,0.1); padding: 5px 10px; border-radius: 4px; display: inline-block; user-select: all; }
+
+    /* ========== 設定画面 ========== */
+    #settings-view { padding: 30px; overflow-y: auto; }
+    .settings-group { background-color: var(--nav-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-color); }
+    .icon-selector { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 10px; }
+    .icon-option { font-size: 24px; cursor: pointer; text-align: center; padding: 5px; border-radius: 4px; border: 1px solid transparent; }
+    .icon-option:hover { background-color: var(--bg-color); }
+    .icon-option.selected { border-color: var(--neon-blue); background-color: rgba(0,243,255,0.2); }
+    
+    .setting-row { display: flex; align-items: center; margin-bottom: 15px; }
+    .setting-row label { width: 150px; }
+    .setting-row input[type="range"] { flex: 1; accent-color: var(--neon-blue); }
+    .setting-row .val-display { width: 50px; text-align: right; }
+
+    /* ========== メッセージ画面 ========== */
+    #message-view { display: flex; flex-direction: row; }
+    .msg-sidebar { width: 300px; background-color: var(--nav-bg); display: flex; flex-direction: column; border-right: 1px solid var(--border-color); }
+    .msg-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .chat-list { flex: 1; overflow-y: auto; padding: 10px; }
+    .chat-list-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 4px; cursor: pointer; margin-bottom: 5px; }
+    .chat-list-item:hover, .chat-list-item.active { background-color: rgba(0,243,255,0.1); border-left: 4px solid var(--neon-blue); }
+    
+    .msg-main { flex: 1; display: flex; flex-direction: column; background-color: var(--panel-bg); }
+    .msg-topbar { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; }
+    .msg-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+    .message-block { display: flex; gap: 15px; }
+    .message-content { display: flex; flex-direction: column; }
+    .msg-sender { font-weight: bold; font-size: 14px; margin-bottom: 2px; color: var(--neon-blue); }
+    .msg-text { font-size: 16px; line-height: 1.4; word-break: break-all; }
+    
+    .msg-input-area { padding: 20px; background-color: var(--nav-bg); display: flex; gap: 10px; }
+    .msg-input-area input { flex: 1; background-color: var(--panel-bg); border: none; padding: 15px; font-size: 16px; }
+
+    /* グループ作成モーダル */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+    .modal-content { background-color: var(--panel-bg); padding: 30px; border-radius: 8px; width: 500px; border: 1px solid var(--neon-pink); box-shadow: 0 0 20px rgba(255,0,234,0.2); }
+    .modal-content h2 { margin-bottom: 20px; }
+    .friend-select-list { max-height: 300px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-color); padding: 10px; }
+    .select-item { display: flex; align-items: center; gap: 10px; padding: 5px; cursor: pointer; }
+    .select-item input { width: 20px; height: 20px; accent-color: var(--neon-pink); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* ========== ボイスチャット画面 ========== */
+    #voice-view { display: flex; flex-direction: column; padding: 20px; height: 100%; }
+    .vc-setup { display: flex; flex-direction: column; gap: 20px; align-items: center; justify-content: center; height: 100%; }
+    .online-friends-box { background-color: var(--nav-bg); padding: 20px; border-radius: 8px; width: 600px; border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(57,255,20,0.1); }
+    .online-list { max-height: 300px; overflow-y: auto; margin-top: 15px; }
+
+    .vc-room { display: flex; flex-direction: row; height: 100%; }
+    .vc-sidebar { width: 250px; background-color: var(--nav-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; }
+    .vc-members { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    .vc-member-item { display: flex; align-items: center; gap: 10px; padding: 10px; background-color: var(--bg-color); border-radius: 4px; position: relative; }
+    .speaking-ring { border: 2px solid var(--neon-green); box-shadow: 0 0 10px var(--neon-green); }
+    .kick-btn { position: absolute; right: 10px; font-size: 10px; padding: 2px 5px; }
+
+    .vc-main { flex: 1; display: flex; flex-direction: column; position: relative; }
+    .vc-log { flex: 1; overflow-y: auto; padding: 30px; font-size: 24px; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+    .vc-text-entry { animation: fadeIn 0.5s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .vc-controls { height: 80px; background-color: var(--nav-bg); border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; gap: 20px; }
+
+    /* 招待通知 */
+    #invitation-toast { position: fixed; top: 20px; left: 20px; background-color: var(--panel-bg); border: 2px solid var(--neon-blue); padding: 20px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,243,255,0.4); z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
+  </style>
+</head>
+<body>
+
+  <div id="init-screen">
+    <div class="init-box">
+      <h1 class="neon-text">Forcord</h1>
+      <p style="margin-bottom: 20px; color: var(--text-muted);">新しいアカウントを作成します</p>
+      <input type="text" id="init-name" placeholder="名前を入力 (最大15文字)" maxlength="15">
+      <button class="neon-btn" style="width: 100%; font-size: 18px;" onclick="appController.registerUser()">決定</button>
+    </div>
+  </div>
+
+  <div id="main-app" class="hidden">
+    <div id="sidebar">
+      <div class="nav-item active" data-tooltip="ホーム" onclick="appController.switchView('home')">🏠</div>
+      <div class="nav-item" data-tooltip="メッセージ" onclick="appController.switchView('message')">💬</div>
+      <div class="nav-item" data-tooltip="ボイスチャット" onclick="appController.switchView('voice')">🎙️</div>
+      <div class="nav-item" data-tooltip="設定" onclick="appController.switchView('settings')">⚙️</div>
+    </div>
+
+    <div id="content-area">
+      
+      <div id="home-view" class="view-section">
+        <div class="home-left">
+          <h2 class="section-header neon-text">フレンド</h2>
+          <div class="add-friend-box">
+            <input type="text" id="friend-code-input" placeholder="フレンドコードを入力 (例: a1b2c3d4)" maxlength="8">
+            <button class="primary-btn" onclick="appController.addFriend()">フレンド追加</button>
+          </div>
+          <div class="friend-list" id="home-friend-list">
+            </div>
+        </div>
+        <div class="home-right">
+          <h1 class="neon-text" style="font-size: 40px; margin-bottom: 40px;">Forcord</h1>
+          <div class="profile-card">
+            <div class="profile-icon" id="profile-icon-display">😀</div>
+            <div class="profile-name" id="profile-name-display">名前</div>
+            <div class="profile-code" id="profile-code-display">コード: --------</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="settings-view" class="view-section hidden">
+        <h2 class="section-header neon-text">設定</h2>
+        
+        <div class="settings-group">
+          <h3>プロフィール設定</h3>
+          <div style="margin-top: 15px;">
+            <label>名前 (最大15文字):</label>
+            <input type="text" id="setting-name" maxlength="15" style="margin-left: 10px;">
+            <button class="neon-btn" style="margin-left: 10px;" onclick="appController.updateProfile()">更新</button>
+          </div>
+          <div style="margin-top: 20px;">
+            <label>アイコン変更:</label>
+            <div class="icon-selector" id="icon-selector-container">
+              </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>声の設定 (ボイスチャット用TTS)</h3>
+          <div style="margin-top: 15px; margin-bottom: 20px;">
+            <label>簡易設定 (プリセット):</label>
+            <select id="voice-preset" onchange="appController.applyVoicePreset()">
+              </select>
+          </div>
+          <div id="voice-sliders">
+            </div>
+          <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="neon-btn" onclick="appController.testVoice()">試しに聞く</button>
+            <button class="primary-btn" onclick="appController.saveVoiceSettings()">音声設定を保存</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="message-view" class="view-section hidden">
+        <div class="msg-sidebar">
+          <div class="msg-header">
+            <span style="font-weight: bold; font-size: 18px;">チャット一覧</span>
+            <button class="neon-btn" style="padding: 4px 8px; font-size: 12px;" onclick="appController.openGroupModal()">+ グループ作成</button>
+          </div>
+          <div class="chat-list" id="chat-list-container">
+            </div>
+        </div>
+        <div class="msg-main" id="chat-main-area" style="display: none;">
+          <div class="msg-topbar">
+            <span id="chat-title-display">チャット名</span>
+            <button id="group-leave-btn" class="danger-btn hidden" onclick="appController.leaveGroup()">退会</button>
+          </div>
+          <div class="msg-history" id="message-history">
+            </div>
+          <div class="msg-input-area">
+            <input type="text" id="message-input" placeholder="メッセージを送信 (最大200文字)" maxlength="200" onkeypress="if(event.key === 'Enter') appController.sendMessage()">
+            <button class="primary-btn" onclick="appController.sendMessage()">送信</button>
+          </div>
+        </div>
+        <div class="msg-main" id="chat-placeholder" style="align-items: center; justify-content: center; font-size: 24px; color: var(--text-muted);">
+          左からフレンドまたはグループを選択してください
+        </div>
+      </div>
+
+      <div id="voice-view" class="view-section hidden">
+        <div id="vc-setup-area" class="vc-setup">
+          <h2 class="neon-text" style="font-size: 32px;">ボイスチャットルーム作成</h2>
+          <div class="online-friends-box">
+            <h3>オンライン中のフレンドを招待</h3>
+            <div class="online-list" id="vc-invite-list">
+              </div>
+            <button class="primary-btn" style="width: 100%; margin-top: 20px; font-size: 18px;" onclick="appController.createVoiceRoom()">決定 (部屋を作成して招待)</button>
+          </div>
+        </div>
+
+        <div id="vc-room-area" class="vc-room hidden">
+          <div class="vc-sidebar">
+            <h3 class="neon-text">参加者</h3>
+            <div class="vc-members" id="vc-member-list">
+              </div>
+            <button id="vc-invite-more-btn" class="neon-btn hidden" style="margin-top: 10px;" onclick="appController.showInviteMoreModal()">人を追加招待</button>
+          </div>
+          <div class="vc-main">
+            <div class="vc-log" id="vc-text-log">
+              <div style="color: var(--text-muted); font-size: 16px;">ここに会話のテキストが表示され、音声で読み上げられます。</div>
+            </div>
+            <div class="vc-controls">
+              <button id="mic-toggle-btn" class="primary-btn" onclick="appController.toggleMic()">🎤 マイク ON</button>
+              <button class="danger-btn" style="padding: 10px 20px; font-size: 16px;" onclick="appController.leaveVoiceRoom()">🚪 部屋を抜ける</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="group-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h2 class="neon-text">グループ作成</h2>
+      <p style="margin-bottom: 10px;">メンバーを選択してください (最大50人)</p>
+      <input type="text" id="group-name-input" placeholder="グループ名を入力" style="width: 100%; margin-bottom: 10px;" maxlength="20">
+      <div class="friend-select-list" id="group-friend-select"></div>
+      <div class="modal-actions">
+        <button class="neon-btn" onclick="document.getElementById('group-modal').classList.add('hidden')">キャンセル</button>
+        <button class="primary-btn" onclick="appController.createGroup()">作成</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="invitation-toast" class="hidden">
+    <div id="invitation-text" style="font-weight: bold;"></div>
+    <div style="display: flex; gap: 10px; justify-content: center;">
+      <button class="primary-btn" onclick="appController.acceptInvitation()">許可</button>
+      <button class="danger-btn" onclick="appController.declineInvitation()">拒否</button>
+    </div>
+  </div>
+
+  <div id="invite-more-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h2 class="neon-text">追加招待</h2>
+      <div class="friend-select-list" id="invite-more-list"></div>
+      <div class="modal-actions">
+        <button class="neon-btn" onclick="document.getElementById('invite-more-modal').classList.add('hidden')">閉じる</button>
+        <button class="primary-btn" onclick="appController.sendMoreInvites()">招待送信</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ========== Firebase 構成と初期化 ==========
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
+    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ",
+      authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com",
+      databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com",
+      projectId: "iikotowaruikoto-d5aa7",
+      storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app",
+      messagingSenderId: "455780219216",
+      appId: "1:455780219216:web:225461fcf24c1a46f69455",
+      measurementId: "G-YQD459DBSG"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    // const analytics = getAnalytics(app); // エラー回避のため一旦コメントアウト
+
+    // ========== 定数とマスターデータ ==========
+    const ICONS = ["😀","😂","😇","😍","😎","🤔","😐","🙄","😴","😷","🤠","🤡","👽","🤖","👻","💀","👹","👺","💩","🐱","🐶","🦊","🐼","🐨","🐸","🐵","🦄","🦉","🦇","🦖"];
+    
+    const VOICE_PRESETS = [
+      { name: "人間 (標準男)", pitch: 1.0, rate: 1.0, volume: 1.0, brightness: 50, roughness: 50, echo: 0, reverb: 0, metallic: 0, breath: 50, bass: 50 },
+      { name: "人間 (標準女)", pitch: 1.5, rate: 1.1, volume: 1.0, brightness: 70, roughness: 30, echo: 0, reverb: 0, metallic: 0, breath: 40, bass: 30 },
+      { name: "子供", pitch: 2.0, rate: 1.2, volume: 1.0, brightness: 80, roughness: 10, echo: 0, reverb: 0, metallic: 0, breath: 20, bass: 10 },
+      { name: "老人", pitch: 0.6, rate: 0.8, volume: 1.0, brightness: 20, roughness: 80, echo: 0, reverb: 0, metallic: 0, breath: 80, bass: 60 },
+      { name: "エイリアン", pitch: 1.8, rate: 0.9, volume: 1.0, brightness: 90, roughness: 10, echo: 50, reverb: 30, metallic: 80, breath: 0, bass: 20 },
+      { name: "巨人", pitch: 0.1, rate: 0.7, volume: 1.0, brightness: 10, roughness: 90, echo: 20, reverb: 40, metallic: 0, breath: 60, bass: 100 },
+      { name: "ロボット", pitch: 1.0, rate: 0.9, volume: 1.0, brightness: 50, roughness: 0, echo: 0, reverb: 0, metallic: 100, breath: 0, bass: 50 },
+      { name: "モンスター", pitch: 0.3, rate: 0.8, volume: 1.0, brightness: 0, roughness: 100, echo: 10, reverb: 20, metallic: 0, breath: 90, bass: 90 },
+      { name: "妖精", pitch: 2.0, rate: 1.3, volume: 0.8, brightness: 100, roughness: 0, echo: 30, reverb: 50, metallic: 0, breath: 10, bass: 0 },
+      { name: "幽霊", pitch: 0.8, rate: 0.6, volume: 0.7, brightness: 10, roughness: 20, echo: 80, reverb: 80, metallic: 0, breath: 100, bass: 30 },
+      { name: "ヒーロー", pitch: 1.1, rate: 1.1, volume: 1.0, brightness: 80, roughness: 40, echo: 10, reverb: 10, metallic: 0, breath: 30, bass: 60 },
+      { name: "悪役", pitch: 0.5, rate: 0.9, volume: 1.0, brightness: 20, roughness: 70, echo: 20, reverb: 30, metallic: 0, breath: 70, bass: 80 },
+      { name: "アナウンサー", pitch: 1.2, rate: 1.2, volume: 1.0, brightness: 60, roughness: 10, echo: 0, reverb: 0, metallic: 0, breath: 20, bass: 40 },
+      { name: "騎士", pitch: 0.9, rate: 1.0, volume: 1.0, brightness: 50, roughness: 60, echo: 10, reverb: 10, metallic: 40, breath: 40, bass: 70 },
+      { name: "魔女", pitch: 1.7, rate: 0.8, volume: 1.0, brightness: 30, roughness: 90, echo: 20, reverb: 40, metallic: 0, breath: 60, bass: 20 },
+      { name: "サイボーグ", pitch: 0.7, rate: 0.9, volume: 1.0, brightness: 40, roughness: 30, echo: 0, reverb: 10, metallic: 90, breath: 10, bass: 70 },
+      { name: "ゾンビ", pitch: 0.4, rate: 0.5, volume: 0.9, brightness: 0, roughness: 100, echo: 10, reverb: 20, metallic: 0, breath: 100, bass: 80 },
+      { name: "ピエロ", pitch: 1.9, rate: 1.4, volume: 1.0, brightness: 90, roughness: 20, echo: 10, reverb: 10, metallic: 0, breath: 30, bass: 30 },
+      { name: "神様", pitch: 0.5, rate: 0.8, volume: 1.0, brightness: 100, roughness: 0, echo: 60, reverb: 70, metallic: 0, breath: 10, bass: 90 },
+      { name: "悪魔", pitch: 0.2, rate: 1.1, volume: 1.0, brightness: 0, roughness: 90, echo: 40, reverb: 60, metallic: 20, breath: 80, bass: 100 }
+    ];
+
+    const VOICE_PARAMS = [
+      { id: "pitch", name: "音色 (Pitch)", min: 0.1, max: 2.0, step: 0.1 },
+      { id: "rate", name: "速度 (Rate)", min: 0.5, max: 2.0, step: 0.1 },
+      { id: "volume", name: "音量 (Volume)", min: 0.0, max: 1.0, step: 0.1 },
+      { id: "brightness", name: "明るさ", min: 0, max: 100, step: 1 },
+      { id: "roughness", name: "粗さ", min: 0, max: 100, step: 1 },
+      { id: "echo", name: "エコー", min: 0, max: 100, step: 1 },
+      { id: "reverb", name: "リバーブ", min: 0, max: 100, step: 1 },
+      { id: "metallic", name: "メタリック", min: 0, max: 100, step: 1 },
+      { id: "breath", name: "息づかい", min: 0, max: 100, step: 1 },
+      { id: "bass", name: "重低音", min: 0, max: 100, step: 1 }
+    ];
+
+    // ========== グローバル状態 ==========
+    const state = {
+      userId: null,
+      userData: null,
+      usersCache: {}, // { id: { name, icon, friendCode, isOnline } }
+      friends: [], // array of userIds
+      chats: [], // array of chat objects
+      currentChatId: null,
+      voiceRoomId: null,
+      voiceRoomHost: null,
+      voiceMembers: [],
+      recognition: null,
+      isMicOn: true,
+      pendingInvitation: null,
+      activeListeners: {} // unsubscribe functions
+    };
+
+    // ========== ユーティリティ関数 ==========
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
+    const generateFriendCode = () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let code = '';
+      for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    };
+
+    const escapeHTML = (str) => {
+      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
+    };
+
+    const setupListeners = (path, callback) => {
+      const dbRef = ref(db, path);
+      const unsubscribe = onValue(dbRef, callback);
+      state.activeListeners[path] = unsubscribe;
+    };
+
+    const clearListener = (path) => {
+      if (state.activeListeners[path]) {
+        state.activeListeners[path]();
+        delete state.activeListeners[path];
+      }
+    };
+
+    const getUserData = async (uid) => {
+      if (state.usersCache[uid]) return state.usersCache[uid];
+      const snapshot = await get(ref(db, `users/${uid}`));
+      if (snapshot.exists()) {
+        state.usersCache[uid] = snapshot.val();
+        return snapshot.val();
+      }
+      return null;
+    };
+
+    // ========== 音声合成・認識設定 ==========
+    const initSpeech = () => {
+      window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (window.SpeechRecognition) {
+        state.recognition = new window.SpeechRecognition();
+        state.recognition.lang = 'ja-JP';
+        state.recognition.interimResults = false;
+        state.recognition.continuous = true;
+
+        state.recognition.onresult = (event) => {
+          if (!state.isMicOn || !state.voiceRoomId) return;
+          const transcript = event.results[event.results.length - 1][0].transcript;
+          if (transcript.trim()) {
+            sendVoiceTextMessage(transcript);
+          }
+        };
+        state.recognition.onend = () => {
+          if (state.isMicOn && state.voiceRoomId) {
+            state.recognition.start(); // 継続
+          }
+        };
+      } else {
+        console.warn("Speech Recognition API is not supported in this browser.");
+      }
+    };
+
+    const playTTS = (text, senderId) => {
+      if (!window.speechSynthesis) return;
+      getUserData(senderId).then(senderData => {
+        if (!senderData) return;
+        const vs = senderData.voiceSettings || VOICE_PRESETS[0];
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ja-JP';
+        // Web Speech APIの限界により、pitch, rate, volumeのみ実反映。他はダミー値からpitch等に微補正をかける
+        let finalPitch = parseFloat(vs.pitch);
+        let finalRate = parseFloat(vs.rate);
+        // Brightness, Bassによる微調整 (お遊び要素)
+        finalPitch += (vs.brightness - 50) * 0.005;
+        finalPitch -= (vs.bass - 50) * 0.005;
+        
+        utterance.pitch = Math.max(0, Math.min(2, finalPitch));
+        utterance.rate = Math.max(0.1, Math.min(10, finalRate));
+        utterance.volume = parseFloat(vs.volume);
+
+        window.speechSynthesis.speak(utterance);
+      });
+    };
+
+    // ========== メインコントローラー ==========
+    window.appController = {
+      
+      // --- 初期化・認証 ---
+      init: async () => {
+        let storedId = localStorage.getItem('forcord_uid');
+        if (storedId) {
+          const snapshot = await get(ref(db, `users/${storedId}`));
+          if (snapshot.exists()) {
+            state.userId = storedId;
+            state.userData = snapshot.val();
+            document.getElementById('init-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            appController.startApp();
+            return;
+          }
+        }
+        // 初回
+        document.getElementById('init-screen').classList.remove('hidden');
+      },
+
+      registerUser: async () => {
+        const nameInput = document.getElementById('init-name').value.trim();
+        if (!nameInput) return alert("名前を入力してください");
+        
+        const newUid = generateUUID();
+        const fCode = generateFriendCode();
+        const initialData = {
+          name: nameInput.substring(0, 15),
+          friendCode: fCode,
+          icon: ICONS[0],
+          voiceSettings: VOICE_PRESETS[0]
+        };
+
+        await set(ref(db, `users/${newUid}`), initialData);
+        localStorage.setItem('forcord_uid', newUid);
+        
+        state.userId = newUid;
+        state.userData = initialData;
+        
+        document.getElementById('init-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        appController.startApp();
+      },
+
+      startApp: () => {
+        appController.setupOnlineStatus();
+        appController.initUI();
+        appController.listenFriends();
+        appController.listenChats();
+        appController.listenInvitations();
+        initSpeech();
+        appController.switchView('home');
+      },
+
+      setupOnlineStatus: () => {
+        const myStatusRef = ref(db, `onlineStatus/${state.userId}`);
+        const connectedRef = ref(db, ".info/connected");
+        onValue(connectedRef, (snap) => {
+          if (snap.val() === true) {
+            set(myStatusRef, true);
+            onDisconnect(myStatusRef).remove();
+          }
+        });
+      },
+
+      initUI: () => {
+        // 設定のアイコン生成
+        const iconCont = document.getElementById('icon-selector-container');
+        ICONS.forEach(icon => {
+          const div = document.createElement('div');
+          div.className = `icon-option ${icon === state.userData.icon ? 'selected' : ''}`;
+          div.innerText = icon;
+          div.onclick = () => {
+            document.querySelectorAll('.icon-option').forEach(el => el.classList.remove('selected'));
+            div.classList.add('selected');
+            state.userData.icon = icon;
+          };
+          iconCont.appendChild(div);
+        });
+
+        // 設定の音声プリセット生成
+        const presetSel = document.getElementById('voice-preset');
+        VOICE_PRESETS.forEach((p, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.innerText = p.name;
+          presetSel.appendChild(opt);
+        });
+
+        // 設定の音声スライダー生成
+        const sliderCont = document.getElementById('voice-sliders');
+        VOICE_PARAMS.forEach(param => {
+          const row = document.createElement('div');
+          row.className = 'setting-row';
+          row.innerHTML = `
+            <label>${param.name}</label>
+            <input type="range" id="vs-${param.id}" min="${param.min}" max="${param.max}" step="${param.step}" oninput="document.getElementById('val-${param.id}').innerText=this.value">
+            <div class="val-display" id="val-${param.id}">0</div>
+          `;
+          sliderCont.appendChild(row);
+        });
+        
+        appController.populateSettings();
+      },
+
+      switchView: (viewId) => {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`${viewId}-view`).classList.remove('hidden');
+        
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+
+        if (viewId === 'home') appController.updateProfileUI();
+        if (viewId === 'voice' && !state.voiceRoomId) appController.updateOnlineFriendsList();
+      },
+
+      // --- ホーム・フレンド・プロフィール ---
+      updateProfileUI: () => {
+        document.getElementById('profile-icon-display').innerText = state.userData.icon;
+        document.getElementById('profile-name-display').innerText = state.userData.name;
+        document.getElementById('profile-code-display').innerText = `コード: ${state.userData.friendCode}`;
+      },
+
+      addFriend: async () => {
+        const code = document.getElementById('friend-code-input').value.trim();
+        if (!code) return;
+        if (code === state.userData.friendCode) return alert("自分のコードは追加できません");
+
+        const usersRef = ref(db, 'users');
+        const snap = await get(usersRef);
+        let foundUid = null;
+        snap.forEach(child => {
+          if (child.val().friendCode === code) foundUid = child.key;
+        });
+
+        if (foundUid) {
+          if (state.friends.includes(foundUid)) return alert("既にフレンドです");
+          await update(ref(db, `friendships/${state.userId}`), { [foundUid]: true });
+          await update(ref(db, `friendships/${foundUid}`), { [state.userId]: true });
+          
+          // 1on1チャットルームの作成確認
+          const chatsSnap = await get(ref(db, 'chats'));
+          let chatExists = false;
+          chatsSnap.forEach(c => {
+            const cVal = c.val();
+            if (cVal.type === 'direct' && cVal.members[state.userId] && cVal.members[foundUid]) chatExists = true;
+          });
+          if (!chatExists) {
+            const newChatRef = push(ref(db, 'chats'));
+            await set(newChatRef, {
+              type: 'direct',
+              members: { [state.userId]: true, [foundUid]: true },
+              lastUpdated: serverTimestamp()
+            });
+          }
+          alert("フレンドを追加しました！");
+          document.getElementById('friend-code-input').value = '';
+        } else {
+          alert("該当するフレンドコードが見つかりません");
+        }
+      },
+
+      listenFriends: () => {
+        setupListeners(`friendships/${state.userId}`, async (snap) => {
+          const list = document.getElementById('home-friend-list');
+          list.innerHTML = '';
+          state.friends = [];
+          if (!snap.exists()) return;
+
+          const fIds = Object.keys(snap.val());
+          for (const fid of fIds) {
+            state.friends.push(fid);
+            const fdata = await getUserData(fid);
+            if (!fdata) continue;
+
+            const item = document.createElement('div');
+            item.className = 'friend-item';
+            item.innerHTML = `
+              <div class="friend-info">
+                <div class="friend-icon">${fdata.icon}</div>
+                <div class="friend-details">
+                  <span class="friend-name">${escapeHTML(fdata.name)}</span>
+                  <span class="friend-code-display">${fdata.friendCode}</span>
+                </div>
+              </div>
+              <button class="danger-btn" onclick="appController.removeFriend('${fid}')">削除</button>
+            `;
+            list.appendChild(item);
+          }
+        });
+      },
+
+      removeFriend: async (fid) => {
+        if (confirm("本当にこのフレンドを削除しますか？")) {
+          await remove(ref(db, `friendships/${state.userId}/${fid}`));
+          await remove(ref(db, `friendships/${fid}/${state.userId}`));
+        }
+      },
+
+      // --- 設定 ---
+      populateSettings: () => {
+        document.getElementById('setting-name').value = state.userData.name;
+        const vs = state.userData.voiceSettings;
+        VOICE_PARAMS.forEach(param => {
+          const el = document.getElementById(`vs-${param.id}`);
+          if (el && vs[param.id] !== undefined) {
+            el.value = vs[param.id];
+            document.getElementById(`val-${param.id}`).innerText = vs[param.id];
+          }
+        });
+      },
+
+      updateProfile: async () => {
+        const newName = document.getElementById('setting-name').value.trim();
+        if (newName) state.userData.name = newName;
+        await update(ref(db, `users/${state.userId}`), {
+          name: state.userData.name,
+          icon: state.userData.icon
+        });
+        alert("プロフィールを更新しました");
+        appController.updateProfileUI();
+      },
+
+      applyVoicePreset: () => {
+        const idx = document.getElementById('voice-preset').value;
+        const p = VOICE_PRESETS[idx];
+        VOICE_PARAMS.forEach(param => {
+          const el = document.getElementById(`vs-${param.id}`);
+          if (el && p[param.id] !== undefined) {
+            el.value = p[param.id];
+            document.getElementById(`val-${param.id}`).innerText = p[param.id];
+          }
+        });
+      },
+
+      saveVoiceSettings: async () => {
+        const vs = {};
+        VOICE_PARAMS.forEach(param => {
+          vs[param.id] = document.getElementById(`vs-${param.id}`).value;
+        });
+        state.userData.voiceSettings = vs;
+        await update(ref(db, `users/${state.userId}/voiceSettings`), vs);
+        alert("音声設定を保存しました");
+      },
+
+      testVoice: () => {
+        const vs = {};
+        VOICE_PARAMS.forEach(p => vs[p.id] = document.getElementById(`vs-${p.id}`).value);
+        
+        const utterance = new SpeechSynthesisUtterance("これはテスト音声です。どうですか？");
+        utterance.lang = 'ja-JP';
+        let finalPitch = parseFloat(vs.pitch) + (vs.brightness - 50) * 0.005 - (vs.bass - 50) * 0.005;
+        utterance.pitch = Math.max(0, Math.min(2, finalPitch));
+        utterance.rate = Math.max(0.1, Math.min(10, parseFloat(vs.rate)));
+        utterance.volume = parseFloat(vs.volume);
+        window.speechSynthesis.speak(utterance);
+      },
+
+      // --- メッセージ・グループ ---
+      listenChats: () => {
+        setupListeners('chats', async (snap) => {
+          const chats = [];
+          if (snap.exists()) {
+            snap.forEach(child => {
+              const c = child.val();
+              c.id = child.key;
+              if (c.members && c.members[state.userId]) chats.push(c);
+            });
+          }
+          // Sort by lastUpdated desc
+          chats.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+          state.chats = chats;
+          appController.renderChatList();
+        });
+      },
+
+      renderChatList: async () => {
+        const container = document.getElementById('chat-list-container');
+        container.innerHTML = '';
+        
+        for (const chat of state.chats) {
+          let chatName = "グループ";
+          let chatIcon = "👥";
+          
+          if (chat.type === 'direct') {
+            const otherId = Object.keys(chat.members).find(id => id !== state.userId);
+            if (otherId) {
+              const uData = await getUserData(otherId);
+              if (uData) {
+                chatName = uData.name;
+                chatIcon = uData.icon;
+              }
+            }
+          } else {
+            chatName = chat.name || "名称未設定グループ";
+          }
+
+          const item = document.createElement('div');
+          item.className = `chat-list-item ${chat.id === state.currentChatId ? 'active' : ''}`;
+          item.innerHTML = `<div style="font-size: 24px;">${chatIcon}</div><div style="font-weight: bold;">${escapeHTML(chatName)}</div>`;
+          item.onclick = () => appController.openChat(chat.id, chatName, chat.type);
+          container.appendChild(item);
+        }
+      },
+
+      openChat: (chatId, title, type) => {
+        state.currentChatId = chatId;
+        document.getElementById('chat-placeholder').style.display = 'none';
+        document.getElementById('chat-main-area').style.display = 'flex';
+        document.getElementById('chat-title-display').innerText = title;
+        
+        const leaveBtn = document.getElementById('group-leave-btn');
+        if (type === 'group') leaveBtn.classList.remove('hidden');
+        else leaveBtn.classList.add('hidden');
+
+        appController.renderChatList(); // update active state
+        
+        // Listen messages for this chat (limit to 100)
+        clearListener('currentMessages');
+        const msgsRef = query(ref(db, `chats/${chatId}/messages`), limitToLast(100));
+        setupListeners(msgsRef, async (snap) => {
+          const hist = document.getElementById('message-history');
+          hist.innerHTML = '';
+          if (snap.exists()) {
+            const msgs = [];
+            snap.forEach(c => { msgs.push(c.val()); });
+            
+            for (const m of msgs) {
+              const sData = await getUserData(m.sender);
+              if (!sData) continue;
+              const b = document.createElement('div');
+              b.className = 'message-block';
+              b.innerHTML = `
+                <div style="font-size: 32px; width: 40px; text-align: center;">${sData.icon}</div>
+                <div class="message-content">
+                  <div class="msg-sender">${escapeHTML(sData.name)}</div>
+                  <div class="msg-text">${escapeHTML(m.text)}</div>
+                </div>
+              `;
+              hist.appendChild(b);
+            }
+            hist.scrollTop = hist.scrollHeight;
+          }
+        });
+        state.activeListeners['currentMessages'] = state.activeListeners[msgsRef.toString()]; // hacky tracking
+      },
+
+      sendMessage: async () => {
+        if (!state.currentChatId) return;
+        const input = document.getElementById('message-input');
+        const text = input.value.trim();
+        if (!text) return;
+        if (text.length > 200) return alert("メッセージは200文字以内で入力してください");
+
+        input.value = '';
+        
+        // Push message
+        await push(ref(db, `chats/${state.currentChatId}/messages`), {
+          sender: state.userId,
+          text: text,
+          timestamp: serverTimestamp()
+        });
+        
+        // Update lastUpdated
+        await update(ref(db, `chats/${state.currentChatId}`), {
+          lastUpdated: serverTimestamp()
+        });
+      },
+
+      openGroupModal: async () => {
+        document.getElementById('group-modal').classList.remove('hidden');
+        const list = document.getElementById('group-friend-select');
+        list.innerHTML = '';
+        for (const fid of state.friends) {
+          const uData = await getUserData(fid);
+          if (uData) {
+            const div = document.createElement('div');
+            div.className = 'select-item';
+            div.innerHTML = `
+              <input type="checkbox" value="${fid}" class="friend-checkbox">
+              <span>${uData.icon} ${escapeHTML(uData.name)}</span>
+            `;
+            list.appendChild(div);
+          }
+        }
+      },
+
+      createGroup: async () => {
+        const name = document.getElementById('group-name-input').value.trim() || "新規グループ";
+        const checks = document.querySelectorAll('.friend-checkbox:checked');
+        if (checks.length === 0) return alert("メンバーを1人以上選択してください");
+        if (checks.length > 50) return alert("メンバーは最大50人までです");
+
+        const members = { [state.userId]: true };
+        checks.forEach(c => members[c.value] = true);
+
+        const newChatRef = push(ref(db, 'chats'));
+        await set(newChatRef, {
+          type: 'group',
+          name: name,
+          members: members,
+          lastUpdated: serverTimestamp()
+        });
+
+        document.getElementById('group-modal').classList.add('hidden');
+        document.getElementById('group-name-input').value = '';
+      },
+
+      leaveGroup: async () => {
+        if (!state.currentChatId) return;
+        if (confirm("本当にこのグループを退会しますか？")) {
+          await remove(ref(db, `chats/${state.currentChatId}/members/${state.userId}`));
+          document.getElementById('chat-main-area').style.display = 'none';
+          document.getElementById('chat-placeholder').style.display = 'flex';
+          state.currentChatId = null;
+        }
+      },
+
+      // --- ボイスチャット ---
+      updateOnlineFriendsList: async () => {
+        const list = document.getElementById('vc-invite-list');
+        list.innerHTML = '読み込み中...';
+        
+        const snap = await get(ref(db, 'onlineStatus'));
+        const onlines = snap.exists() ? snap.val() : {};
+        
+        list.innerHTML = '';
+        let count = 0;
+        for (const fid of state.friends) {
+          if (onlines[fid]) {
+            count++;
+            const uData = await getUserData(fid);
+            const div = document.createElement('div');
+            div.className = 'select-item';
+            div.innerHTML = `
+              <input type="checkbox" value="${fid}" class="vc-friend-checkbox">
+              <span>${uData.icon} ${escapeHTML(uData.name)}</span>
+            `;
+            list.appendChild(div);
+          }
+        }
+        if (count === 0) list.innerHTML = '<div style="color:var(--text-muted)">オンラインのフレンドがいません</div>';
+      },
+
+      createVoiceRoom: async () => {
+        const checks = document.querySelectorAll('.vc-friend-checkbox:checked');
+        const invitees = Array.from(checks).map(c => c.value);
+        
+        const roomRef = push(ref(db, 'voiceRooms'));
+        const roomId = roomRef.key;
+        
+        await set(roomRef, {
+          host: state.userId,
+          members: { [state.userId]: true }
+        });
+
+        state.voiceRoomId = roomId;
+        state.voiceRoomHost = state.userId;
+        
+        // 招待を送信
+        invitees.forEach(async (fid) => {
+          await push(ref(db, `invitations/${fid}`), {
+            from: state.userId,
+            roomId: roomId,
+            type: 'voice',
+            timestamp: serverTimestamp()
+          });
+        });
+
+        appController.enterVoiceRoom();
+      },
+
+      listenInvitations: () => {
+        setupListeners(`invitations/${state.userId}`, async (snap) => {
+          if (!snap.exists()) {
+            document.getElementById('invitation-toast').classList.add('hidden');
+            return;
+          }
+          // 最新の招待を取得
+          let latestInv = null;
+          let latestKey = null;
+          snap.forEach(child => {
+            latestInv = child.val();
+            latestKey = child.key;
+          });
+
+          if (latestInv && !state.voiceRoomId) { // 既に部屋にいない場合
+            const fromUser = await getUserData(latestInv.from);
+            state.pendingInvitation = { id: latestKey, ...latestInv };
+            document.getElementById('invitation-text').innerText = `${fromUser.name} さんからボイチャの招待が来ています！`;
+            document.getElementById('invitation-toast').classList.remove('hidden');
+          }
+        });
+      },
+
+      acceptInvitation: async () => {
+        if (!state.pendingInvitation) return;
+        const roomId = state.pendingInvitation.roomId;
+        
+        // 部屋に参加
+        await update(ref(db, `voiceRooms/${roomId}/members`), { [state.userId]: true });
+        
+        // 招待を削除
+        await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`));
+        document.getElementById('invitation-toast').classList.add('hidden');
+        
+        state.voiceRoomId = roomId;
+        appController.switchView('voice');
+        appController.enterVoiceRoom();
+      },
+
+      declineInvitation: async () => {
+        if (!state.pendingInvitation) return;
+        await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`));
+        document.getElementById('invitation-toast').classList.add('hidden');
+        state.pendingInvitation = null;
+      },
+
+      enterVoiceRoom: () => {
+        document.getElementById('vc-setup-area').classList.add('hidden');
+        document.getElementById('vc-room-area').classList.remove('hidden');
+        
+        state.isMicOn = true;
+        document.getElementById('mic-toggle-btn').innerText = "🎤 マイク ON";
+        document.getElementById('mic-toggle-btn').className = "primary-btn";
+        
+        if (state.recognition) {
+          try { state.recognition.start(); } catch(e){}
+        }
+
+        // 部屋情報監視
+        setupListeners(`voiceRooms/${state.voiceRoomId}`, (snap) => {
+          if (!snap.exists()) {
+            // 部屋が解散された
+            if (state.voiceRoomId) {
+              alert("部屋が解散されました");
+              appController.leaveVoiceRoom(true);
+            }
+            return;
+          }
+          const data = snap.val();
+          state.voiceRoomHost = data.host;
+          const members = Object.keys(data.members || {});
+          appController.renderVoiceMembers(members);
+          
+          if (data.host === state.userId) {
+            document.getElementById('vc-invite-more-btn').classList.remove('hidden');
+          } else {
+            document.getElementById('vc-invite-more-btn').classList.add('hidden');
+          }
+        });
+
+        // テキストログ監視
+        const logRef = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), limitToLast(100));
+        setupListeners(logRef, async (snap) => {
+          const logArea = document.getElementById('vc-text-log');
+          if (!snap.exists()) {
+            logArea.innerHTML = '<div style="color: var(--text-muted); font-size: 16px;">ここに会話のテキストが表示され、音声で読み上げられます。</div>';
+            return;
+          }
+          
+          const msgs = [];
+          snap.forEach(c => { msgs.push({id: c.key, ...c.val()}); });
+          
+          // 最新のメッセージを取得
+          const latest = msgs[msgs.length - 1];
+          
+          if (latest) {
+             const senderData = await getUserData(latest.sender);
+             logArea.innerHTML = `
+               <div class="vc-text-entry">
+                 <div style="font-size: 40px;">${senderData.icon}</div>
+                 <div style="font-size: 16px; color: var(--neon-blue); margin-bottom: 5px;">${escapeHTML(senderData.name)}</div>
+                 <div>${escapeHTML(latest.text)}</div>
+               </div>
+             `;
+             
+             // 自分が送信したものでなければ読み上げ
+             // 一度読み上げたものを二重再生しないための簡易フラグ
+             if (latest.sender !== state.userId && !latest.readByMe) {
+                latest.readByMe = true; // 厳密にはローカルの別構造に保存すべきだが簡易的に
+                playTTS(latest.text, latest.sender);
+                
+                // しゃべっているリングエフェクト
+                const mEl = document.getElementById(`vc-m-${latest.sender}`);
+                if (mEl) {
+                  mEl.classList.add('speaking-ring');
+                  setTimeout(() => mEl.classList.remove('speaking-ring'), 2000);
+                }
+             }
+          }
+        });
+      },
+
+      renderVoiceMembers: async (members) => {
+        const container = document.getElementById('vc-member-list');
+        container.innerHTML = '';
+        for (const uid of members) {
+          const uData = await getUserData(uid);
+          if (uData) {
+            const el = document.createElement('div');
+            el.className = 'vc-member-item';
+            el.id = `vc-m-${uid}`;
+            let html = `
+              <div style="font-size: 24px;">${uData.icon}</div>
+              <div>${escapeHTML(uData.name)} ${uid === state.voiceRoomHost ? '👑' : ''}</div>
+            `;
+            // ホストならキックボタン追加
+            if (state.voiceRoomHost === state.userId && uid !== state.userId) {
+              html += `<button class="danger-btn kick-btn" onclick="appController.kickUser('${uid}')">キック</button>`;
+            }
+            el.innerHTML = html;
+            container.appendChild(el);
+          }
+        }
+      },
+
+      leaveVoiceRoom: async (forced = false) => {
+        if (!forced && !confirm("部屋を抜けますか？")) return;
+        
+        if (state.voiceRoomId) {
+          await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${state.userId}`));
+          // 誰もいなくなったら部屋削除はCloud Functions等でやるのが理想だが今回はクライアントで簡易処理
+          const snap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`));
+          if (!snap.exists()) {
+            await remove(ref(db, `voiceRooms/${state.voiceRoomId}`));
+          }
+        }
+
+        clearListener(`voiceRooms/${state.voiceRoomId}`);
+        // query based listener clear needs special handling or just let it overwrite
+        
+        if (state.recognition) {
+          try { state.recognition.stop(); } catch(e){}
+        }
+
+        state.voiceRoomId = null;
+        document.getElementById('vc-room-area').classList.add('hidden');
+        document.getElementById('vc-setup-area').classList.remove('hidden');
+        appController.updateOnlineFriendsList();
+      },
+
+      kickUser: async (uid) => {
+        if (confirm("このユーザーをキックしますか？")) {
+          await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${uid}`));
+        }
+      },
+
+      toggleMic: () => {
+        state.isMicOn = !state.isMicOn;
+        const btn = document.getElementById('mic-toggle-btn');
+        if (state.isMicOn) {
+          btn.innerText = "🎤 マイク ON";
+          btn.className = "primary-btn";
+          if (state.recognition) try { state.recognition.start(); } catch(e){}
+        } else {
+          btn.innerText = "🔇 マイク OFF";
+          btn.className = "danger-btn";
+          if (state.recognition) try { state.recognition.stop(); } catch(e){}
+        }
+      },
+
+      showInviteMoreModal: async () => {
+        document.getElementById('invite-more-modal').classList.remove('hidden');
+        const list = document.getElementById('invite-more-list');
+        list.innerHTML = '読み込み中...';
+        
+        const snap = await get(ref(db, 'onlineStatus'));
+        const onlines = snap.exists() ? snap.val() : {};
+        
+        const roomSnap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`));
+        const currentMembers = roomSnap.exists() ? roomSnap.val() : {};
+
+        list.innerHTML = '';
+        for (const fid of state.friends) {
+          if (onlines[fid] && !currentMembers[fid]) {
+            const uData = await getUserData(fid);
+            const div = document.createElement('div');
+            div.className = 'select-item';
+            div.innerHTML = `
+              <input type="checkbox" value="${fid}" class="more-invite-checkbox">
+              <span>${uData.icon} ${escapeHTML(uData.name)}</span>
+            `;
+            list.appendChild(div);
+          }
+        }
+      },
+
+      sendMoreInvites: () => {
+        const checks = document.querySelectorAll('.more-invite-checkbox:checked');
+        checks.forEach(async (c) => {
+          await push(ref(db, `invitations/${c.value}`), {
+            from: state.userId,
+            roomId: state.voiceRoomId,
+            type: 'voice',
+            timestamp: serverTimestamp()
+          });
+        });
+        document.getElementById('invite-more-modal').classList.add('hidden');
+        alert("招待を送信しました");
+      }
+    };
+
+    // 音声認識で取得したテキストをDBに送信
+    function sendVoiceTextMessage(text) {
+      if (!state.voiceRoomId || !text) return;
+      push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), {
+        sender: state.userId,
+        text: text,
+        timestamp: serverTimestamp()
+      });
+    }
+
+    // 起動
+    window.onload = appController.init;
+
+  </script>
+</body>
+</html>
