@@ -1,1032 +1,828 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forcord - 完全安定版</title>
-  <style>
-    :root {
-      --bg-color: #202225;
-      --nav-bg: #2f3136;
-      --panel-bg: #36393f;
-      --text-main: #dcddde;
-      --text-muted: #72767d;
-      --neon-blue: #00f3ff;
-      --neon-pink: #ff00ea;
-      --neon-green: #39ff14;
-      --neon-red: #ff3333;
-      --btn-bg: #5865F2;
-      --btn-hover: #4752C4;
-      --border-color: #4f545c;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Forcord - 新感覚ボイスチャット</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <!-- Google Fonts & Font Awesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Web Speech API polyfill (音声合成) -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
-    button { cursor: pointer; border: none; outline: none; border-radius: 4px; font-weight: bold; transition: all 0.2s; }
-    input, select { background-color: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; outline: none; }
-    input:focus { border-color: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: var(--bg-color); }
-    ::-webkit-scrollbar-thumb { background: #202225; border-radius: 4px; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #1e1f22;
+            color: #e1e3e8;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-    .hidden { display: none !important; }
-    .neon-text { text-shadow: 0 0 5px var(--neon-blue), 0 0 10px var(--neon-blue); color: #fff; }
-    .neon-btn { background-color: transparent; border: 1px solid var(--neon-blue); color: var(--neon-blue); box-shadow: 0 0 5px var(--neon-blue) inset, 0 0 5px var(--neon-blue); padding: 8px 16px; }
-    .neon-btn:hover { background-color: var(--neon-blue); color: #000; box-shadow: 0 0 15px var(--neon-blue) inset, 0 0 15px var(--neon-blue); }
-    .danger-btn { background-color: var(--neon-red); color: #fff; padding: 6px 12px; }
-    .danger-btn:hover { box-shadow: 0 0 10px var(--neon-red); }
-    .primary-btn { background-color: var(--btn-bg); color: white; padding: 10px 20px; }
-    .primary-btn:hover { background-color: var(--btn-hover); }
+        /* ロビー画面 */
+        .lobby-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #1a1b1e 0%, #111214 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            transition: opacity 0.4s ease;
+        }
 
-    #init-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
-    .init-box { background-color: var(--panel-bg); padding: 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,243,255,0.2); text-align: center; width: 400px; border: 1px solid var(--neon-blue); }
-    .init-box h1 { margin-bottom: 20px; font-size: 32px; }
-    .init-box input { width: 100%; margin-bottom: 20px; font-size: 18px; text-align: center; }
+        .lobby-card {
+            background: #2b2d31;
+            padding: 2.5rem;
+            border-radius: 32px;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 380px;
+            border: 1px solid #3c3f45;
+        }
 
-    #main-app { display: flex; width: 100vw; height: 100vh; }
-    #sidebar { width: 70px; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; padding-top: 20px; gap: 15px; border-right: 1px solid var(--border-color); }
-    .nav-item { width: 50px; height: 50px; border-radius: 50%; background-color: var(--panel-bg); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: 0.3s; position: relative; cursor: pointer; }
-    .nav-item:hover, .nav-item.active { border-radius: 16px; background-color: var(--neon-blue); color: #000; box-shadow: 0 0 10px var(--neon-blue); }
-    .nav-item::after { content: attr(data-tooltip); position: absolute; left: 60px; background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: 0.2s; }
-    .nav-item:hover::after { opacity: 1; }
+        .lobby-card h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #5865F2, #9b59b6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 1.5rem;
+            font-weight: 800;
+        }
 
-    #content-area { flex: 1; display: flex; position: relative; background-color: var(--panel-bg); }
-    .view-section { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        .lobby-card input {
+            width: 100%;
+            padding: 14px 18px;
+            background: #1e1f22;
+            border: 1px solid #3c3f45;
+            border-radius: 28px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+            margin-bottom: 1rem;
+        }
 
-    #home-view { display: flex; flex-direction: row; }
-    .home-left { flex: 7; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 20px; }
-    .home-right { flex: 3; padding: 20px; background-color: var(--nav-bg); display: flex; flex-direction: column; align-items: center; }
-    .section-header { font-size: 24px; margin-bottom: 20px; border-bottom: 2px solid var(--neon-blue); padding-bottom: 10px; display: inline-block; }
-    .add-friend-box { display: flex; gap: 10px; margin-bottom: 30px; }
-    .add-friend-box input { flex: 1; }
-    .friend-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .friend-item { display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-color); padding: 15px; border-radius: 8px; border: 1px solid transparent; transition: 0.2s; }
-    .friend-item:hover { border-color: var(--neon-pink); }
-    .friend-info { display: flex; align-items: center; gap: 15px; }
-    .friend-icon { font-size: 32px; width: 50px; height: 50px; background-color: var(--panel-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--neon-blue); }
-    .profile-card { background-color: var(--bg-color); padding: 30px; border-radius: 12px; text-align: center; width: 100%; border: 1px solid var(--neon-green); }
-    .profile-icon { font-size: 64px; margin-bottom: 10px; }
-    .profile-name { font-size: 28px; margin-bottom: 5px; font-weight: bold; }
-    .profile-code { font-size: 16px; color: var(--neon-green); background: rgba(57,255,20,0.1); padding: 5px 10px; border-radius: 4px; display: inline-block; }
+        .lobby-card input:focus {
+            border-color: #5865F2;
+        }
 
-    #connect-view { display: flex; flex-direction: row; height: 100%; }
-    .connect-left { flex: 5; border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; overflow: hidden; }
-    .connect-right { flex: 5; padding: 20px; display: flex; flex-direction: column; overflow: hidden; background-color: var(--nav-bg); }
-    .today-users-list, .connect-requests-list { flex: 1; overflow-y: auto; margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
-    .today-user-item, .request-item { display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-color); padding: 12px; border-radius: 8px; }
-    .user-info { display: flex; align-items: center; gap: 15px; }
-    .user-icon { font-size: 32px; width: 45px; height: 45px; background-color: var(--panel-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-    .connect-btn { background-color: var(--neon-blue); color: #000; padding: 5px 15px; border-radius: 20px; cursor: pointer; }
-    .accept-btn, .decline-btn { padding: 5px 12px; border-radius: 4px; margin: 0 5px; cursor: pointer; }
-    .accept-btn { background-color: var(--neon-green); color: #000; }
-    .decline-btn { background-color: var(--neon-red); color: #fff; }
+        .lobby-card button {
+            background: #5865F2;
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 28px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
 
-    #message-view { display: flex; flex-direction: row; }
-    .msg-sidebar { width: 300px; background-color: var(--nav-bg); display: flex; flex-direction: column; border-right: 1px solid var(--border-color); }
-    .msg-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
-    .chat-list { flex: 1; overflow-y: auto; padding: 10px; }
-    .chat-list-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 4px; cursor: pointer; margin-bottom: 5px; transition: all 0.2s; }
-    .chat-list-item:hover, .chat-list-item.active { background-color: rgba(0,243,255,0.2); border-left: 4px solid var(--neon-blue); transform: translateX(2px); }
-    .msg-main { flex: 1; display: flex; flex-direction: column; background-color: var(--panel-bg); }
-    .msg-topbar { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; }
-    .msg-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-    .msg-row { display: flex; width: 100%; animation: slideIn 0.3s ease; }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .msg-row.self { justify-content: flex-end; }
-    .msg-row.other { justify-content: flex-start; }
-    .message-block { display: flex; max-width: 80%; gap: 10px; align-items: flex-start; }
-    .msg-row.self .message-block { flex-direction: row-reverse; }
-    .msg-icon { font-size: 32px; width: 40px; text-align: center; }
-    .msg-content { display: flex; flex-direction: column; }
-    .msg-row.self .msg-content { align-items: flex-end; }
-    .msg-sender { font-weight: bold; font-size: 12px; margin-bottom: 4px; color: var(--text-muted); }
-    .msg-bubble { padding: 10px 15px; border-radius: 18px; font-size: 14px; color: #000; word-break: break-word; max-width: 400px; }
-    .msg-bubble img { max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer; margin-top: 5px; }
-    .msg-row.self .msg-bubble { background-color: var(--neon-green); }
-    .msg-row.other .msg-bubble { background-color: #ffffff; }
-    .msg-input-area { padding: 20px; background-color: var(--nav-bg); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .msg-input-area input { flex: 1; background-color: var(--panel-bg); border: none; padding: 15px; border-radius: 8px; color: white; min-width: 200px; }
-    .image-upload-btn { background: var(--btn-bg); padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; display: inline-block; }
+        .lobby-card button:hover {
+            background: #4752c4;
+        }
 
-    #settings-view { padding: 30px; overflow-y: auto; }
-    .settings-group { background-color: var(--nav-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-    .icon-selector { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 10px; }
-    .icon-option { font-size: 24px; cursor: pointer; text-align: center; padding: 5px; border-radius: 4px; }
-    .icon-option.selected { border-color: var(--neon-blue); background-color: rgba(0,243,255,0.2); border: 1px solid var(--neon-blue); }
-    .voice-preset-select { width: 100%; margin: 10px 0; padding: 8px; }
-    .voice-slider { margin: 15px 0; }
+        .error-msg {
+            color: #ed4245;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
 
-    #voice-view { display: flex; flex-direction: column; padding: 20px; height: 100%; }
-    .vc-setup { display: flex; flex-direction: column; gap: 20px; align-items: center; justify-content: center; height: 100%; }
-    .online-friends-box { background-color: var(--nav-bg); padding: 20px; border-radius: 8px; width: 600px; border: 1px solid var(--neon-green); }
-    .online-list { max-height: 300px; overflow-y: auto; margin-top: 15px; }
-    .vc-room { display: flex; flex-direction: row; height: 100%; }
-    .vc-sidebar { width: 250px; background-color: var(--nav-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; }
-    .vc-members { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-    .vc-member-item { display: flex; align-items: center; gap: 10px; padding: 10px; background-color: var(--bg-color); border-radius: 4px; position: relative; transition: all 0.2s; }
-    .speaking-ring { border: 2px solid var(--neon-green); box-shadow: 0 0 10px var(--neon-green); animation: pulse 0.5s ease; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-    .vc-main { flex: 1; display: flex; flex-direction: column; }
-    .vc-log { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-    .vc-text-entry { background-color: var(--nav-bg); padding: 12px; border-radius: 8px; animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    .vc-controls { height: 80px; background-color: var(--nav-bg); border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; gap: 20px; }
+        /* メインアプリ */
+        .app-main {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
 
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-    .modal-content { background-color: var(--panel-bg); padding: 30px; border-radius: 8px; width: 500px; border: 1px solid var(--neon-pink); }
-    .friend-select-list { max-height: 300px; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-color); padding: 10px; }
-    .select-item { display: flex; align-items: center; gap: 10px; padding: 5px; cursor: pointer; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-    #invitation-toast { position: fixed; top: 20px; left: 20px; background-color: var(--panel-bg); border: 2px solid var(--neon-blue); padding: 20px; border-radius: 8px; z-index: 3000; animation: slideInLeft 0.3s ease; }
-    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-100px); } to { opacity: 1; transform: translateX(0); } }
-  </style>
+        /* サイドバー (タブ) */
+        .sidebar {
+            width: 72px;
+            background: #1e1f22;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            gap: 28px;
+            border-right: 1px solid #2b2d31;
+        }
+
+        .sidebar-icon {
+            font-size: 28px;
+            color: #949ba4;
+            cursor: pointer;
+            transition: 0.1s;
+            padding: 8px;
+            border-radius: 16px;
+            width: 48px;
+            text-align: center;
+        }
+
+        .sidebar-icon.active {
+            color: #e1e3e8;
+            background: #3c3f45;
+        }
+
+        .sidebar-icon:hover {
+            color: #dbdee1;
+        }
+
+        /* メインコンテンツエリア */
+        .content-area {
+            flex: 1;
+            display: flex;
+            background: #2b2d31;
+            overflow: hidden;
+        }
+
+        /* 各タブのビュー */
+        .tab-view {
+            display: none;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .tab-view.active-view {
+            display: flex;
+        }
+
+        /* ホーム画面 */
+        .home-container {
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            width: 100%;
+            gap: 28px;
+        }
+
+        .profile-card {
+            background: #1e1f22;
+            border-radius: 24px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid #3c3f45;
+        }
+
+        .profile-icon {
+            font-size: 52px;
+            background: #2b2d31;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .profile-info h3 {
+            font-size: 1.4rem;
+        }
+
+        .friend-code {
+            background: #111214;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 1rem;
+            margin-top: 6px;
+            display: inline-block;
+        }
+
+        .friend-add-section {
+            background: #1e1f22;
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .friend-add-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .friend-add-row input {
+            flex: 1;
+            background: #111214;
+            border: 1px solid #3c3f45;
+            border-radius: 28px;
+            padding: 12px;
+            color: white;
+        }
+
+        button {
+            background: #5865F2;
+            border: none;
+            border-radius: 28px;
+            padding: 8px 18px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .friend-list {
+            list-style: none;
+            margin-top: 12px;
+        }
+
+        .friend-item {
+            display: flex;
+            justify-content: space-between;
+            background: #111214;
+            margin: 8px 0;
+            padding: 10px 16px;
+            border-radius: 20px;
+            align-items: center;
+        }
+
+        /* つながる画面 */
+        .connect-container {
+            padding: 24px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .section-card {
+            background: #1e1f22;
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .user-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #2b2d31;
+        }
+
+        /* メッセージ画面 */
+        .messages-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .channels-list {
+            width: 280px;
+            background: #1e1f22;
+            border-right: 1px solid #2b2d31;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #2b2d31;
+        }
+
+        .chat-header {
+            padding: 16px;
+            border-bottom: 1px solid #3c3f45;
+            font-weight: 600;
+        }
+
+        .messages-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message-bubble {
+            background: #1e1f22;
+            padding: 8px 14px;
+            border-radius: 20px;
+            max-width: 80%;
+            align-self: flex-start;
+        }
+
+        .message-input-area {
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            background: #1e1f22;
+            border-top: 1px solid #3c3f45;
+        }
+
+        .message-input-area input {
+            flex: 1;
+            background: #111214;
+            border: none;
+            border-radius: 28px;
+            padding: 12px;
+            color: white;
+        }
+
+        /* ボイスチャット */
+        .voice-container {
+            padding: 24px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .voice-room-card {
+            background: #1e1f22;
+            border-radius: 24px;
+            padding: 20px;
+        }
+
+        /* 設定 */
+        .settings-container {
+            padding: 24px;
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .setting-group {
+            margin-bottom: 28px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 8px 0;
+        }
+
+        .icon-grid {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+
+        .icon-option {
+            font-size: 32px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            background: #111214;
+            transition: 0.1s;
+        }
+
+        .icon-option.selected {
+            background: #5865F2;
+        }
+
+        hr {
+            border-color: #3c3f45;
+            margin: 16px 0;
+        }
+    </style>
 </head>
 <body>
-  <div id="init-screen">
-    <div class="init-box">
-      <h1 class="neon-text">Forcord</h1>
-      <p style="margin-bottom: 20px;">新しいアカウントを作成します</p>
-      <input type="text" id="init-name" placeholder="名前を入力" maxlength="15">
-      <button class="neon-btn" style="width: 100%;" id="register-btn">決定</button>
+
+<div id="lobbyScreen" class="lobby-container">
+    <div class="lobby-card">
+        <h1>Forcord</h1>
+        <input type="text" id="usernameInput" placeholder="ニックネーム (最大15文字)" maxlength="15">
+        <button id="createAccountBtn">✨ はじめる ✨</button>
+        <div id="lobbyError" class="error-msg"></div>
     </div>
-  </div>
+</div>
 
-  <div id="main-app" class="hidden">
-    <div id="sidebar">
-      <div class="nav-item active" data-tooltip="ホーム" data-view="home">🏠</div>
-      <div class="nav-item" data-tooltip="つながる" data-view="connect">🤝</div>
-      <div class="nav-item" data-tooltip="メッセージ" data-view="message">💬</div>
-      <div class="nav-item" data-tooltip="ボイスチャット" data-view="voice">🎙️</div>
-      <div class="nav-item" data-tooltip="設定" data-view="settings">⚙️</div>
+<div id="mainApp" class="app-main" style="display: none;">
+    <div class="sidebar">
+        <div class="sidebar-icon" data-tab="home"><i class="fas fa-home"></i></div>
+        <div class="sidebar-icon" data-tab="connect"><i class="fas fa-handshake"></i></div>
+        <div class="sidebar-icon" data-tab="messages"><i class="fas fa-comment-dots"></i></div>
+        <div class="sidebar-icon" data-tab="voice"><i class="fas fa-microphone-alt"></i></div>
+        <div class="sidebar-icon" data-tab="settings"><i class="fas fa-sliders-h"></i></div>
     </div>
-    <div id="content-area">
-      <div id="home-view" class="view-section">
-        <div class="home-left">
-          <h2 class="section-header neon-text">フレンド</h2>
-          <div class="add-friend-box">
-            <input type="text" id="friend-code-input" placeholder="フレンドコード" maxlength="8">
-            <button class="primary-btn" id="add-friend-btn">追加</button>
-          </div>
-          <div class="friend-list" id="home-friend-list"></div>
-        </div>
-        <div class="home-right">
-          <div class="profile-card">
-            <div class="profile-icon" id="profile-icon-display">😀</div>
-            <div class="profile-name" id="profile-name-display">名前</div>
-            <div class="profile-code" id="profile-code-display">コード: --------</div>
-          </div>
-        </div>
-      </div>
-
-      <div id="connect-view" class="view-section hidden">
-        <div class="connect-left">
-          <h2 class="section-header neon-text">今日ログインした人</h2>
-          <div class="today-users-list" id="today-users-list"></div>
-        </div>
-        <div class="connect-right">
-          <h2 class="section-header neon-text">つながりリクエスト</h2>
-          <div class="connect-requests-list" id="connect-requests-list"></div>
-        </div>
-      </div>
-
-      <div id="message-view" class="view-section hidden">
-        <div class="msg-sidebar">
-          <div class="msg-header">
-            <span>チャット一覧</span>
-            <div>
-              <button class="primary-btn" style="padding: 4px 8px; margin-right: 5px;" id="refresh-chat-list-btn">🔄</button>
-              <button class="neon-btn" style="padding: 4px 8px;" id="new-group-btn">+ グループ</button>
+    <div class="content-area">
+        <!-- ホーム -->
+        <div id="homeView" class="tab-view">
+            <div class="home-container">
+                <div class="profile-card" id="profileSection">
+                    <div class="profile-icon" id="profileIconSpan">😀</div>
+                    <div class="profile-info">
+                        <h3 id="profileName">Loading...</h3>
+                        <div class="friend-code" id="friendCodeDisplay">コード: ********</div>
+                    </div>
+                </div>
+                <div class="friend-add-section">
+                    <h4><i class="fas fa-user-plus"></i> フレンド追加</h4>
+                    <div class="friend-add-row">
+                        <input type="text" id="addFriendInput" placeholder="8桁のフレンドコード">
+                        <button id="addFriendBtn">追加</button>
+                    </div>
+                </div>
+                <div class="friend-add-section">
+                    <h4><i class="fas fa-users"></i> フレンドリスト</h4>
+                    <ul id="friendListUl" class="friend-list"></ul>
+                </div>
             </div>
-          </div>
-          <div class="chat-list" id="chat-list-container"></div>
         </div>
-        <div class="msg-main" id="chat-main-area" style="display: none;">
-          <div class="msg-topbar">
-            <span id="chat-title-display">チャット名</span>
-            <button id="group-leave-btn" class="danger-btn" style="display: none;">退会</button>
-          </div>
-          <div class="msg-history" id="message-history"></div>
-          <div class="msg-input-area">
-            <input type="text" id="message-input" placeholder="メッセージを入力..." maxlength="500">
-            <label class="image-upload-btn" id="image-upload-label">📷 画像</label>
-            <input type="file" id="image-input" accept="image/*" style="display: none;">
-            <button class="primary-btn" id="send-msg-btn">送信</button>
-          </div>
-        </div>
-        <div class="msg-main" id="chat-placeholder" style="align-items: center; justify-content: center;">チャットを選択してください</div>
-      </div>
-
-      <div id="voice-view" class="view-section hidden">
-        <div id="vc-setup-area" class="vc-setup">
-          <h2 class="neon-text">ボイスチャットルーム作成</h2>
-          <div class="online-friends-box">
-            <h3>オンライン中のフレンドを招待</h3>
-            <div class="online-list" id="vc-invite-list"></div>
-            <button class="primary-btn" style="width: 100%; margin-top: 20px;" id="create-vc-btn">部屋を作成</button>
-          </div>
-        </div>
-        <div id="vc-room-area" class="vc-room hidden">
-          <div class="vc-sidebar">
-            <h3>参加者</h3>
-            <div class="vc-members" id="vc-member-list"></div>
-            <button id="vc-invite-more-btn" class="neon-btn hidden" style="margin-top: 10px;">招待追加</button>
-          </div>
-          <div class="vc-main">
-            <div class="vc-log" id="vc-text-log"></div>
-            <div class="vc-controls">
-              <button id="mic-toggle-btn" class="primary-btn">🎤 マイク ON</button>
-              <button id="leave-vc-btn" class="danger-btn">🚪 退出</button>
+        <!-- つながる -->
+        <div id="connectView" class="tab-view">
+            <div class="connect-container">
+                <div class="section-card">
+                    <h3><i class="fas fa-globe"></i> 今日ログインしている人</h3>
+                    <div id="onlineUsersList"></div>
+                </div>
+                <div class="section-card">
+                    <h3><i class="fas fa-envelope-open-text"></i> つながりリクエスト</h3>
+                    <div id="requestsList"></div>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
-
-      <div id="settings-view" class="view-section hidden">
-        <h2 class="section-header neon-text">設定</h2>
-        <div class="settings-group">
-          <h3>プロフィール</h3>
-          <div><input type="text" id="setting-name" maxlength="15"> <button class="neon-btn" id="update-profile-btn">更新</button></div>
-          <div class="icon-selector" id="icon-selector-container"></div>
+        <!-- メッセージ -->
+        <div id="messagesView" class="tab-view">
+            <div class="messages-layout">
+                <div class="channels-list">
+                    <button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button>
+                    <div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px;"><i class="fas fa-sync-alt"></i></button></div>
+                    <ul id="chatListUl" style="list-style:none; margin-top:12px;"></ul>
+                </div>
+                <div class="chat-area">
+                    <div class="chat-header" id="currentChatName">チャットを選択</div>
+                    <div class="messages-history" id="messagesHistory"></div>
+                    <div class="message-input-area">
+                        <input type="text" id="messageInput" placeholder="メッセージを入力...">
+                        <button id="sendImageBtn"><i class="fas fa-image"></i></button>
+                        <button id="sendMsgBtn">送信</button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="settings-group">
-          <h3>声の設定</h3>
-          <select id="voice-preset" class="voice-preset-select">
-            <option value="normal">標準</option>
-            <option value="female">女性</option>
-            <option value="robot">ロボット</option>
-            <option value="alien">エイリアン</option>
-          </select>
-          <div class="voice-slider">
-            <label>音程: <span id="pitch-value">1.0</span></label>
-            <input type="range" id="voice-pitch" min="0.5" max="2.0" step="0.1" value="1.0">
-          </div>
-          <div class="voice-slider">
-            <label>速度: <span id="rate-value">1.0</span></label>
-            <input type="range" id="voice-rate" min="0.5" max="2.0" step="0.1" value="1.0">
-          </div>
-          <div class="voice-slider">
-            <label>音量: <span id="volume-value">1.0</span></label>
-            <input type="range" id="voice-volume" min="0.0" max="1.0" step="0.1" value="1.0">
-          </div>
-          <button class="neon-btn" id="test-voice-btn">テスト発声</button>
-          <button class="primary-btn" id="save-voice-btn">保存</button>
+        <!-- ボイスチャット -->
+        <div id="voiceView" class="tab-view">
+            <div class="voice-container">
+                <div class="voice-room-card">
+                    <h3><i class="fas fa-magic"></i> 魔法のボイスチャット</h3>
+                    <p>マイクON → 音声を文字変換 → 自動音声読み上げ (相手側)</p>
+                    <button id="createVoiceRoomBtn" class="button-primary">✨ フレンドと部屋を作成 ✨</button>
+                    <div id="voiceRoomStatus">現在、ボイスチャット未接続</div>
+                    <div id="voiceMembersArea" style="margin-top:12px;"></div>
+                    <button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button>
+                </div>
+                <div class="voice-room-card">
+                    <h4>声の変換プリセット (送信者側で適用)</h4>
+                    <div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div>
+                    <div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div>
+                    <div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div>
+                    <div>音量: <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"></div>
+                    <button id="testVoiceBtn">テスト発声</button>
+                </div>
+            </div>
         </div>
-      </div>
+        <!-- 設定 -->
+        <div id="settingsView" class="tab-view">
+            <div class="settings-container">
+                <div class="setting-group">
+                    <h3>プロフィール変更</h3>
+                    <input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15">
+                    <button id="updateNameBtn">名前変更</button>
+                    <div class="icon-grid" id="iconPicker"></div>
+                </div>
+                <hr>
+                <div class="setting-group">
+                    <h3>声の微調整 (ボイスチャット読み上げ用)</h3>
+                    <p>現在の読み上げプリセット: <span id="currentVoicePreset">標準</span></p>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
+</div>
 
-  <div id="group-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h2>グループ作成</h2>
-      <input type="text" id="group-name-input" placeholder="グループ名">
-      <div class="friend-select-list" id="group-friend-select"></div>
-      <div class="modal-actions">
-        <button class="neon-btn" id="close-group-modal">キャンセル</button>
-        <button class="primary-btn" id="confirm-group-btn">作成</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="invitation-toast" class="hidden">
-    <div id="invitation-text"></div>
-    <div><button class="primary-btn" id="accept-invite-btn">許可</button><button class="danger-btn" id="decline-invite-btn">拒否</button></div>
-  </div>
-
-  <div id="invite-more-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h2>追加招待</h2>
-      <div class="friend-select-list" id="invite-more-list"></div>
-      <div class="modal-actions">
-        <button class="neon-btn" id="close-invite-more">閉じる</button>
-        <button class="primary-btn" id="send-more-invites">送信</button>
-      </div>
-    </div>
-  </div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
-
+<script>
+    // Firebase初期化
     const firebaseConfig = {
-      apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ",
-      authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com",
-      databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com",
-      projectId: "iikotowaruikoto-d5aa7",
-      storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app",
-      messagingSenderId: "455780219216",
-      appId: "1:455780219216:web:225461fcf24c1a46f69455"
+        apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ",
+        authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com",
+        databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com",
+        projectId: "iikotowaruikoto-d5aa7",
+        storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app",
+        messagingSenderId: "455780219216",
+        appId: "1:455780219216:web:225461fcf24c1a46f69455",
+        measurementId: "G-YQD459DBSG"
     };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    const firebaseApp = initializeApp(firebaseConfig);
-    const db = getDatabase(firebaseApp);
-    const storage = getStorage(firebaseApp);
+    let currentUser = null; // { uid, name, friendCode, icon }
 
-    const ICONS = ["😀","😂","😇","😍","😎","🤔","😐","🙄","😴","😷","🤠","🤡","👽","🤖","👻","💀","👹","👺","💩","🐱","🐶","🦊","🐼","🐨","🐸","🐵","🦄","🦉","🦇","🦖"];
-    
-    const state = {
-      userId: null, userData: null, usersCache: {}, friends: [], chats: [], currentChatId: null,
-      voiceRoomId: null, voiceRoomHost: null, recognition: null, isMicOn: false,
-      pendingInvitation: null, activeListeners: {}
-    };
-
-    const utils = {
-      generateUUID: () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }),
-      generateFriendCode: () => { let c = ''; for (let i = 0; i < 8; i++) c += 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]; return c; },
-      escapeHTML: (s) => s ? String(s).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])) : '',
-      getUserData: async (uid) => { if (state.usersCache[uid]) return state.usersCache[uid]; const snap = await get(ref(db, `users/${uid}`)); if (snap.exists()) { state.usersCache[uid] = snap.val(); return snap.val(); } return null; },
-      playTTS: (text, voiceSettings) => {
-        if (!window.speechSynthesis || !text) return;
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ja-JP';
-        utterance.pitch = voiceSettings?.pitch || 1;
-        utterance.rate = voiceSettings?.rate || 1;
-        utterance.volume = voiceSettings?.volume || 1;
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-      },
-      uploadImage: async (file) => {
-        const imageId = utils.generateUUID();
-        const imageRef = storageRef(storage, `images/${imageId}`);
-        await uploadBytes(imageRef, file);
-        return await getDownloadURL(imageRef);
-      }
-    };
-
-    const app = {
-      init: async () => {
-        const storedId = localStorage.getItem('forcord_uid');
-        if (storedId) { 
-          const snap = await get(ref(db, `users/${storedId}`)); 
-          if (snap.exists()) { 
-            state.userId = storedId; 
-            state.userData = snap.val(); 
-            document.getElementById('init-screen').classList.add('hidden'); 
-            document.getElementById('main-app').classList.remove('hidden'); 
-            app.start(); 
-            return; 
-          } 
-        }
-        document.getElementById('init-screen').classList.remove('hidden');
-      },
-      register: async () => {
-        const name = document.getElementById('init-name').value.trim();
-        if (!name) return alert("名前を入力してください");
-        const uid = utils.generateUUID();
-        const data = { name: name.substring(0, 15), friendCode: utils.generateFriendCode(), icon: ICONS[0], voiceSettings: { pitch: 1, rate: 1, volume: 1 } };
-        await set(ref(db, `users/${uid}`), data);
-        localStorage.setItem('forcord_uid', uid);
-        state.userId = uid; 
-        state.userData = data;
-        document.getElementById('init-screen').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-        app.start();
-      },
-      start: () => {
-        const statusRef = ref(db, `onlineStatus/${state.userId}`);
-        onValue(ref(db, ".info/connected"), (snap) => { if (snap.val() === true) { set(statusRef, { online: true, lastLogin: serverTimestamp() }); onDisconnect(statusRef).remove(); } });
-        app.initUI();
-        app.listenFriends();
-        app.listenChats();
-        app.listenInvitations();
-        app.listenConnectRequests();
-        app.initSpeech();
-        app.switchView('home');
-      },
-      initUI: () => {
-        const container = document.getElementById('icon-selector-container');
-        ICONS.forEach(icon => { const div = document.createElement('div'); div.className = `icon-option ${icon === state.userData.icon ? 'selected' : ''}`; div.innerText = icon; div.onclick = () => { document.querySelectorAll('.icon-option').forEach(el => el.classList.remove('selected')); div.classList.add('selected'); state.userData.icon = icon; }; container.appendChild(div); });
-        document.getElementById('setting-name').value = state.userData.name;
-        document.getElementById('profile-icon-display').innerText = state.userData.icon;
-        document.getElementById('profile-name-display').innerText = state.userData.name;
-        document.getElementById('profile-code-display').innerText = `コード: ${state.userData.friendCode}`;
-        
-        const voiceSettings = state.userData.voiceSettings || { pitch: 1, rate: 1, volume: 1 };
-        document.getElementById('voice-pitch').value = voiceSettings.pitch;
-        document.getElementById('voice-rate').value = voiceSettings.rate;
-        document.getElementById('voice-volume').value = voiceSettings.volume;
-        document.getElementById('pitch-value').innerText = voiceSettings.pitch;
-        document.getElementById('rate-value').innerText = voiceSettings.rate;
-        document.getElementById('volume-value').innerText = voiceSettings.volume;
-        
-        document.getElementById('voice-pitch').oninput = (e) => document.getElementById('pitch-value').innerText = e.target.value;
-        document.getElementById('voice-rate').oninput = (e) => document.getElementById('rate-value').innerText = e.target.value;
-        document.getElementById('voice-volume').oninput = (e) => document.getElementById('volume-value').innerText = e.target.value;
-        
-        document.getElementById('voice-preset').onchange = () => {
-          const preset = document.getElementById('voice-preset').value;
-          let pitch = 1, rate = 1;
-          if (preset === 'female') { pitch = 1.5; rate = 1.1; }
-          else if (preset === 'robot') { pitch = 1; rate = 0.8; }
-          else if (preset === 'alien') { pitch = 1.8; rate = 0.9; }
-          document.getElementById('voice-pitch').value = pitch;
-          document.getElementById('voice-rate').value = rate;
-          document.getElementById('pitch-value').innerText = pitch;
-          document.getElementById('rate-value').innerText = rate;
-        };
-        
-        document.getElementById('test-voice-btn').onclick = () => {
-          const settings = { pitch: parseFloat(document.getElementById('voice-pitch').value), rate: parseFloat(document.getElementById('voice-rate').value), volume: parseFloat(document.getElementById('voice-volume').value) };
-          utils.playTTS("これはテスト音声です", settings);
-        };
-        
-        document.getElementById('save-voice-btn').onclick = async () => {
-          const settings = { pitch: parseFloat(document.getElementById('voice-pitch').value), rate: parseFloat(document.getElementById('voice-rate').value), volume: parseFloat(document.getElementById('voice-volume').value) };
-          state.userData.voiceSettings = settings;
-          await update(ref(db, `users/${state.userId}/voiceSettings`), settings);
-          alert("声の設定を保存しました");
-        };
-        
-        const imageLabel = document.getElementById('image-upload-label');
-        const imageInput = document.getElementById('image-input');
-        if (imageLabel && imageInput) {
-          imageLabel.style.cursor = 'pointer';
-          imageLabel.onclick = (e) => {
-            e.preventDefault();
-            if (!state.currentChatId) {
-              alert("先にチャットを選択してください");
-              return;
-            }
-            imageInput.click();
-          };
-          imageInput.onchange = async (e) => {
-            const file = e.target.files?.[0];
-            if (!file || !state.currentChatId) return;
-            try {
-              const url = await utils.uploadImage(file);
-              await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, image: url, timestamp: serverTimestamp() });
-              await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() });
-              imageInput.value = '';
-            } catch (err) {
-              console.error("画像アップロードエラー:", err);
-              alert("画像のアップロードに失敗しました");
-            }
-          };
-        }
-      },
-      switchView: (viewId) => {
-        document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-        document.getElementById(`${viewId}-view`).classList.remove('hidden');
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        document.querySelector(`.nav-item[data-view="${viewId}"]`).classList.add('active');
-        if (viewId === 'home') { 
-          document.getElementById('profile-icon-display').innerText = state.userData.icon; 
-          document.getElementById('profile-name-display').innerText = state.userData.name; 
-        }
-        if (viewId === 'connect') { app.loadTodayUsers(); app.loadConnectRequests(); }
-        if (viewId === 'voice' && !state.voiceRoomId) app.updateOnlineFriendsList();
-      },
-      addFriend: async () => {
-        const code = document.getElementById('friend-code-input').value.trim();
-        if (!code) return;
-        const usersSnap = await get(ref(db, 'users'));
-        let targetId = null;
-        usersSnap.forEach(c => { if (c.val().friendCode === code) targetId = c.key; });
-        if (!targetId || targetId === state.userId) return alert("見つかりません");
-        await update(ref(db, `friendships/${state.userId}`), { [targetId]: true });
-        await update(ref(db, `friendships/${targetId}`), { [state.userId]: true });
-        const chatsSnap = await get(ref(db, 'chats'));
-        let exists = false;
-        chatsSnap.forEach(c => { const v = c.val(); if (v.type === 'direct' && v.members[state.userId] && v.members[targetId]) exists = true; });
-        if (!exists) { const newChat = push(ref(db, 'chats')); await set(newChat, { type: 'direct', members: { [state.userId]: true, [targetId]: true }, lastUpdated: serverTimestamp() }); }
-        alert("フレンド追加しました");
-        document.getElementById('friend-code-input').value = '';
-      },
-      listenFriends: () => { 
-        onValue(ref(db, `friendships/${state.userId}`), async (snap) => { 
-          state.friends = []; 
-          const list = document.getElementById('home-friend-list'); 
-          list.innerHTML = ''; 
-          if (!snap.exists()) return; 
-          for (const fid of Object.keys(snap.val())) { 
-            state.friends.push(fid); 
-            const u = await utils.getUserData(fid); 
-            if (u) {
-              const div = document.createElement('div');
-              div.className = 'friend-item';
-              div.innerHTML = `<div class="friend-info"><div class="friend-icon">${utils.escapeHTML(u.icon)}</div><div><div class="friend-name">${utils.escapeHTML(u.name)}</div><div>${utils.escapeHTML(u.friendCode)}</div></div></div><button class="danger-btn" data-fid="${fid}">削除</button>`;
-              list.appendChild(div);
-              div.querySelector('.danger-btn').onclick = () => app.removeFriend(fid);
-            }
-          } 
-          app.renderChatList();
-        }); 
-      },
-      removeFriend: async (fid) => { 
-        if (confirm("削除しますか？")) { 
-          await remove(ref(db, `friendships/${state.userId}/${fid}`)); 
-          await remove(ref(db, `friendships/${fid}/${state.userId}`)); 
-        } 
-      },
-      updateProfile: async () => { 
-        const newName = document.getElementById('setting-name').value.trim(); 
-        if (newName) state.userData.name = newName; 
-        const selectedIcon = document.querySelector('.icon-option.selected')?.innerText;
-        if (selectedIcon) state.userData.icon = selectedIcon;
-        await update(ref(db, `users/${state.userId}`), { name: state.userData.name, icon: state.userData.icon }); 
-        document.getElementById('profile-name-display').innerText = state.userData.name;
-        document.getElementById('profile-icon-display').innerText = state.userData.icon;
-        alert("更新しました"); 
-      },
-      initSpeech: () => { 
-        if ('webkitSpeechRecognition' in window) { 
-          state.recognition = new webkitSpeechRecognition(); 
-          state.recognition.lang = 'ja-JP'; 
-          state.recognition.interimResults = false;
-          state.recognition.continuous = true; 
-          state.recognition.onresult = (e) => { 
-            if (!state.isMicOn || !state.voiceRoomId) return; 
-            for (let i = e.resultIndex; i < e.results.length; i++) {
-              if (e.results[i].isFinal) {
-                const text = e.results[i][0].transcript.trim();
-                if (text) {
-                  push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() });
-                }
-              }
-            }
-          }; 
-          state.recognition.onerror = (e) => console.log("音声認識エラー:", e); 
-          state.recognition.onend = () => { 
-            if (state.isMicOn && state.voiceRoomId) setTimeout(() => { try { state.recognition.start(); } catch(e) {} }, 100); 
-          }; 
-        } 
-      },
-      
-      loadTodayUsers: async () => { 
-        const snap = await get(ref(db, 'onlineStatus')); 
-        const list = document.getElementById('today-users-list'); 
-        list.innerHTML = ''; 
-        let hasUsers = false;
-        for (const [uid, data] of Object.entries(snap.val() || {})) {
-          if (uid !== state.userId && data.online === true && !state.friends.includes(uid)) {
-            hasUsers = true;
-            const u = await utils.getUserData(uid);
-            if (u) {
-              const div = document.createElement('div');
-              div.className = 'today-user-item';
-              div.innerHTML = `<div class="user-info"><div class="user-icon">${utils.escapeHTML(u.icon)}</div><div>${utils.escapeHTML(u.name)}</div></div><button class="connect-btn" data-uid="${uid}">つながる</button>`;
-              list.appendChild(div);
-              div.querySelector('.connect-btn').onclick = () => app.sendConnectRequest(uid);
-            }
-          }
-        }
-        if (!hasUsers) list.innerHTML = '<div>オンラインユーザーはいません</div>'; 
-      },
-      sendConnectRequest: async (uid) => { 
-        await push(ref(db, `connectRequests/${uid}`), { from: state.userId, timestamp: serverTimestamp(), status: 'pending' }); 
-        alert("リクエストを送信しました"); 
-      },
-      listenConnectRequests: () => { 
-        onValue(ref(db, `connectRequests/${state.userId}`), () => app.loadConnectRequests()); 
-      },
-      loadConnectRequests: async () => { 
-        const snap = await get(ref(db, `connectRequests/${state.userId}`)); 
-        const list = document.getElementById('connect-requests-list'); 
-        list.innerHTML = ''; 
-        if (!snap.exists()) { list.innerHTML = '<div>リクエストはありません</div>'; return; }
-        for (const [reqId, req] of Object.entries(snap.val())) {
-          if (req.status !== 'pending') continue;
-          const u = await utils.getUserData(req.from);
-          if (u) {
-            const div = document.createElement('div');
-            div.className = 'request-item';
-            div.innerHTML = `<div class="user-info"><div class="user-icon">${utils.escapeHTML(u.icon)}</div><div>${utils.escapeHTML(u.name)} さんから繋がりたい！</div></div><div><button class="accept-btn" data-req="${reqId}" data-from="${req.from}">許可</button><button class="decline-btn" data-req="${reqId}">拒否</button></div>`;
-            list.appendChild(div);
-            div.querySelector('.accept-btn').onclick = () => app.acceptConnectRequest(reqId, req.from);
-            div.querySelector('.decline-btn').onclick = () => app.declineConnectRequest(reqId);
-          }
-        }
-      },
-      acceptConnectRequest: async (reqId, fromUid) => { 
-        await update(ref(db, `friendships/${state.userId}`), { [fromUid]: true }); 
-        await update(ref(db, `friendships/${fromUid}`), { [state.userId]: true }); 
-        await remove(ref(db, `connectRequests/${state.userId}/${reqId}`));
-        const chatsSnap = await get(ref(db, 'chats'));
-        let exists = false;
-        chatsSnap.forEach(c => { const v = c.val(); if (v.type === 'direct' && v.members[state.userId] && v.members[fromUid]) exists = true; });
-        if (!exists) { const newChat = push(ref(db, 'chats')); await set(newChat, { type: 'direct', members: { [state.userId]: true, [fromUid]: true }, lastUpdated: serverTimestamp() }); }
-        alert("フレンドになりました！"); 
-      },
-      declineConnectRequest: async (reqId) => { await remove(ref(db, `connectRequests/${state.userId}/${reqId}`)); },
-      
-      listenChats: () => { 
-        onValue(ref(db, 'chats'), async (snap) => { 
-          const chats = []; 
-          snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); }); 
-          state.chats = [];
-          
-          const uniqueDirectFriends = new Set();
-          const uniqueGroups = new Set();
-          
-          for (const chat of chats) {
-            if (chat.type === 'direct') {
-              const other = Object.keys(chat.members).find(id => id !== state.userId);
-              if (other && state.friends.includes(other)) {
-                if (uniqueDirectFriends.has(other)) continue;
-                uniqueDirectFriends.add(other);
-                state.chats.push(chat);
-              }
-            } else {
-              if (uniqueGroups.has(chat.id)) continue;
-              uniqueGroups.add(chat.id);
-              state.chats.push(chat);
-            }
-          }
-          state.chats.sort((a,b) => (b.lastUpdated||0) - (a.lastUpdated||0)); 
-          app.renderChatList(); 
-        }); 
-      },
-      renderChatList: async () => { 
-        const container = document.getElementById('chat-list-container'); 
-        container.innerHTML = ''; 
-        for (const chat of state.chats) { 
-          let name = "グループ", icon = "👥"; 
-          if (chat.type === 'direct') { 
-            const other = Object.keys(chat.members).find(id => id !== state.userId); 
-            if (other) { const u = await utils.getUserData(other); if (u) { name = u.name; icon = u.icon; } } 
-          } else name = chat.name || "グループ"; 
-          const div = document.createElement('div');
-          div.className = `chat-list-item ${chat.id === state.currentChatId ? 'active' : ''}`;
-          div.setAttribute('data-chat-id', chat.id);
-          div.setAttribute('data-title', name);
-          div.setAttribute('data-type', chat.type);
-          div.innerHTML = `<div>${utils.escapeHTML(icon)}</div><div>${utils.escapeHTML(name)}</div>`;
-          div.onclick = () => app.openChat(chat.id, name, chat.type);
-          container.appendChild(div);
-        } 
-      },
-      openChat: (chatId, title, type) => { 
-        state.currentChatId = chatId;
-        document.getElementById('chat-placeholder').style.display = 'none'; 
-        document.getElementById('chat-main-area').style.display = 'flex'; 
-        document.getElementById('chat-title-display').innerText = title; 
-        const leaveBtn = document.getElementById('group-leave-btn');
-        leaveBtn.style.display = type === 'group' ? 'block' : 'none';
-        
-        if (state.activeListeners.chat) {
-          state.activeListeners.chat(); 
-          delete state.activeListeners.chat;
-          delete state.activeListeners.chatId;
-        }
-        
-        const hist = document.getElementById('message-history');
-        hist.innerHTML = '';
-        let displayedIds = new Set();
-        state.activeListeners.chatId = chatId;
-        
-        const msgQuery = query(ref(db, `chats/${chatId}/messages`), limitToLast(100)); 
-        const unsubscribe = onValue(msgQuery, async (snap) => { 
-          if (!snap.exists()) { 
-            hist.innerHTML = '';
-            return;
-          }
-          
-          const msgs = [];
-          snap.forEach(c => msgs.push({ ...c.val(), key: c.key })); 
-          
-          const wasAtBottom = hist.scrollHeight - hist.clientHeight <= hist.scrollTop + 50;
-          
-          for (const m of msgs) {
-            if (!displayedIds.has(m.key)) {
-              displayedIds.add(m.key);
-              const sender = await utils.getUserData(m.sender); 
-              if (sender) { 
-                const isSelf = m.sender === state.userId; 
-                const msgDiv = document.createElement('div'); 
-                msgDiv.className = `msg-row ${isSelf ? 'self' : 'other'}`; 
-                let content = '';
-                if (m.text) content = `<div class="msg-bubble">${utils.escapeHTML(m.text)}</div>`;
-                if (m.image) content = `<div class="msg-bubble"><img src="${m.image}" alt="画像" onclick="window.open('${m.image}')" style="max-width:200px; max-height:200px; border-radius:8px; cursor:pointer;"></div>`;
-                msgDiv.innerHTML = `<div class="message-block"><div class="msg-icon">${utils.escapeHTML(sender.icon)}</div><div class="msg-content"><div class="msg-sender">${utils.escapeHTML(sender.name)}</div>${content}</div></div>`; 
-                hist.appendChild(msgDiv);
-              } 
-            }
-          }
-          
-          if (wasAtBottom) {
-            hist.scrollTop = hist.scrollHeight;
-          }
-        }); 
-        state.activeListeners.chat = unsubscribe; 
-      },
-      sendMessage: async () => { 
-        if (!state.currentChatId) return; 
-        const input = document.getElementById('message-input'); 
-        const text = input.value.trim(); 
-        if (!text) return; 
-        input.value = ''; 
-        await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() }); 
-        await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() }); 
-      },
-      openGroupModal: async () => { 
-        document.getElementById('group-modal').classList.remove('hidden'); 
-        const list = document.getElementById('group-friend-select'); 
-        list.innerHTML = ''; 
-        for (const fid of state.friends) { 
-          const u = await utils.getUserData(fid); 
-          if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="friend-checkbox"><span>${utils.escapeHTML(u.icon)} ${utils.escapeHTML(u.name)}</span></div>`; 
-        } 
-      },
-      createGroup: async () => { 
-        const name = document.getElementById('group-name-input').value.trim() || "新規グループ"; 
-        const checks = document.querySelectorAll('#group-friend-select .friend-checkbox:checked'); 
-        if (checks.length === 0) return alert("メンバーを選択してください"); 
-        const members = { [state.userId]: true }; 
-        checks.forEach(c => members[c.value] = true); 
-        await set(push(ref(db, 'chats')), { type: 'group', name: name, members: members, lastUpdated: serverTimestamp() }); 
-        document.getElementById('group-modal').classList.add('hidden'); 
-        document.getElementById('group-name-input').value = '';
-      },
-      leaveGroup: async () => { 
-        if (state.currentChatId && confirm("退会しますか？")) { 
-          await remove(ref(db, `chats/${state.currentChatId}/members/${state.userId}`)); 
-          document.getElementById('chat-main-area').style.display = 'none'; 
-          document.getElementById('chat-placeholder').style.display = 'flex'; 
-          state.currentChatId = null; 
-        } 
-      },
-      
-      updateOnlineFriendsList: async () => { 
-        const snap = await get(ref(db, 'onlineStatus')); 
-        const onlines = snap.val() || {}; 
-        const list = document.getElementById('vc-invite-list'); 
-        list.innerHTML = ''; 
-        for (const fid of state.friends) { 
-          if (onlines[fid]?.online) { 
-            const u = await utils.getUserData(fid); 
-            if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="vc-friend-checkbox"><span>${utils.escapeHTML(u.icon)} ${utils.escapeHTML(u.name)}</span></div>`; 
-          } 
-        } 
-        if (!list.children.length) list.innerHTML = '<div>オンラインフレンドはいません</div>'; 
-      },
-      createVoiceRoom: async () => { 
-        const checks = document.querySelectorAll('.vc-friend-checkbox:checked'); 
-        const roomRef = push(ref(db, 'voiceRooms')); 
-        const roomId = roomRef.key; 
-        await set(roomRef, { host: state.userId, members: { [state.userId]: true }, createdAt: serverTimestamp() }); 
-        state.voiceRoomId = roomId; 
-        state.voiceRoomHost = state.userId; 
-        checks.forEach(c => push(ref(db, `invitations/${c.value}`), { from: state.userId, roomId: roomId, timestamp: serverTimestamp() })); 
-        app.enterVoiceRoom(); 
-      },
-      listenInvitations: () => { 
-        onValue(ref(db, `invitations/${state.userId}`), async (snap) => { 
-          if (!snap.exists()) { document.getElementById('invitation-toast').classList.add('hidden'); return; } 
-          let latest; 
-          snap.forEach(c => latest = { id: c.key, ...c.val() }); 
-          if (latest && !state.voiceRoomId) { 
-            const from = await utils.getUserData(latest.from); 
-            state.pendingInvitation = latest; 
-            document.getElementById('invitation-text').innerHTML = `${from?.name}さんからボイチャ招待！`; 
-            document.getElementById('invitation-toast').classList.remove('hidden'); 
-          } 
-        }); 
-      },
-      acceptInvitation: async () => { 
-        if (!state.pendingInvitation) return; 
-        await update(ref(db, `voiceRooms/${state.pendingInvitation.roomId}/members`), { [state.userId]: true }); 
-        await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`)); 
-        document.getElementById('invitation-toast').classList.add('hidden'); 
-        state.voiceRoomId = state.pendingInvitation.roomId; 
-        app.switchView('voice'); 
-        app.enterVoiceRoom(); 
-      },
-      declineInvitation: async () => { 
-        if (state.pendingInvitation) { 
-          await remove(ref(db, `invitations/${state.userId}/${state.pendingInvitation.id}`)); 
-          document.getElementById('invitation-toast').classList.add('hidden'); 
-          state.pendingInvitation = null; 
-        } 
-      },
-      enterVoiceRoom: () => { 
-        document.getElementById('vc-setup-area').classList.add('hidden'); 
-        document.getElementById('vc-room-area').classList.remove('hidden'); 
-        state.isMicOn = true; 
-        const micBtn = document.getElementById('mic-toggle-btn');
-        micBtn.innerHTML = "🎤 マイク ON"; 
-        micBtn.className = "primary-btn"; 
-        
-        if (state.recognition) {
-          state.recognition.onend = null; 
-          try { state.recognition.stop(); } catch(e) {}
-          setTimeout(() => {
-            state.recognition.onend = () => {
-              if (state.isMicOn && state.voiceRoomId) setTimeout(() => { try { state.recognition.start(); } catch(e) {} }, 100);
-            };
-            try { state.recognition.start(); } catch(e) {}
-          }, 300);
-        }
-        
-        if (state.activeListeners.voice) {
-          state.activeListeners.voice();
-          delete state.activeListeners.voice;
-          delete state.activeListeners.voiceRoomId;
-        }
-        if (state.activeListeners.voiceRoom) {
-          state.activeListeners.voiceRoom();
-          delete state.activeListeners.voiceRoom;
-        }
-        
-        const logDiv = document.getElementById('vc-text-log');
-        logDiv.innerHTML = '<div style="color: var(--text-muted);">メッセージがここに表示されます</div>';
-        let displayedIds = new Set();
-        state.activeListeners.voiceRoomId = state.voiceRoomId;
-        
-        const msgQuery = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), limitToLast(100));
-        const unsubscribe = onValue(msgQuery, async (snap) => {
-          if (!snap.exists()) { 
-            logDiv.innerHTML = '<div style="color: var(--text-muted);">メッセージがここに表示されます</div>';
-            return;
-          }
-          
-          const msgs = [];
-          snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
-          
-          const wasAtBottom = logDiv.scrollHeight - logDiv.clientHeight <= logDiv.scrollTop + 50;
-          
-          for (const msg of msgs) {
-            if (!displayedIds.has(msg.id)) {
-              displayedIds.add(msg.id);
-              
-              const sender = await utils.getUserData(msg.sender);
-              const senderName = sender ? sender.name : '不明';
-              const msgDiv = document.createElement('div');
-              msgDiv.className = 'vc-text-entry';
-              msgDiv.innerHTML = `<div class="vc-text-sender" style="color:var(--neon-blue);">${utils.escapeHTML(senderName)}</div><div class="vc-text-message">${utils.escapeHTML(msg.text || '')}</div>`;
-              logDiv.appendChild(msgDiv);
-              
-              const placeholder = logDiv.querySelector('[style*="color: var(--text-muted)"]');
-              if (placeholder && logDiv.children.length > 1) {
-                placeholder.remove();
-              }
-              
-              if (msg.sender !== state.userId) {
-                utils.playTTS(msg.text, sender?.voiceSettings);
-                const memberEl = document.getElementById(`vc-m-${msg.sender}`);
-                if (memberEl) { 
-                  memberEl.classList.add('speaking-ring'); 
-                  setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); 
-                }
-              }
-            }
-          }
-          
-          if (wasAtBottom) {
-            logDiv.scrollTop = logDiv.scrollHeight;
-          }
-        });
-        state.activeListeners.voice = unsubscribe;
-        
-        const unsubscribeRoom = onValue(ref(db, `voiceRooms/${state.voiceRoomId}`), (snap) => {
-          if (!snap.exists()) { app.leaveVoiceRoom(true); return; }
-          const data = snap.val();
-          state.voiceRoomHost = data.host;
-          const members = Object.keys(data.members || {});
-          const container = document.getElementById('vc-member-list');
-          container.innerHTML = '';
-          members.forEach(uid => {
-            utils.getUserData(uid).then(u => {
-              if (u) {
-                const memberDiv = document.createElement('div');
-                memberDiv.className = 'vc-member-item';
-                memberDiv.id = `vc-m-${uid}`;
-                memberDiv.innerHTML = `<div>${utils.escapeHTML(u.icon)}</div><div>${utils.escapeHTML(u.name)}${uid === state.voiceRoomHost ? ' 👑' : ''}</div>${state.voiceRoomHost === state.userId && uid !== state.userId ? `<button class="danger-btn kick-btn" data-uid="${uid}">キック</button>` : ''}`;
-                container.appendChild(memberDiv);
-                if (state.voiceRoomHost === state.userId && uid !== state.userId) {
-                  memberDiv.querySelector('.kick-btn').onclick = () => app.kickUser(uid);
-                }
-              }
-            });
-          });
-          const moreBtn = document.getElementById('vc-invite-more-btn');
-          if (data.host === state.userId) moreBtn.classList.remove('hidden');
-          else moreBtn.classList.add('hidden');
-        });
-        state.activeListeners.voiceRoom = unsubscribeRoom;
-      },
-      leaveVoiceRoom: async (forced = false) => { 
-        if (!forced && !confirm("退出しますか？")) return; 
-        if (state.voiceRoomId) { 
-          await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${state.userId}`)); 
-          const snap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`)); 
-          if (!snap.exists()) await remove(ref(db, `voiceRooms/${state.voiceRoomId}`)); 
-        } 
-        
-        state.isMicOn = false; 
-        if (state.recognition) {
-          state.recognition.onend = null; 
-          try { state.recognition.stop(); } catch(e) {}
-        }
-        
-        if (state.activeListeners.voice) {
-          state.activeListeners.voice();
-          delete state.activeListeners.voice;
-        }
-        if (state.activeListeners.voiceRoom) {
-          state.activeListeners.voiceRoom();
-          delete state.activeListeners.voiceRoom;
-        }
-        
-        state.voiceRoomId = null;
-        state.voiceRoomHost = null;
-        delete state.activeListeners.voiceRoomId;
-        
-        document.getElementById('vc-room-area').classList.add('hidden'); 
-        document.getElementById('vc-setup-area').classList.remove('hidden'); 
-        app.updateOnlineFriendsList(); 
-      },
-      kickUser: async (uid) => { if (confirm("キックしますか？")) await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${uid}`)); },
-      toggleMic: () => { 
-        state.isMicOn = !state.isMicOn; 
-        const btn = document.getElementById('mic-toggle-btn'); 
-        if (state.isMicOn) { 
-          btn.innerHTML = "🎤 マイク ON"; 
-          btn.className = "primary-btn"; 
-          if (state.recognition && state.voiceRoomId) {
-            setTimeout(() => { try { state.recognition.start(); } catch(e) {} }, 100);
-          } 
-        } else { 
-          btn.innerHTML = "🔇 マイク OFF"; 
-          btn.className = "danger-btn"; 
-          if (state.recognition) {
-            try { state.recognition.stop(); } catch(e) {}
-          } 
-        } 
-      },
-      showInviteMoreModal: async () => { 
-        document.getElementById('invite-more-modal').classList.remove('hidden'); 
-        const snap = await get(ref(db, 'onlineStatus')); 
-        const onlines = snap.val() || {}; 
-        const roomSnap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`)); 
-        const members = roomSnap.val() || {}; 
-        const list = document.getElementById('invite-more-list'); 
-        list.innerHTML = ''; 
-        for (const fid of state.friends) { 
-          if (onlines[fid]?.online && !members[fid]) { 
-            const u = await utils.getUserData(fid); 
-            if (u) list.innerHTML += `<div class="select-item"><input type="checkbox" value="${fid}" class="more-invite-checkbox"><span>${utils.escapeHTML(u.icon)} ${utils.escapeHTML(u.name)}</span></div>`; 
-          } 
-        } 
-      },
-      sendMoreInvites: () => { 
-        const checks = document.querySelectorAll('.more-invite-checkbox:checked'); 
-        checks.forEach(c => push(ref(db, `invitations/${c.value}`), { from: state.userId, roomId: state.voiceRoomId, timestamp: serverTimestamp() })); 
-        document.getElementById('invite-more-modal').classList.add('hidden'); 
-        alert("招待しました"); 
-      }
-    };
-
-    document.getElementById('register-btn').onclick = () => app.register();
-    document.getElementById('add-friend-btn').onclick = () => app.addFriend();
-    document.getElementById('new-group-btn').onclick = () => app.openGroupModal();
-    document.getElementById('close-group-modal').onclick = () => document.getElementById('group-modal').classList.add('hidden');
-    document.getElementById('confirm-group-btn').onclick = () => app.createGroup();
-    document.getElementById('group-leave-btn').onclick = () => app.leaveGroup();
-    document.getElementById('send-msg-btn').onclick = () => app.sendMessage();
-    
-    const chatListRefreshBtn = document.getElementById('refresh-chat-list-btn');
-    if(chatListRefreshBtn) {
-      chatListRefreshBtn.onclick = async () => {
-        const snap = await get(ref(db, 'chats'));
-        const chats = [];
-        snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); });
-        state.chats = [];
-        
-        const uniqueDirectFriends = new Set();
-        const uniqueGroups = new Set();
-        
-        for (const chat of chats) {
-          if (chat.type === 'direct') {
-            const other = Object.keys(chat.members).find(id => id !== state.userId);
-            if (other && state.friends.includes(other)) {
-              if (uniqueDirectFriends.has(other)) continue;
-              uniqueDirectFriends.add(other);
-              state.chats.push(chat);
-            }
-          } else {
-            if (uniqueGroups.has(chat.id)) continue;
-            uniqueGroups.add(chat.id);
-            state.chats.push(chat);
-          }
-        }
-        state.chats.sort((a,b) => (b.lastUpdated||0) - (a.lastUpdated||0));
-        app.renderChatList();
-      };
+    // ユーティリティ
+    function generateFriendCode() {
+        return Math.floor(10000000 + Math.random() * 90000000).toString();
     }
 
-    document.getElementById('message-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') app.sendMessage(); });
-    document.getElementById('create-vc-btn').onclick = () => app.createVoiceRoom();
-    document.getElementById('mic-toggle-btn').onclick = () => app.toggleMic();
-    document.getElementById('leave-vc-btn').onclick = () => app.leaveVoiceRoom();
-    document.getElementById('vc-invite-more-btn').onclick = () => app.showInviteMoreModal();
-    document.getElementById('close-invite-more').onclick = () => document.getElementById('invite-more-modal').classList.add('hidden');
-    document.getElementById('send-more-invites').onclick = () => app.sendMoreInvites();
-    document.getElementById('update-profile-btn').onclick = () => app.updateProfile();
-    document.getElementById('accept-invite-btn').onclick = () => app.acceptInvitation();
-    document.getElementById('decline-invite-btn').onclick = () => app.declineInvitation();
-    document.querySelectorAll('.nav-item').forEach(item => item.onclick = () => app.switchView(item.dataset.view));
-    
-    app.init();
-  </script>
+    // ロビー アカウント作成
+    document.getElementById('createAccountBtn').onclick = async () => {
+        const name = document.getElementById('usernameInput').value.trim();
+        if(!name) { document.getElementById('lobbyError').innerText = '名前を入力してください'; return; }
+        const friendCode = generateFriendCode();
+        const newUserRef = db.ref('users').push();
+        const uid = newUserRef.key;
+        const userData = { uid, name, friendCode, icon: '😀', online: true, friends: {}, voiceRoom: null };
+        await newUserRef.set(userData);
+        currentUser = { uid, name, friendCode, icon: '😀' };
+        localStorage.setItem('forcord_user', JSON.stringify(currentUser));
+        startApp();
+    };
+
+    function startApp() {
+        document.getElementById('lobbyScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'flex';
+        loadUserData();
+        initTabs();
+        initRealtimeListeners();
+        loadIconPicker();
+        setupVoiceSettings();
+    }
+
+    async function loadUserData() {
+        if(!currentUser) return;
+        const snap = await db.ref(`users/${currentUser.uid}`).once('value');
+        const data = snap.val();
+        if(data) {
+            currentUser.name = data.name;
+            currentUser.friendCode = data.friendCode;
+            currentUser.icon = data.icon || '😀';
+            document.getElementById('profileName').innerText = currentUser.name;
+            document.getElementById('friendCodeDisplay').innerText = `コード: ${currentUser.friendCode}`;
+            document.getElementById('profileIconSpan').innerText = currentUser.icon;
+        }
+        renderFriends();
+        renderOnlineUsers();
+        renderRequests();
+        renderChatList();
+    }
+
+    async function renderFriends() {
+        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+        const friends = friendsSnap.val() || {};
+        const list = document.getElementById('friendListUl');
+        list.innerHTML = '';
+        for(let [friendId, val] of Object.entries(friends)) {
+            const friendSnap = await db.ref(`users/${friendId}`).once('value');
+            const fdata = friendSnap.val();
+            if(fdata) {
+                const li = document.createElement('li');
+                li.className = 'friend-item';
+                li.innerHTML = `<span>${fdata.icon || '😀'} ${fdata.name} (${fdata.friendCode})</span><button data-uid="${friendId}" class="removeFriendBtn">削除</button>`;
+                list.appendChild(li);
+            }
+        }
+        document.querySelectorAll('.removeFriendBtn').forEach(btn => btn.onclick = async (e) => {
+            const fid = btn.getAttribute('data-uid');
+            await db.ref(`users/${currentUser.uid}/friends/${fid}`).remove();
+            await db.ref(`users/${fid}/friends/${currentUser.uid}`).remove();
+            renderFriends();
+        });
+    }
+
+    document.getElementById('addFriendBtn').onclick = async () => {
+        const code = document.getElementById('addFriendInput').value.trim();
+        if(code.length !== 8) return;
+        const usersSnap = await db.ref('users').orderByChild('friendCode').equalTo(code).once('value');
+        let targetUid = null;
+        usersSnap.forEach(snap => { targetUid = snap.key; });
+        if(targetUid && targetUid !== currentUser.uid) {
+            await db.ref(`users/${currentUser.uid}/friends/${targetUid}`).set(true);
+            await db.ref(`users/${targetUid}/friends/${currentUser.uid}`).set(true);
+            renderFriends();
+        } else alert("ユーザーが見つかりません");
+    };
+
+    async function renderOnlineUsers() {
+        const usersSnap = await db.ref('users').once('value');
+        const container = document.getElementById('onlineUsersList');
+        container.innerHTML = '';
+        usersSnap.forEach(snap => {
+            const u = snap.val();
+            if(u.uid !== currentUser.uid && u.online && !currentUser.friends?.[u.uid]) {
+                const div = document.createElement('div');
+                div.className = 'user-row';
+                div.innerHTML = `<span>${u.icon || '😀'} ${u.name} (${u.friendCode})</span><button data-uid="${u.uid}" class="connectReqBtn">つながる</button>`;
+                container.appendChild(div);
+            }
+        });
+        document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async (e) => {
+            const target = btn.getAttribute('data-uid');
+            await db.ref(`requests/${target}/${currentUser.uid}`).set({ fromName: currentUser.name, fromIcon: currentUser.icon, fromUid: currentUser.uid });
+            alert("リクエスト送信しました");
+        });
+    }
+
+    async function renderRequests() {
+        const reqSnap = await db.ref(`requests/${currentUser.uid}`).once('value');
+        const reqs = reqSnap.val() || {};
+        const container = document.getElementById('requestsList');
+        container.innerHTML = '';
+        for(let [fromId, req] of Object.entries(reqs)) {
+            const div = document.createElement('div');
+            div.className = 'user-row';
+            div.innerHTML = `<span>${req.fromIcon} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq">許可</button><button data-uid="${fromId}" class="rejectReq">拒否</button></div>`;
+            container.appendChild(div);
+        }
+        document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async (e) => {
+            const fid = btn.getAttribute('data-uid');
+            await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true);
+            await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true);
+            await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
+            renderRequests(); renderFriends();
+        });
+        document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async (e) => {
+            const fid = btn.getAttribute('data-uid');
+            await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
+            renderRequests();
+        });
+    }
+
+    // チャット簡易版 (グローバルチャット + グループ)
+    let currentChatId = null;
+    async function renderChatList() {
+        const groupsSnap = await db.ref(`groups`).once('value');
+        const listUl = document.getElementById('chatListUl');
+        listUl.innerHTML = '<li style="cursor:pointer" data-chat="global">🌍 全体チャット</li>';
+        groupsSnap.forEach(snap => {
+            const group = snap.val();
+            if(group.members && group.members[currentUser.uid]) {
+                const li = document.createElement('li');
+                li.style.cursor = 'pointer';
+                li.setAttribute('data-chat', snap.key);
+                li.innerText = `👥 ${group.name}`;
+                listUl.appendChild(li);
+            }
+        });
+        document.querySelectorAll('[data-chat]').forEach(el => el.onclick = () => openChat(el.getAttribute('data-chat')));
+    }
+    function openChat(chatId) {
+        currentChatId = chatId;
+        document.getElementById('currentChatName').innerText = chatId === 'global' ? '全体チャット' : 'グループチャット';
+        loadMessages(chatId);
+    }
+    async function loadMessages(chatId) {
+        const path = chatId === 'global' ? 'globalMessages' : `groups/${chatId}/messages`;
+        const snap = await db.ref(path).limitToLast(50).once('value');
+        const history = document.getElementById('messagesHistory');
+        history.innerHTML = '';
+        const msgs = snap.val() || {};
+        Object.values(msgs).forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'message-bubble';
+            div.innerHTML = `<b>${msg.senderName}</b>: ${msg.text} ${msg.imageUrl ? `<br/><img src="${msg.imageUrl}" style="max-width:200px; border-radius:12px;"/>` : ''}`;
+            history.appendChild(div);
+        });
+    }
+    document.getElementById('sendMsgBtn').onclick = async () => {
+        if(!currentChatId) return;
+        const text = document.getElementById('messageInput').value;
+        if(!text) return;
+        const msgData = { senderId: currentUser.uid, senderName: currentUser.name, text, timestamp: Date.now() };
+        if(currentChatId === 'global') await db.ref('globalMessages').push(msgData);
+        else await db.ref(`groups/${currentChatId}/messages`).push(msgData);
+        document.getElementById('messageInput').value = '';
+        loadMessages(currentChatId);
+    };
+    document.getElementById('createGroupBtn').onclick = async () => {
+        const groupName = prompt("グループ名");
+        if(!groupName) return;
+        const newGroup = { name: groupName, members: { [currentUser.uid]: true }, messages: {} };
+        const groupRef = db.ref('groups').push();
+        await groupRef.set(newGroup);
+        renderChatList();
+    };
+    document.getElementById('refreshChatsBtn').onclick = () => renderChatList();
+
+    // ボイスチャット: 音声認識→合成
+    let voiceRoomId = null;
+    let recognition = null;
+    document.getElementById('createVoiceRoomBtn').onclick = async () => {
+        const friendsList = Object.keys(currentUser.friends || {});
+        if(friendsList.length === 0) { alert("フレンドがいません"); return; }
+        const targetFriend = prompt("招待するフレンドのUID(最初の一人) : フレンドコードではありません。簡易版のためfriendListから選んでください。コンソール参照", friendsList[0]);
+        if(targetFriend && currentUser.friends[targetFriend]) {
+            voiceRoomId = `room_${Date.now()}`;
+            await db.ref(`voiceRooms/${voiceRoomId}`).set({ host: currentUser.uid, members: { [currentUser.uid]: true, [targetFriend]: true }, active: true });
+            await db.ref(`users/${currentUser.uid}/voiceRoom`).set(voiceRoomId);
+            await db.ref(`users/${targetFriend}/voiceRoom`).set(voiceRoomId);
+            listenVoiceRoom();
+        }
+    };
+    function listenVoiceRoom() {
+        if(voiceRoomId) {
+            db.ref(`voiceRooms/${voiceRoomId}/members`).on('value', snap => {
+                const members = snap.val() || {};
+                document.getElementById('voiceMembersArea').innerHTML = `メンバー: ${Object.keys(members).join(',')}`;
+            });
+            startVoiceInput();
+        }
+    }
+    function startVoiceInput() {
+        if(!('webkitSpeechRecognition' in window)) { alert("ブラウザ未対応"); return; }
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.interimResults = false;
+        recognition.onresult = async (event) => {
+            const text = event.results[0][0].transcript;
+            if(text && voiceRoomId) {
+                const voiceMsg = { text, sender: currentUser.uid, senderName: currentUser.name };
+                await db.ref(`voiceRooms/${voiceRoomId}/voiceMessages`).push(voiceMsg);
+            }
+        };
+        recognition.onend = () => { if(voiceRoomId) recognition.start(); };
+        recognition.start();
+        db.ref(`voiceRooms/${voiceRoomId}/voiceMessages`).on('child_added', snap => {
+            const data = snap.val();
+            if(data.sender !== currentUser.uid) {
+                speakText(data.text);
+            }
+        });
+    }
+    let speechSynthesis = window.speechSynthesis;
+    function speakText(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.pitch = parseFloat(document.getElementById('pitchSlider').value);
+        utterance.rate = parseFloat(document.getElementById('rateSlider').value);
+        utterance.volume = parseFloat(document.getElementById('volumeSlider').value);
+        const preset = localStorage.getItem('voicePreset') || 'standard';
+        if(preset === 'female') utterance.voice = speechSynthesis.getVoices().find(v => v.name.includes('Google 日本語') && v.name.includes('女性'));
+        else if(preset === 'robot') utterance.rate = 1.8;
+        else if(preset === 'alien') utterance.pitch = 1.6;
+        speechSynthesis.speak(utterance);
+    }
+    function setupVoiceSettings() {
+        document.querySelectorAll('[data-preset]').forEach(btn => btn.onclick = () => {
+            const preset = btn.getAttribute('data-preset');
+            localStorage.setItem('voicePreset', preset);
+            document.getElementById('currentVoicePreset').innerText = preset;
+        });
+        document.getElementById('testVoiceBtn').onclick = () => speakText("これはテストボイスです。");
+    }
+    document.getElementById('leaveVoiceBtn').onclick = async () => {
+        if(voiceRoomId) await db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove();
+        if(recognition) recognition.stop();
+        voiceRoomId = null;
+    };
+    function initTabs() {
+        const tabs = document.querySelectorAll('.sidebar-icon');
+        const views = ['home', 'connect', 'messages', 'voice', 'settings'];
+        tabs.forEach((tab, idx) => {
+            tab.onclick = () => {
+                views.forEach(v => document.getElementById(v+'View').classList.remove('active-view'));
+                document.getElementById(views[idx]+'View').classList.add('active-view');
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                if(views[idx]==='home') { loadUserData(); }
+                if(views[idx]==='connect') { renderOnlineUsers(); renderRequests(); }
+                if(views[idx]==='messages') { renderChatList(); }
+            };
+        });
+        document.getElementById('homeView').classList.add('active-view');
+        document.querySelector('.sidebar-icon').classList.add('active');
+    }
+    function loadIconPicker() {
+        const icons = ['😀','😎','🥳','😺','🐶','🌸','🌟','🎮','⚡','💎'];
+        const container = document.getElementById('iconPicker');
+        icons.forEach(ic => {
+            const span = document.createElement('span');
+            span.innerText = ic;
+            span.className = 'icon-option';
+            span.onclick = async () => {
+                await db.ref(`users/${currentUser.uid}/icon`).set(ic);
+                currentUser.icon = ic;
+                loadUserData();
+            };
+            container.appendChild(span);
+        });
+    }
+    document.getElementById('updateNameBtn').onclick = async () => {
+        const newName = document.getElementById('changeNameInput').value.trim();
+        if(newName) { await db.ref(`users/${currentUser.uid}/name`).set(newName); currentUser.name = newName; loadUserData(); }
+    };
+    function initRealtimeListeners() {
+        window.addEventListener('beforeunload', () => { if(currentUser) db.ref(`users/${currentUser.uid}/online`).set(false); });
+        if(currentUser) db.ref(`users/${currentUser.uid}/online`).set(true);
+    }
+    // 既存ユーザー確認
+    const stored = localStorage.getItem('forcord_user');
+    if(stored) { currentUser = JSON.parse(stored); startApp(); }
+</script>
 </body>
 </html>
