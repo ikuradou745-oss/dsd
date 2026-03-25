@@ -49,7 +49,8 @@
         .messages-layout { display: flex; width: 100%; height: 100%; }
         .channels-list { width: 280px; background: #1e1f22; border-right: 1px solid #2b2d31; padding: 20px; overflow-y: auto; }
         .chat-area { flex: 1; display: flex; flex-direction: column; background: #2b2d31; }
-        .chat-header { padding: 16px; border-bottom: 1px solid #3c3f45; font-weight: 600; }
+        .chat-header { padding: 16px; border-bottom: 1px solid #3c3f45; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .group-members { font-size: 0.8rem; color: #949ba4; }
         .messages-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
         .message-bubble { padding: 8px 14px; border-radius: 20px; max-width: 70%; display: flex; flex-direction: column; gap: 4px; position: relative; }
         .message-bubble.my-message { background: #248046; align-self: flex-end; }
@@ -57,8 +58,10 @@
         .message-sender { font-size: 0.75rem; opacity: 0.8; display: flex; align-items: center; gap: 6px; }
         .message-text { word-wrap: break-word; }
         .message-image { max-width: 200px; border-radius: 12px; margin-top: 4px; cursor: pointer; }
-        .read-status { font-size: 0.65rem; opacity: 0.6; margin-top: 4px; cursor: pointer; display: inline-block; }
+        .message-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; font-size: 0.65rem; opacity: 0.6; }
+        .read-status { cursor: pointer; }
         .read-status:hover { opacity: 1; text-decoration: underline; }
+        .timestamp { font-size: 0.65rem; }
         .unread-badge { background: #ed4245; color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: bold; margin-left: 8px; }
         .message-input-area { padding: 16px; display: flex; gap: 12px; background: #1e1f22; border-top: 1px solid #3c3f45; }
         .message-input-area input { flex: 1; background: #111214; border: none; border-radius: 28px; padding: 12px; color: white; }
@@ -99,8 +102,8 @@
         .clearfix::after { content: ""; clear: both; display: table; }
         .voice-indicator { display: inline-block; width: 8px; height: 8px; background: #23a559; border-radius: 50%; margin-right: 6px; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-        .voice-speaking { background: #23a559 !important; animation: speakPulse 0.3s ease; }
-        @keyframes speakPulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .new-message-notice { background: #5865F2; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -116,12 +119,12 @@
         <div class="sidebar-icon" data-tab="settings"><i class="fas fa-sliders-h"></i></div>
     </div>
     <div class="content-area">
-        <div id="homeView" class="tab-view"><div class="home-container"><div class="profile-card"><div class="profile-icon" id="profileIconSpan">😀</div><div class="profile-info"><h3 id="profileName">Loading...<span id="coinDisplay" class="coin-badge">💰 0コイン</span></h3><div class="friend-code" id="friendCodeDisplay">コード: ********</div><div class="info-text">✨ メッセージ1回で10コイン獲得！ ✨</div></div></div><div class="friend-add-section"><h4><i class="fas fa-user-plus"></i> フレンド追加</h4><div class="friend-add-row"><input type="text" id="addFriendInput" placeholder="8桁のフレンドコード"><button id="addFriendBtn">追加</button></div></div><div class="friend-add-section"><h4><i class="fas fa-users"></i> フレンドリスト</h4><ul id="friendListUl" class="friend-list"></ul></div></div></div>
+        <div id="homeView" class="tab-view"><div class="home-container"><div class="profile-card"><div class="profile-icon" id="profileIconSpan">😀</div><div class="profile-info"><h3 id="profileName">Loading...<span id="coinDisplay" class="coin-badge">💰 0コイン</span></h3><div class="friend-code" id="friendCodeDisplay">コード: ********</div><div class="info-text">✨ メッセージ1回で10コイン獲得！ ✨</div></div></div><div class="friend-add-section"><h4><i class="fas fa-user-plus"></i> フレンド追加</h4><div class="friend-add-row"><input type="text" id="addFriendInput" placeholder="8桁のフレンドコード"><button id="addFriendBtn">追加</button></div></div><div class="friend-add-section"><h4><i class="fas fa-users"></i> フレンドリスト</h4><ul id="friendListUl" class="friend-list"></ul></div><div id="newMessagesArea" style="margin-top: 20px;"></div></div></div>
         <div id="connectView" class="tab-view"><div class="connect-container"><div class="section-card"><h3><i class="fas fa-globe"></i> オンラインユーザー</h3><div id="onlineUsersList"></div></div><div class="section-card"><h3><i class="fas fa-envelope-open-text"></i> フレンドリクエスト</h3><div id="requestsList"></div></div></div></div>
-        <div id="messagesView" class="tab-view"><div class="messages-layout"><div class="channels-list"><button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button><div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px;"><i class="fas fa-sync-alt"></i></button></div><div id="chatListContainer"></div></div><div class="chat-area"><div class="chat-header" id="currentChatName">チャットを選択</div><div class="messages-history" id="messagesHistory"></div><div class="message-input-area"><input type="text" id="messageInput" placeholder="メッセージを入力..."><button id="sendStampBtn"><i class="fas fa-smile"></i></button><button id="sendImageBtn"><i class="fas fa-image"></i></button><button id="sendMsgBtn">送信</button></div></div></div></div>
+        <div id="messagesView" class="tab-view"><div class="messages-layout"><div class="channels-list"><button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button><div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px;"><i class="fas fa-sync-alt"></i></button></div><div id="chatListContainer"></div></div><div class="chat-area"><div class="chat-header" id="chatHeader"><span id="currentChatName">チャットを選択</span><span id="groupMembersDisplay" class="group-members"></span></div><div class="messages-history" id="messagesHistory"></div><div class="message-input-area"><input type="text" id="messageInput" placeholder="メッセージを入力..."><button id="sendStampBtn"><i class="fas fa-smile"></i></button><button id="sendImageBtn"><i class="fas fa-image"></i></button><button id="sendMsgBtn">送信</button></div></div></div></div>
         <div id="voiceView" class="tab-view"><div class="voice-layout"><div class="voice-members-panel"><h3><i class="fas fa-users"></i> 参加者</h3><div id="voiceMembersList"></div><button id="startVoiceInviteBtn" style="margin-top:20px; width:100%; background:#5865F2;">🎤 ボイスチャットを始める</button></div><div class="voice-chat-panel"><div class="voice-log-area"><div id="voiceLogList" style="display:flex; flex-direction:column; gap:6px;"></div></div><div class="voice-control-area"><div id="voiceRoomStatus" style="margin-bottom:12px; padding:8px; background:#111214; border-radius:12px;">⚪ 未接続</div><div class="voice-mic-row"><button id="toggleMicBtn" style="background:#3c3f45;"><i class="fas fa-microphone-slash"></i> マイクOFF</button><button id="sendVoiceTextBtn"><i class="fas fa-keyboard"></i> 文字送信</button></div><div id="voiceTextInputDiv" style="display:none; margin-top:12px;"><div style="display:flex; gap:8px;"><input type="text" id="voiceManualText" placeholder="テキストを入力 (音声で読み上げ)" style="flex:1; background:#111214; border:none; border-radius:28px; padding:8px 12px; color:white;"><button id="submitVoiceTextBtn">送信</button></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div></div></div></div>
         <div id="shopView" class="tab-view"><div class="settings-container"><h2><i class="fas fa-store"></i> ショップ <span id="shopCoinDisplay" class="coin-badge">💰 0コイン</span></h2><div class="info-text" style="margin-bottom:16px;">💡 メッセージを送ると10コインGET！</div><div class="setting-group"><h3>📱 スタンプ</h3><div id="stampShop"></div><h3>⚡ アップグレード</h3><div id="upgradeShop"></div></div></div></div>
-        <div id="settingsView" class="tab-view"><div class="settings-container"><div class="setting-group"><h3>プロフィール変更</h3><input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15"><button id="updateNameBtn">名前変更</button><div class="icon-grid" id="iconPicker"></div></div><hr><div class="setting-group"><h3>🎤 声の変換プリセット (ボイスチャット読み上げ用)</h3><div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div><div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div><div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div><div>音量: <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"></div><button id="testVoiceBtn">テスト発声</button><p>現在のプリセット: <span id="currentVoicePreset">標準</span></p><div class="info-text">🎙️ マイクONにして話すと、相手に変換された音声が届きます！</div></div></div></div>
+        <div id="settingsView" class="tab-view"><div class="settings-container"><div class="setting-group"><h3>プロフィール変更</h3><input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15"><button id="updateNameBtn">名前変更</button><div class="icon-grid" id="iconPicker"></div></div><hr><div class="setting-group"><h3>🎤 声の変換プリセット (相手に聞こえる声)</h3><div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div><div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div><div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div><div>音量: <input type="range" id="volumeSlider" min="0" max="1.5" step="0.05" value="1"></div><button id="testVoiceBtn">テスト発声</button><p>現在のプリセット: <span id="currentVoicePreset">標準</span></p><div class="info-text">🎙️ マイクONにして話すと、この設定の声で相手に聞こえます！</div></div></div></div>
     </div>
 </div>
 <div id="stampSelector" class="stamp-selector"><h4>スタンプを選んでね</h4><div id="stampList" class="clearfix"></div></div>
@@ -145,8 +148,11 @@
     ];
     let ownedStamps = [...defaultStamps];
     let unreadCounts = {};
+    let recentMessages = []; // 新着メッセージ通知用
 
+    function formatTime(timestamp) { if(!timestamp) return ''; const d = new Date(timestamp); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; }
     function generateFriendCode() { return Math.floor(10000000 + Math.random() * 90000000).toString(); }
+    
     document.getElementById('createAccountBtn').onclick = async () => {
         const name = document.getElementById('usernameInput').value.trim();
         if(!name) { document.getElementById('lobbyError').innerText = '名前を入力してください'; return; }
@@ -172,11 +178,11 @@
         renderShop();
         setupGroupModal();
         startVoiceMessagePoller();
+        startNewMessageListener();
         if('webkitSpeechRecognition' in window) console.log('音声認識対応');
         else alert("このブラウザは音声認識に対応していません。Chrome推奨");
     }
 
-    // ポーリング方式で音声メッセージをチェック（確実に読み上げ）
     let lastVoiceMessageTime = 0;
     function startVoiceMessagePoller() {
         setInterval(async () => {
@@ -185,13 +191,44 @@
             const msgs = snap.val() || {};
             Object.entries(msgs).forEach(([key, data]) => {
                 if(data && data.text && data.timestamp > lastVoiceMessageTime) {
-                    console.log(`ポーラー読み上げ: ${data.fromName}: ${data.text}`);
                     speakText(data.text);
                     lastVoiceMessageTime = data.timestamp;
                     db.ref(`voiceSpeak/${currentUser.uid}/${key}`).remove();
                 }
             });
         }, 1000);
+    }
+
+    function startNewMessageListener() {
+        setInterval(async () => {
+            if(!currentUser || currentChatId) return;
+            const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+            for(let fid of Object.keys(friendsSnap.val() || {})) {
+                const path = `privateChats/${[currentUser.uid, fid].sort().join('_')}/messages`;
+                const snap = await db.ref(path).limitToLast(1).once('value');
+                snap.forEach(msg => {
+                    if(msg.val().senderId !== currentUser.uid && !msg.val().readBy?.[currentUser.uid]) {
+                        addNewMessageNotice(fid, msg.val().senderName, msg.val().text);
+                    }
+                });
+            }
+        }, 3000);
+    }
+
+    function addNewMessageNotice(friendId, senderName, text) {
+        const area = document.getElementById('newMessagesArea');
+        const existing = document.querySelector(`.new-message-notice[data-friend="${friendId}"]`);
+        if(existing) return;
+        const div = document.createElement('div');
+        div.className = 'new-message-notice';
+        div.setAttribute('data-friend', friendId);
+        div.innerHTML = `<span><strong>${senderName}</strong>さんからメッセージが来ています！<br><small>${text.substring(0,30)}${text.length>30?'...':''}</small></span><button class="goto-chat-btn" data-friend="${friendId}">見に行く</button>`;
+        area.prepend(div);
+        document.querySelectorAll('.goto-chat-btn').forEach(btn => btn.onclick = () => {
+            openChat(`friend_${friendId}`, 'friend');
+            div.remove();
+        });
+        setTimeout(() => div.remove(), 10000);
     }
 
     async function loadUserFull() {
@@ -242,7 +279,9 @@
     function renderRequests() { db.ref(`requests/${currentUser.uid}`).on('value', (snap) => { const reqs = snap.val() || {}; const container = document.getElementById('requestsList'); container.innerHTML = ''; for(let [fromId, req] of Object.entries(reqs)) container.innerHTML += `<div class="user-row"><span>${req.fromIcon} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq">許可</button><button data-uid="${fromId}" class="rejectReq">拒否</button></div></div>`; document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true); await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); renderFriends(); }); document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); }); }); }
 
     async function renderChatListWithUnread() {
-        const container = document.getElementById('chatListContainer'); container.innerHTML = '';
+        const container = document.getElementById('chatListContainer');
+        if(!container) return;
+        container.innerHTML = '';
         const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>'; globalDiv.onclick = () => openChat('global', 'global'); container.appendChild(globalDiv);
         const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
         for(let friendId of Object.keys(friendsSnap.val() || {})) { 
@@ -274,9 +313,28 @@
     function openChat(chatId, type) { 
         currentChatId = chatId; 
         currentChatType = type; 
-        document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ'); 
+        document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ');
+        loadGroupMembersDisplay();
         loadMessagesWithRead(); 
         renderChatListWithUnread(); 
+    }
+    
+    async function loadGroupMembersDisplay() {
+        const displaySpan = document.getElementById('groupMembersDisplay');
+        if(currentChatType === 'group' && currentChatId) {
+            const membersSnap = await db.ref(`groups/${currentChatId}/members`).once('value');
+            const members = membersSnap.val() || {};
+            const names = [];
+            for(let uid of Object.keys(members)) {
+                if(uid !== currentUser.uid) {
+                    const userData = (await db.ref(`users/${uid}`).once('value')).val();
+                    if(userData) names.push(userData.name);
+                }
+            }
+            displaySpan.innerText = names.length ? `メンバー: ${names.join(', ')}` : '';
+        } else {
+            displaySpan.innerText = '';
+        }
     }
     
     async function loadMessagesWithRead() { 
@@ -306,7 +364,7 @@
                         readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="global" data-type="global">既読：${readCount}</span>`;
                     }
                 }
-                div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div><div class="message-text">${escapeHtml(msg.text || '')}</div>${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}${readHtml}`;
+                div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div><div class="message-text">${escapeHtml(msg.text || '')}</div>${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}<div class="message-footer"><span class="timestamp">${formatTime(msg.timestamp)}</span>${readHtml}</div>`;
                 history.appendChild(div);
                 
                 if(msg.senderId !== currentUser.uid && !msg.readBy?.[currentUser.uid]) {
@@ -402,7 +460,6 @@
     document.getElementById('sendStampBtn').onclick = () => { renderStampList(); stampSelector.style.display = stampSelector.style.display === 'none' ? 'block' : 'none'; };
     function renderStampList() { const container = document.getElementById('stampList'); container.innerHTML = ''; ownedStamps.forEach(st => { const btn = document.createElement('div'); btn.className = 'stamp-item'; const emoji = stampEmojis[st] || '💬'; btn.innerHTML = `<div class="stamp-emoji">${emoji}</div><div class="stamp-text">${st}</div>`; btn.onclick = async () => { if(!currentChatId) return; if(await sendMessageWithCooldownAndRead(st, true)) { const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text: `${emoji} ${st}`, timestamp: Date.now(), readBy: {} }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); stampSelector.style.display = 'none'; } }; container.appendChild(btn); }); }
 
-    // ボイスチャット
     function listenVoiceInvites() { 
         db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => { 
             const invite = snap.val(); 
@@ -515,7 +572,7 @@
         const utterance = new SpeechSynthesisUtterance(text); 
         utterance.pitch = parseFloat(document.getElementById('pitchSlider').value); 
         utterance.rate = parseFloat(document.getElementById('rateSlider').value); 
-        utterance.volume = parseFloat(document.getElementById('volumeSlider').value); 
+        utterance.volume = parseFloat(document.getElementById('volumeSlider').value) * 1.2; // 音量UP
         const preset = localStorage.getItem('voicePreset') || 'standard'; 
         const voices = speechSynthesis.getVoices();
         if(preset === 'female') {
