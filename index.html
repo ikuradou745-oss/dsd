@@ -38,7 +38,7 @@
     .primary-btn { background-color: var(--btn-bg); color: white; padding: 10px 20px; }
     .primary-btn:hover { background-color: var(--btn-hover); }
 
-    #init-screen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+    #init-screen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--bg-color); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
     .init-box { background-color: var(--panel-bg); padding: 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,243,255,0.2); text-align: center; width: 400px; border: 1px solid var(--neon-blue); }
     .init-box h1 { margin-bottom: 20px; font-size: 32px; }
     .init-box input { width: 100%; margin-bottom: 20px; font-size: 18px; text-align: center; }
@@ -205,8 +205,9 @@
           <div class="msg-history" id="message-history"></div>
           <div class="msg-input-area">
             <input type="text" id="message-input" placeholder="メッセージを入力..." maxlength="500">
-            <label class="image-upload-btn" id="image-upload-label">📷 画像アップロード</label>
+            <label class="image-upload-btn" id="image-upload-label">📷 画像</label>
             <input type="file" id="image-input" accept="image/*" style="display: none;">
+            <button class="primary-btn" id="refresh-msg-btn">🔄 更新</button>
             <button class="primary-btn" id="send-msg-btn">送信</button>
           </div>
         </div>
@@ -302,7 +303,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast, orderByChild } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast, orderByChild, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
     const firebaseConfig = {
@@ -324,8 +325,7 @@
     const state = {
       userId: null, userData: null, usersCache: {}, friends: [], chats: [], currentChatId: null,
       voiceRoomId: null, voiceRoomHost: null, recognition: null, isMicOn: false,
-      pendingInvitation: null, activeListeners: {}, processedVoiceMsgIds: new Set(),
-      lastMessageTimestamp: null
+      pendingInvitation: null, activeListeners: {}
     };
 
     const utils = {
@@ -354,7 +354,17 @@
     const app = {
       init: async () => {
         const storedId = localStorage.getItem('forcord_uid');
-        if (storedId) { const snap = await get(ref(db, `users/${storedId}`)); if (snap.exists()) { state.userId = storedId; state.userData = snap.val(); document.getElementById('init-screen').classList.add('hidden'); document.getElementById('main-app').classList.remove('hidden'); app.start(); return; } }
+        if (storedId) { 
+          const snap = await get(ref(db, `users/${storedId}`)); 
+          if (snap.exists()) { 
+            state.userId = storedId; 
+            state.userData = snap.val(); 
+            document.getElementById('init-screen').classList.add('hidden'); 
+            document.getElementById('main-app').classList.remove('hidden'); 
+            app.start(); 
+            return; 
+          } 
+        }
         document.getElementById('init-screen').classList.remove('hidden');
       },
       register: async () => {
@@ -364,7 +374,8 @@
         const data = { name: name.substring(0, 15), friendCode: utils.generateFriendCode(), icon: ICONS[0], voiceSettings: { pitch: 1, rate: 1, volume: 1 } };
         await set(ref(db, `users/${uid}`), data);
         localStorage.setItem('forcord_uid', uid);
-        state.userId = uid; state.userData = data;
+        state.userId = uid; 
+        state.userData = data;
         document.getElementById('init-screen').classList.add('hidden');
         document.getElementById('main-app').classList.remove('hidden');
         app.start();
@@ -424,7 +435,6 @@
           alert("声の設定を保存しました");
         };
         
-        // 画像アップロード修正
         const imageLabel = document.getElementById('image-upload-label');
         const imageInput = document.getElementById('image-input');
         if (imageLabel && imageInput) {
@@ -445,7 +455,6 @@
               await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, image: url, timestamp: serverTimestamp() });
               await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() });
               imageInput.value = '';
-              e.target.value = '';
             } catch (err) {
               console.error("画像アップロードエラー:", err);
               alert("画像のアップロードに失敗しました");
@@ -639,53 +648,56 @@
       },
       openChat: (chatId, title, type) => { 
         state.currentChatId = chatId;
-        state.lastMessageTimestamp = null;
         document.getElementById('chat-placeholder').style.display = 'none'; 
         document.getElementById('chat-main-area').style.display = 'flex'; 
         document.getElementById('chat-title-display').innerText = title; 
         const leaveBtn = document.getElementById('group-leave-btn');
         leaveBtn.style.display = type === 'group' ? 'block' : 'none';
-        if (state.activeListeners.chat) { state.activeListeners.chat(); delete state.activeListeners.chat; } 
+        
+        // 前のリスナーを完全に削除
+        if (state.activeListeners.chat) {
+          off(ref(db, `chats/${state.activeListeners.chatId}/messages`));
+          delete state.activeListeners.chat;
+          delete state.activeListeners.chatId;
+        }
+        
+        const hist = document.getElementById('message-history');
+        hist.innerHTML = '';
+        let displayedIds = new Set();
+        state.activeListeners.chatId = chatId;
+        
         const msgQuery = query(ref(db, `chats/${chatId}/messages`), orderByChild('timestamp'), limitToLast(100)); 
         const unsubscribe = onValue(msgQuery, async (snap) => { 
-          const hist = document.getElementById('message-history'); 
-          if (snap.exists()) { 
-            const msgs = []; 
-            snap.forEach(c => msgs.push({ ...c.val(), key: c.key })); 
-            msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
-            
-            // スクロール位置を保持
-            const wasAtBottom = hist.scrollHeight - hist.clientHeight <= hist.scrollTop + 50;
-            const messageElements = [];
-            
-            for (const m of msgs) { 
+          if (!snap.exists()) { 
+            hist.innerHTML = '';
+            return;
+          }
+          
+          const msgs = [];
+          snap.forEach(c => msgs.push({ ...c.val(), key: c.key })); 
+          msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+          
+          const wasAtBottom = hist.scrollHeight - hist.clientHeight <= hist.scrollTop + 50;
+          
+          for (const m of msgs) {
+            if (!displayedIds.has(m.key)) {
+              displayedIds.add(m.key);
               const sender = await utils.getUserData(m.sender); 
               if (sender) { 
                 const isSelf = m.sender === state.userId; 
                 const msgDiv = document.createElement('div'); 
                 msgDiv.className = `msg-row ${isSelf ? 'self' : 'other'}`; 
-                msgDiv.setAttribute('data-msg-id', m.key);
                 let content = '';
                 if (m.text) content = `<div class="msg-bubble">${utils.escapeHTML(m.text)}</div>`;
                 if (m.image) content = `<div class="msg-bubble"><img src="${m.image}" alt="画像" onclick="window.open('${m.image}')" style="max-width:200px; max-height:200px; border-radius:8px; cursor:pointer;"></div>`;
                 msgDiv.innerHTML = `<div class="message-block"><div class="msg-icon">${utils.escapeHTML(sender.icon)}</div><div class="msg-content"><div class="msg-sender">${utils.escapeHTML(sender.name)}</div>${content}</div></div>`; 
-                messageElements.push({ element: msgDiv, id: m.key });
+                hist.appendChild(msgDiv);
               } 
             }
-            
-            // 既存のメッセージを保持して新しいメッセージだけ追加
-            const existingIds = new Set(Array.from(hist.querySelectorAll('[data-msg-id]')).map(el => el.getAttribute('data-msg-id')));
-            for (const { element, id } of messageElements) {
-              if (!existingIds.has(id)) {
-                hist.appendChild(element);
-              }
-            }
-            
-            if (wasAtBottom) {
-              hist.scrollTop = hist.scrollHeight;
-            }
-          } else {
-            hist.innerHTML = '';
+          }
+          
+          if (wasAtBottom) {
+            hist.scrollTop = hist.scrollHeight;
           }
         }); 
         state.activeListeners.chat = unsubscribe; 
@@ -783,20 +795,34 @@
         document.getElementById('vc-setup-area').classList.add('hidden'); 
         document.getElementById('vc-room-area').classList.remove('hidden'); 
         state.isMicOn = true; 
-        state.processedVoiceMsgIds.clear();
         const micBtn = document.getElementById('mic-toggle-btn');
         micBtn.innerHTML = "🎤 マイク ON"; 
         micBtn.className = "primary-btn"; 
         if (state.recognition) try { state.recognition.start(); } catch(e) {} 
-        if (state.activeListeners.voice) { state.activeListeners.voice(); delete state.activeListeners.voice; } 
+        
+        // 前のボイスリスナーを完全に削除
+        if (state.activeListeners.voice) {
+          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}/messages`));
+          delete state.activeListeners.voice;
+          delete state.activeListeners.voiceRoomId;
+        }
+        if (state.activeListeners.voiceRoom) {
+          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}`));
+          delete state.activeListeners.voiceRoom;
+        }
+        
+        const logDiv = document.getElementById('vc-text-log');
+        logDiv.innerHTML = '<div style="color: var(--text-muted);">メッセージがここに表示されます</div>';
+        let displayedIds = new Set();
+        state.activeListeners.voiceRoomId = state.voiceRoomId;
         
         const msgQuery = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), orderByChild('timestamp'), limitToLast(100));
         const unsubscribe = onValue(msgQuery, async (snap) => {
-          const logDiv = document.getElementById('vc-text-log');
           if (!snap.exists()) { 
             logDiv.innerHTML = '<div style="color: var(--text-muted);">メッセージがここに表示されます</div>';
             return;
           }
+          
           const msgs = [];
           snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
           msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
@@ -804,30 +830,39 @@
           const wasAtBottom = logDiv.scrollHeight - logDiv.clientHeight <= logDiv.scrollTop + 50;
           
           for (const msg of msgs) {
-            if (!state.processedVoiceMsgIds.has(msg.id)) {
+            if (!displayedIds.has(msg.id)) {
+              displayedIds.add(msg.id);
+              
               const sender = await utils.getUserData(msg.sender);
               const senderName = sender ? sender.name : '不明';
               const msgDiv = document.createElement('div');
               msgDiv.className = 'vc-text-entry';
-              msgDiv.setAttribute('data-vc-msg-id', msg.id);
               msgDiv.innerHTML = `<div class="vc-text-sender" style="color:var(--neon-blue);">${utils.escapeHTML(senderName)}</div><div class="vc-text-message">${utils.escapeHTML(msg.text || '')}</div>`;
               logDiv.appendChild(msgDiv);
               
-              state.processedVoiceMsgIds.add(msg.id);
+              const placeholder = logDiv.querySelector('[style*="color: var(--text-muted)"]');
+              if (placeholder && logDiv.children.length > 1) {
+                placeholder.remove();
+              }
+              
               if (msg.sender !== state.userId) {
                 utils.playTTS(msg.text, sender?.voiceSettings);
                 const memberEl = document.getElementById(`vc-m-${msg.sender}`);
-                if (memberEl) { memberEl.classList.add('speaking-ring'); setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); }
+                if (memberEl) { 
+                  memberEl.classList.add('speaking-ring'); 
+                  setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); 
+                }
               }
             }
           }
+          
           if (wasAtBottom) {
             logDiv.scrollTop = logDiv.scrollHeight;
           }
         });
         state.activeListeners.voice = unsubscribe;
         
-        onValue(ref(db, `voiceRooms/${state.voiceRoomId}`), (snap) => {
+        const unsubscribeRoom = onValue(ref(db, `voiceRooms/${state.voiceRoomId}`), (snap) => {
           if (!snap.exists()) { app.leaveVoiceRoom(true); return; }
           const data = snap.val();
           state.voiceRoomHost = data.host;
@@ -852,6 +887,7 @@
           if (data.host === state.userId) moreBtn.classList.remove('hidden');
           else moreBtn.classList.add('hidden');
         });
+        state.activeListeners.voiceRoom = unsubscribeRoom;
       },
       leaveVoiceRoom: async (forced = false) => { 
         if (!forced && !confirm("退出しますか？")) return; 
@@ -862,13 +898,23 @@
         } 
         if (state.recognition) try { state.recognition.stop(); } catch(e) {} 
         state.isMicOn = false; 
+        
+        if (state.activeListeners.voice) {
+          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}/messages`));
+          delete state.activeListeners.voice;
+        }
+        if (state.activeListeners.voiceRoom) {
+          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}`));
+          delete state.activeListeners.voiceRoom;
+        }
+        
         state.voiceRoomId = null;
         state.voiceRoomHost = null;
-        state.processedVoiceMsgIds.clear();
+        delete state.activeListeners.voiceRoomId;
+        
         document.getElementById('vc-room-area').classList.add('hidden'); 
         document.getElementById('vc-setup-area').classList.remove('hidden'); 
         app.updateOnlineFriendsList(); 
-        if (state.activeListeners.voice) { state.activeListeners.voice(); delete state.activeListeners.voice; } 
       },
       kickUser: async (uid) => { if (confirm("キックしますか？")) await remove(ref(db, `voiceRooms/${state.voiceRoomId}/members/${uid}`)); },
       toggleMic: () => { 
@@ -915,6 +961,23 @@
     document.getElementById('confirm-group-btn').onclick = () => app.createGroup();
     document.getElementById('group-leave-btn').onclick = () => app.leaveGroup();
     document.getElementById('send-msg-btn').onclick = () => app.sendMessage();
+    document.getElementById('refresh-msg-btn').onclick = () => {
+      const hist = document.getElementById('message-history');
+      hist.innerHTML = '';
+      if (state.activeListeners.chat) {
+        off(ref(db, `chats/${state.activeListeners.chatId}/messages`));
+        delete state.activeListeners.chat;
+        delete state.activeListeners.chatId;
+      }
+      if (state.currentChatId) {
+        const listItem = document.querySelector(`[data-chat-id="${state.currentChatId}"]`);
+        if (listItem) {
+          const title = listItem.getAttribute('data-title');
+          const type = listItem.getAttribute('data-type');
+          app.openChat(state.currentChatId, title, type);
+        }
+      }
+    };
     document.getElementById('message-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') app.sendMessage(); });
     document.getElementById('create-vc-btn').onclick = () => app.createVoiceRoom();
     document.getElementById('mic-toggle-btn').onclick = () => app.toggleMic();
