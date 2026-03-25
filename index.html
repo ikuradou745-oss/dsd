@@ -18,13 +18,18 @@
         .lobby-card input { width: 100%; padding: 14px 18px; background: #1e1f22; border: 1px solid #3c3f45; border-radius: 28px; color: white; font-size: 1rem; outline: none; margin-bottom: 1rem; }
         .lobby-card button { background: #5865F2; border: none; color: white; padding: 12px 20px; border-radius: 28px; font-weight: 600; cursor: pointer; width: 100%; }
         .error-msg { color: #ed4245; margin-top: 10px; font-size: 0.85rem; }
-        .app-main { display: flex; height: 100vh; width: 100%; }
+        .app-main { display: flex; height: 100vh; width: 100%; position: relative; }
         .sidebar { width: 72px; background: #1e1f22; display: flex; flex-direction: column; align-items: center; padding-top: 20px; gap: 28px; border-right: 1px solid #2b2d31; }
         .sidebar-icon { font-size: 28px; color: #949ba4; cursor: pointer; padding: 8px; border-radius: 16px; width: 48px; text-align: center; transition: 0.1s; }
         .sidebar-icon.active { color: #e1e3e8; background: #3c3f45; }
         .content-area { flex: 1; display: flex; background: #2b2d31; overflow: hidden; }
         .tab-view { display: none; width: 100%; height: 100%; overflow-y: auto; }
         .tab-view.active-view { display: flex; }
+        /* 左上招待通知エリア */
+        .global-invite-area { position: fixed; top: 16px; left: 88px; z-index: 1000; width: 320px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .global-invite-area > * { pointer-events: auto; }
+        .invite-notification { background: #2b2d31; border-left: 4px solid #5865F2; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; animation: slideDown 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         .home-container { display: flex; flex-direction: column; padding: 24px; width: 100%; gap: 28px; }
         .profile-card { background: #1e1f22; border-radius: 24px; padding: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #3c3f45; }
         .profile-icon { font-size: 52px; background: #2b2d31; width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
@@ -69,7 +74,7 @@
         .stamp-item { background: #2b2d31; margin: 8px; padding: 12px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: 0.1s; width: calc(33% - 16px); float: left; }
         .stamp-item:hover { background: #5865F2; transform: scale(1.02); }
         .stamp-emoji { font-size: 2rem; }
-        .stamp-text { font-size: 0.7rem; text-align: center; }
+        .stamp-text { font-size: 0.7rem; text-align: center; word-break: break-word; }
         .settings-container { padding: 24px; max-width: 700px; width: 100%; }
         .setting-group { margin-bottom: 28px; }
         input[type="range"] { width: 100%; margin: 8px 0; }
@@ -78,8 +83,6 @@
         .icon-option:hover { background: #5865F2; }
         .shop-item { background: #111214; margin: 10px 0; padding: 12px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         hr { border-color: #3c3f45; margin: 16px 0; }
-        .invite-notification { background: #5865F2; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .friend-select-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2b2d31; border-radius: 24px; padding: 20px; z-index: 1000; width: 350px; max-height: 80%; overflow-y: auto; display: none; }
         .friend-select-item { padding: 12px; margin: 5px 0; background: #1e1f22; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.1s; }
         .friend-select-item:hover { background: #5865F2; }
@@ -88,7 +91,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         .member-item { padding: 8px; background: #111214; border-radius: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         .group-create-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2b2d31; border-radius: 24px; padding: 24px; z-index: 1000; width: 400px; display: none; }
-        .group-create-modal input, .group-create-modal select { width: 100%; padding: 10px; margin: 8px 0; background: #1e1f22; border: 1px solid #3c3f45; border-radius: 12px; color: white; }
+        .group-create-modal input { width: 100%; padding: 10px; margin: 8px 0; background: #1e1f22; border: 1px solid #3c3f45; border-radius: 12px; color: white; }
         .member-checkbox { display: flex; align-items: center; gap: 8px; padding: 6px; margin: 4px 0; background: #1e1f22; border-radius: 8px; cursor: pointer; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         .clearfix::after { content: ""; clear: both; display: table; }
@@ -97,6 +100,7 @@
 <body>
 <div id="lobbyScreen" class="lobby-container"><div class="lobby-card"><h1>Forcord</h1><input type="text" id="usernameInput" placeholder="ニックネーム (最大15文字)" maxlength="15"><button id="createAccountBtn">✨ はじめる ✨</button><div id="lobbyError" class="error-msg"></div></div></div>
 <div id="mainApp" class="app-main" style="display: none;">
+    <div class="global-invite-area" id="globalInviteArea"></div>
     <div class="sidebar">
         <div class="sidebar-icon" data-tab="home"><i class="fas fa-home"></i></div>
         <div class="sidebar-icon" data-tab="connect"><i class="fas fa-handshake"></i></div>
@@ -109,7 +113,7 @@
         <div id="homeView" class="tab-view"><div class="home-container"><div class="profile-card"><div class="profile-icon" id="profileIconSpan">😀</div><div class="profile-info"><h3 id="profileName">Loading...<span id="coinDisplay" class="coin-badge">💰 0コイン</span></h3><div class="friend-code" id="friendCodeDisplay">コード: ********</div><div class="info-text">✨ メッセージ1回で10コイン獲得！ ✨</div></div></div><div class="friend-add-section"><h4><i class="fas fa-user-plus"></i> フレンド追加</h4><div class="friend-add-row"><input type="text" id="addFriendInput" placeholder="8桁のフレンドコード"><button id="addFriendBtn">追加</button></div></div><div class="friend-add-section"><h4><i class="fas fa-users"></i> フレンドリスト</h4><ul id="friendListUl" class="friend-list"></ul></div></div></div>
         <div id="connectView" class="tab-view"><div class="connect-container"><div class="section-card"><h3><i class="fas fa-globe"></i> オンラインユーザー</h3><div id="onlineUsersList"></div></div><div class="section-card"><h3><i class="fas fa-envelope-open-text"></i> フレンドリクエスト</h3><div id="requestsList"></div></div></div></div>
         <div id="messagesView" class="tab-view"><div class="messages-layout"><div class="channels-list"><button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button><div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px;"><i class="fas fa-sync-alt"></i></button></div><div id="chatListContainer"></div></div><div class="chat-area"><div class="chat-header" id="currentChatName">チャットを選択</div><div class="messages-history" id="messagesHistory"></div><div class="message-input-area"><input type="text" id="messageInput" placeholder="メッセージを入力..."><button id="sendStampBtn"><i class="fas fa-smile"></i></button><button id="sendImageBtn"><i class="fas fa-image"></i></button><button id="sendMsgBtn">送信</button></div></div></div></div>
-        <div id="voiceView" class="tab-view"><div class="voice-layout"><div class="voice-members-panel"><h3><i class="fas fa-users"></i> 参加者</h3><div id="voiceMembersList"></div><button id="startVoiceInviteBtn" style="margin-top:20px; width:100%; background:#5865F2;">🎤 ボイスチャットを始める</button><div id="voiceInviteArea" style="margin-top:12px;"></div></div><div class="voice-chat-panel"><div class="voice-log-area"><div id="voiceLogList" style="display:flex; flex-direction:column; gap:6px;"></div></div><div class="voice-control-area"><div id="voiceRoomStatus" style="margin-bottom:12px; padding:8px; background:#111214; border-radius:12px;">⚪ 未接続</div><div class="voice-mic-row"><button id="toggleMicBtn" style="background:#3c3f45;"><i class="fas fa-microphone-slash"></i> マイクOFF</button><button id="sendVoiceTextBtn"><i class="fas fa-keyboard"></i> 文字送信</button></div><div id="voiceTextInputDiv" style="display:none; margin-top:12px;"><div style="display:flex; gap:8px;"><input type="text" id="voiceManualText" placeholder="テキストを入力 (音声で読み上げ)" style="flex:1; background:#111214; border:none; border-radius:28px; padding:8px 12px; color:white;"><button id="submitVoiceTextBtn">送信</button></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div></div></div></div>
+        <div id="voiceView" class="tab-view"><div class="voice-layout"><div class="voice-members-panel"><h3><i class="fas fa-users"></i> 参加者</h3><div id="voiceMembersList"></div><button id="startVoiceInviteBtn" style="margin-top:20px; width:100%; background:#5865F2;">🎤 ボイスチャットを始める</button></div><div class="voice-chat-panel"><div class="voice-log-area"><div id="voiceLogList" style="display:flex; flex-direction:column; gap:6px;"></div></div><div class="voice-control-area"><div id="voiceRoomStatus" style="margin-bottom:12px; padding:8px; background:#111214; border-radius:12px;">⚪ 未接続</div><div class="voice-mic-row"><button id="toggleMicBtn" style="background:#3c3f45;"><i class="fas fa-microphone-slash"></i> マイクOFF</button><button id="sendVoiceTextBtn"><i class="fas fa-keyboard"></i> 文字送信</button></div><div id="voiceTextInputDiv" style="display:none; margin-top:12px;"><div style="display:flex; gap:8px;"><input type="text" id="voiceManualText" placeholder="テキストを入力 (音声で読み上げ)" style="flex:1; background:#111214; border:none; border-radius:28px; padding:8px 12px; color:white;"><button id="submitVoiceTextBtn">送信</button></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div></div></div></div>
         <div id="shopView" class="tab-view"><div class="settings-container"><h2><i class="fas fa-store"></i> ショップ <span id="shopCoinDisplay" class="coin-badge">💰 0コイン</span></h2><div class="info-text" style="margin-bottom:16px;">💡 メッセージを送ると10コインGET！</div><div class="setting-group"><h3>📱 スタンプ</h3><div id="stampShop"></div><h3>⚡ アップグレード</h3><div id="upgradeShop"></div></div></div></div>
         <div id="settingsView" class="tab-view"><div class="settings-container"><div class="setting-group"><h3>プロフィール変更</h3><input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15"><button id="updateNameBtn">名前変更</button><div class="icon-grid" id="iconPicker"></div></div><hr><div class="setting-group"><h3>🎤 声の変換プリセット (ボイスチャット読み上げ用)</h3><div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div><div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div><div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div><div>音量: <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"></div><button id="testVoiceBtn">テスト発声</button><p>現在のプリセット: <span id="currentVoicePreset">標準</span></p></div></div></div>
     </div>
@@ -127,10 +131,11 @@
     let currentUser = null, currentChatId = null, currentChatType = null, voiceRoomId = null, recognition = null, isMicActive = false;
     let lastMessageTime = 0, lastStampTime = 0, userCoins = 0, messageCooldown = 2500, maxMessageLength = 200;
     const defaultStamps = ['やっほー！', 'おーい！', 'バイバイ！', 'ボイチャできる？'];
+    const stampEmojis = { 'やっほー！': '👋', 'おーい！': '📣', 'バイバイ！': '👋', 'ボイチャできる？': '🎤', 'Yes!!!': '✅', 'No!!!': '❌', 'そろそろやめるかも': '😴', 'よろしくぅ！': '🙌', 'わからん': '🤔', 'うんうん': '👍', 'へぇ〜〜': '😮', '話聞けやボケェ': '💢' };
     const shopStamps = [
-        { name: 'Yes!!!', price: 1000, emoji: '✅' }, { name: 'No!!!', price: 1000, emoji: '❌' }, { name: 'そろそろやめるかも', price: 1000, emoji: '😴' },
-        { name: 'よろしくぅ！', price: 5000, emoji: '🙌' }, { name: 'わからん', price: 5000, emoji: '🤔' }, { name: 'うんうん', price: 7500, emoji: '👍' },
-        { name: 'へぇ〜〜', price: 7500, emoji: '😮' }, { name: '話聞けやボケェ', price: 10000, emoji: '💢' }
+        { name: 'Yes!!!', price: 1000 }, { name: 'No!!!', price: 1000 }, { name: 'そろそろやめるかも', price: 1000 },
+        { name: 'よろしくぅ！', price: 5000 }, { name: 'わからん', price: 5000 }, { name: 'うんうん', price: 7500 },
+        { name: 'へぇ〜〜', price: 7500 }, { name: '話聞けやボケェ', price: 10000 }
     ];
     let ownedStamps = [...defaultStamps];
 
@@ -263,10 +268,34 @@
 
     const stampSelector = document.getElementById('stampSelector');
     document.getElementById('sendStampBtn').onclick = () => { renderStampList(); stampSelector.style.display = stampSelector.style.display === 'none' ? 'block' : 'none'; };
-    function renderStampList() { const container = document.getElementById('stampList'); container.innerHTML = ''; ownedStamps.forEach(st => { const btn = document.createElement('div'); btn.className = 'stamp-item'; btn.innerHTML = `<div class="stamp-emoji">${st.includes('!') ? '😊' : st.includes('？') ? '🤔' : '💬'}</div><div class="stamp-text">${st}</div>`; btn.onclick = async () => { if(!currentChatId) return; if(await sendMessageWithCooldown(st, true)) { const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text: `📢 ${st}`, timestamp: Date.now() }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); stampSelector.style.display = 'none'; } }; container.appendChild(btn); }); }
+    function renderStampList() { const container = document.getElementById('stampList'); container.innerHTML = ''; ownedStamps.forEach(st => { const btn = document.createElement('div'); btn.className = 'stamp-item'; const emoji = stampEmojis[st] || '💬'; btn.innerHTML = `<div class="stamp-emoji">${emoji}</div><div class="stamp-text">${st}</div>`; btn.onclick = async () => { if(!currentChatId) return; if(await sendMessageWithCooldown(st, true)) { const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text: `${emoji} ${st}`, timestamp: Date.now() }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); stampSelector.style.display = 'none'; } }; container.appendChild(btn); }); }
 
-    // ボイスチャット
-    function listenVoiceInvites() { db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => { const invite = snap.val(); const div = document.createElement('div'); div.className = 'invite-notification'; div.innerHTML = `<span>🎤 <strong>${invite.fromName}</strong> さんからボイチャの招待が来ています！</span><div><button data-room="${invite.roomId}" data-key="${snap.key}" class="acceptVoiceInvite" style="background:#23a559; margin-right:8px;">✅ 許可</button><button data-key="${snap.key}" class="rejectVoiceInvite" style="background:#ed4245;">❌ 拒否</button></div>`; document.getElementById('voiceInviteArea').prepend(div); document.querySelectorAll('.acceptVoiceInvite').forEach(btn => btn.onclick = async () => { const roomId = btn.getAttribute('data-room'); const key = btn.getAttribute('data-key'); await db.ref(`voiceRooms/${roomId}/members/${currentUser.uid}`).set(true); await db.ref(`users/${currentUser.uid}/voiceRoom`).set(roomId); await db.ref(`voiceInvites/${currentUser.uid}/${key}`).remove(); joinVoiceRoom(roomId); div.remove(); }); document.querySelectorAll('.rejectVoiceInvite').forEach(btn => btn.onclick = async () => { const key = btn.getAttribute('data-key'); await db.ref(`voiceInvites/${currentUser.uid}/${key}`).remove(); div.remove(); }); }); }
+    // ボイスチャット - 左上に招待表示
+    function listenVoiceInvites() { 
+        db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => { 
+            const invite = snap.val(); 
+            const inviteArea = document.getElementById('globalInviteArea');
+            const div = document.createElement('div'); 
+            div.className = 'invite-notification'; 
+            div.innerHTML = `<span>🎤 <strong>${invite.fromName}</strong> さんからボイチャの招待が来ています！</span><div><button data-room="${invite.roomId}" data-key="${snap.key}" class="acceptVoiceInvite" style="background:#23a559; margin-right:8px;">✅ 許可</button><button data-key="${snap.key}" class="rejectVoiceInvite" style="background:#ed4245;">❌ 拒否</button></div>`; 
+            inviteArea.prepend(div);
+            setTimeout(() => { if(div.parentNode) div.remove(); }, 30000);
+            document.querySelectorAll('.acceptVoiceInvite').forEach(btn => btn.onclick = async () => { 
+                const roomId = btn.getAttribute('data-room'); 
+                const key = btn.getAttribute('data-key'); 
+                await db.ref(`voiceRooms/${roomId}/members/${currentUser.uid}`).set(true); 
+                await db.ref(`users/${currentUser.uid}/voiceRoom`).set(roomId); 
+                await db.ref(`voiceInvites/${currentUser.uid}/${key}`).remove(); 
+                joinVoiceRoom(roomId); 
+                div.remove(); 
+            }); 
+            document.querySelectorAll('.rejectVoiceInvite').forEach(btn => btn.onclick = async () => { 
+                const key = btn.getAttribute('data-key'); 
+                await db.ref(`voiceInvites/${currentUser.uid}/${key}`).remove(); 
+                div.remove(); 
+            }); 
+        }); 
+    }
 
     document.getElementById('startVoiceInviteBtn').onclick = async () => {
         const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
@@ -278,8 +307,33 @@
     overlay.onclick = () => { document.getElementById('friendSelectModal').style.display = 'none'; document.getElementById('groupCreateModal').style.display = 'none'; overlay.style.display = 'none'; };
 
     function joinVoiceRoom(roomId) { if(voiceRoomId) leaveVoiceRoom(); voiceRoomId = roomId; document.getElementById('voiceRoomStatus').innerHTML = '🎙️ ボイスチャット接続中 (リアルタイム更新)'; db.ref(`voiceRooms/${roomId}/members`).on('value', (snap) => { const members = snap.val() || {}; const membersDiv = document.getElementById('voiceMembersList'); membersDiv.innerHTML = ''; Object.keys(members).forEach(m => { membersDiv.innerHTML += `<div class="member-item"><i class="fas fa-user-circle"></i> ${m === currentUser.uid ? currentUser.name + ' (あなた)' : m.substring(0,8)}</div>`; }); }); db.ref(`voiceRooms/${roomId}/voiceLog`).limitToLast(100).on('value', (snap) => { const logs = snap.val() || {}; const logDiv = document.getElementById('voiceLogList'); logDiv.innerHTML = ''; Object.values(logs).sort((a,b)=>a.timestamp-b.timestamp).forEach(log => { logDiv.innerHTML += `<div class="voice-message-item"><strong>${log.senderName}:</strong> ${log.text}</div>`; }); logDiv.scrollTop = logDiv.scrollHeight; }); startVoiceRecognition(); }
-    function startVoiceRecognition() { if(!('webkitSpeechRecognition' in window)) return; recognition = new webkitSpeechRecognition(); recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.onresult = async (event) => { const text = event.results[0][0].transcript; if(text && voiceRoomId) { const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() }; await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); membersSnap.forEach(memberSnap => { if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name }); }); } }; if(isMicActive) recognition.start(); recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); }; }
-    db.ref(`voiceSpeak/${currentUser?.uid}`).on('child_added', (snap) => { const data = snap.val(); if(data) speakText(data.text); snap.ref.remove(); });
+    
+    function startVoiceRecognition() { 
+        if(!('webkitSpeechRecognition' in window)) return; 
+        recognition = new webkitSpeechRecognition(); 
+        recognition.lang = 'ja-JP'; 
+        recognition.interimResults = false; 
+        recognition.onresult = async (event) => { 
+            const text = event.results[0][0].transcript; 
+            if(text && voiceRoomId) { 
+                const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() }; 
+                await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
+                const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
+                membersSnap.forEach(memberSnap => { 
+                    if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name }); 
+                }); 
+            } 
+        }; 
+        if(isMicActive) recognition.start(); 
+        recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); }; 
+    }
+    
+    db.ref(`voiceSpeak/${currentUser?.uid}`).on('child_added', (snap) => { 
+        const data = snap.val(); 
+        if(data) speakText(data.text); 
+        snap.ref.remove(); 
+    });
+    
     document.getElementById('toggleMicBtn').onclick = () => { isMicActive = !isMicActive; const btn = document.getElementById('toggleMicBtn'); if(isMicActive) { if(recognition) recognition.start(); btn.innerHTML = '<i class="fas fa-microphone"></i> マイクON'; btn.style.background = '#23a559'; } else { if(recognition) recognition.stop(); btn.innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; btn.style.background = '#3c3f45'; } };
     document.getElementById('sendVoiceTextBtn').onclick = () => { const div = document.getElementById('voiceTextInputDiv'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; };
     document.getElementById('submitVoiceTextBtn').onclick = async () => { const text = document.getElementById('voiceManualText').value.trim(); if(text && voiceRoomId) { const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() }; await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); membersSnap.forEach(memberSnap => { if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name }); }); document.getElementById('voiceManualText').value = ''; } };
@@ -287,11 +341,25 @@
     function leaveVoiceRoom() { if(voiceRoomId) { db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove(); db.ref(`users/${currentUser.uid}/voiceRoom`).remove(); } if(recognition) recognition.stop(); isMicActive = false; voiceRoomId = null; document.getElementById('voiceRoomStatus').innerHTML = '⚪ 未接続'; document.getElementById('voiceMembersList').innerHTML = ''; document.getElementById('toggleMicBtn').innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; document.getElementById('toggleMicBtn').style.background = '#3c3f45'; }
 
     let speechSynthesis = window.speechSynthesis;
-    function speakText(text) { const utterance = new SpeechSynthesisUtterance(text); utterance.pitch = parseFloat(document.getElementById('pitchSlider').value); utterance.rate = parseFloat(document.getElementById('rateSlider').value); utterance.volume = parseFloat(document.getElementById('volumeSlider').value); const preset = localStorage.getItem('voicePreset') || 'standard'; if(preset === 'female') utterance.voice = speechSynthesis.getVoices().find(v => v.lang === 'ja-JP' && v.name.includes('女性')); else if(preset === 'robot') utterance.rate = 1.6; else if(preset === 'alien') utterance.pitch = 1.5; speechSynthesis.speak(utterance); }
-    function setupVoiceSettings() { document.querySelectorAll('[data-preset]').forEach(btn => btn.onclick = () => { localStorage.setItem('voicePreset', btn.getAttribute('data-preset')); document.getElementById('currentVoicePreset').innerText = btn.getAttribute('data-preset'); }); document.getElementById('testVoiceBtn').onclick = () => speakText("これはテストボイスです。"); }
+    function speakText(text) { 
+        const utterance = new SpeechSynthesisUtterance(text); 
+        utterance.pitch = parseFloat(document.getElementById('pitchSlider').value); 
+        utterance.rate = parseFloat(document.getElementById('rateSlider').value); 
+        utterance.volume = parseFloat(document.getElementById('volumeSlider').value); 
+        const preset = localStorage.getItem('voicePreset') || 'standard'; 
+        const voices = speechSynthesis.getVoices();
+        if(preset === 'female') utterance.voice = voices.find(v => v.lang === 'ja-JP' && (v.name.includes('女性') || v.name.includes('Kyoko'))); 
+        else if(preset === 'robot') utterance.rate = 1.8; 
+        else if(preset === 'alien') utterance.pitch = 1.7; 
+        speechSynthesis.speak(utterance); 
+    }
+    function setupVoiceSettings() { 
+        document.querySelectorAll('[data-preset]').forEach(btn => btn.onclick = () => { localStorage.setItem('voicePreset', btn.getAttribute('data-preset')); document.getElementById('currentVoicePreset').innerText = btn.getAttribute('data-preset'); }); 
+        document.getElementById('testVoiceBtn').onclick = () => speakText("これはテストボイスです。"); 
+    }
 
     function renderShop() {
-        const stampDiv = document.getElementById('stampShop'); stampDiv.innerHTML = ''; shopStamps.forEach(s => { if(!ownedStamps.includes(s.name)) stampDiv.innerHTML += `<div class="shop-item"><span>${s.emoji} ${s.name}</span><button data-stamp="${s.name}" data-price="${s.price}" class="buyStampBtn">${s.price}コイン</button></div>`; });
+        const stampDiv = document.getElementById('stampShop'); stampDiv.innerHTML = ''; shopStamps.forEach(s => { if(!ownedStamps.includes(s.name)) stampDiv.innerHTML += `<div class="shop-item"><span>${stampEmojis[s.name] || '📱'} ${s.name}</span><button data-stamp="${s.name}" data-price="${s.price}" class="buyStampBtn">${s.price}コイン</button></div>`; });
         document.querySelectorAll('.buyStampBtn').forEach(btn => btn.onclick = async () => { const stampName = btn.getAttribute('data-stamp'); const price = parseInt(btn.getAttribute('data-price')); if(userCoins >= price && !ownedStamps.includes(stampName)) { userCoins -= price; ownedStamps.push(stampName); await db.ref(`users/${currentUser.uid}/coins`).set(userCoins); await db.ref(`users/${currentUser.uid}/stamps/${stampName}`).set(true); updateCoinDisplay(); renderShop(); alert(`${stampName}を購入しました！`); } else alert("コイン不足か既に所持しています"); });
         const upgradeDiv = document.getElementById('upgradeShop'); upgradeDiv.innerHTML = `
             <div class="shop-item"><span>⚡ メッセージクールダウン -0.01秒 (現在: ${(messageCooldown/1000).toFixed(2)}秒)</span><button id="buyCooldownBtn" ${messageCooldown <= 1000 ? 'disabled' : ''}>500コイン</button></div>
