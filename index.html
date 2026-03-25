@@ -7,12 +7,10 @@
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <!-- Google Fonts & Font Awesome -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Web Speech API polyfill (音声合成) -->
     <style>
         * {
             margin: 0;
@@ -28,7 +26,6 @@
             overflow: hidden;
         }
 
-        /* ロビー画面 */
         .lobby-container {
             position: fixed;
             top: 0;
@@ -40,7 +37,6 @@
             justify-content: center;
             align-items: center;
             z-index: 200;
-            transition: opacity 0.4s ease;
         }
 
         .lobby-card {
@@ -72,14 +68,10 @@
             color: white;
             font-size: 1rem;
             outline: none;
-            transition: 0.2s;
             margin-bottom: 1rem;
         }
 
-        .lobby-card input:focus {
-            border-color: #5865F2;
-        }
-
+        .lobby-card input:focus { border-color: #5865F2; }
         .lobby-card button {
             background: #5865F2;
             border: none;
@@ -89,28 +81,10 @@
             font-weight: 600;
             cursor: pointer;
             width: 100%;
-            font-size: 1rem;
-            transition: 0.2s;
         }
+        .error-msg { color: #ed4245; margin-top: 10px; font-size: 0.85rem; }
 
-        .lobby-card button:hover {
-            background: #4752c4;
-        }
-
-        .error-msg {
-            color: #ed4245;
-            margin-top: 10px;
-            font-size: 0.85rem;
-        }
-
-        /* メインアプリ */
-        .app-main {
-            display: flex;
-            height: 100vh;
-            width: 100%;
-        }
-
-        /* サイドバー (タブ) */
+        .app-main { display: flex; height: 100vh; width: 100%; }
         .sidebar {
             width: 72px;
             background: #1e1f22;
@@ -121,56 +95,24 @@
             gap: 28px;
             border-right: 1px solid #2b2d31;
         }
-
         .sidebar-icon {
             font-size: 28px;
             color: #949ba4;
             cursor: pointer;
-            transition: 0.1s;
             padding: 8px;
             border-radius: 16px;
             width: 48px;
             text-align: center;
+            transition: 0.1s;
         }
+        .sidebar-icon.active { color: #e1e3e8; background: #3c3f45; }
+        .sidebar-icon:hover { color: #dbdee1; }
+        .content-area { flex: 1; display: flex; background: #2b2d31; overflow: hidden; }
+        .tab-view { display: none; width: 100%; height: 100%; overflow-y: auto; }
+        .tab-view.active-view { display: flex; }
 
-        .sidebar-icon.active {
-            color: #e1e3e8;
-            background: #3c3f45;
-        }
-
-        .sidebar-icon:hover {
-            color: #dbdee1;
-        }
-
-        /* メインコンテンツエリア */
-        .content-area {
-            flex: 1;
-            display: flex;
-            background: #2b2d31;
-            overflow: hidden;
-        }
-
-        /* 各タブのビュー */
-        .tab-view {
-            display: none;
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-        }
-
-        .tab-view.active-view {
-            display: flex;
-        }
-
-        /* ホーム画面 */
-        .home-container {
-            display: flex;
-            flex-direction: column;
-            padding: 24px;
-            width: 100%;
-            gap: 28px;
-        }
-
+        /* ホーム */
+        .home-container { display: flex; flex-direction: column; padding: 24px; width: 100%; gap: 28px; }
         .profile-card {
             background: #1e1f22;
             border-radius: 24px;
@@ -180,218 +122,58 @@
             gap: 20px;
             border: 1px solid #3c3f45;
         }
+        .profile-icon { font-size: 52px; background: #2b2d31; width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .profile-info h3 { font-size: 1.4rem; }
+        .friend-code { background: #111214; padding: 6px 12px; border-radius: 20px; font-family: monospace; font-size: 1rem; margin-top: 6px; display: inline-block; }
+        .friend-add-section { background: #1e1f22; border-radius: 20px; padding: 20px; }
+        .friend-add-row { display: flex; gap: 12px; margin-top: 10px; }
+        .friend-add-row input { flex: 1; background: #111214; border: 1px solid #3c3f45; border-radius: 28px; padding: 12px; color: white; }
+        button { background: #5865F2; border: none; border-radius: 28px; padding: 8px 18px; color: white; font-weight: 500; cursor: pointer; }
+        .friend-list { list-style: none; margin-top: 12px; }
+        .friend-item { display: flex; justify-content: space-between; background: #111214; margin: 8px 0; padding: 10px 16px; border-radius: 20px; align-items: center; }
 
-        .profile-icon {
-            font-size: 52px;
-            background: #2b2d31;
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        /* つながる */
+        .connect-container { padding: 24px; width: 100%; display: flex; flex-direction: column; gap: 32px; }
+        .section-card { background: #1e1f22; border-radius: 20px; padding: 20px; }
+        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2b2d31; }
 
-        .profile-info h3 {
-            font-size: 1.4rem;
-        }
-
-        .friend-code {
-            background: #111214;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-family: monospace;
-            font-size: 1rem;
-            margin-top: 6px;
-            display: inline-block;
-        }
-
-        .friend-add-section {
-            background: #1e1f22;
-            border-radius: 20px;
-            padding: 20px;
-        }
-
-        .friend-add-row {
-            display: flex;
-            gap: 12px;
-            margin-top: 10px;
-        }
-
-        .friend-add-row input {
-            flex: 1;
-            background: #111214;
-            border: 1px solid #3c3f45;
-            border-radius: 28px;
-            padding: 12px;
-            color: white;
-        }
-
-        button {
-            background: #5865F2;
-            border: none;
-            border-radius: 28px;
-            padding: 8px 18px;
-            color: white;
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        .friend-list {
-            list-style: none;
-            margin-top: 12px;
-        }
-
-        .friend-item {
-            display: flex;
-            justify-content: space-between;
-            background: #111214;
-            margin: 8px 0;
-            padding: 10px 16px;
-            border-radius: 20px;
-            align-items: center;
-        }
-
-        /* つながる画面 */
-        .connect-container {
-            padding: 24px;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 32px;
-        }
-
-        .section-card {
-            background: #1e1f22;
-            border-radius: 20px;
-            padding: 20px;
-        }
-
-        .user-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #2b2d31;
-        }
-
-        /* メッセージ画面 */
-        .messages-layout {
-            display: flex;
-            width: 100%;
-            height: 100%;
-        }
-
-        .channels-list {
-            width: 280px;
-            background: #1e1f22;
-            border-right: 1px solid #2b2d31;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        .chat-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #2b2d31;
-        }
-
-        .chat-header {
-            padding: 16px;
-            border-bottom: 1px solid #3c3f45;
-            font-weight: 600;
-        }
-
-        .messages-history {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .message-bubble {
-            background: #1e1f22;
-            padding: 8px 14px;
-            border-radius: 20px;
-            max-width: 80%;
-            align-self: flex-start;
-        }
-
-        .message-input-area {
-            padding: 16px;
-            display: flex;
-            gap: 12px;
-            background: #1e1f22;
-            border-top: 1px solid #3c3f45;
-        }
-
-        .message-input-area input {
-            flex: 1;
-            background: #111214;
-            border: none;
-            border-radius: 28px;
-            padding: 12px;
-            color: white;
-        }
+        /* メッセージ */
+        .messages-layout { display: flex; width: 100%; height: 100%; }
+        .channels-list { width: 280px; background: #1e1f22; border-right: 1px solid #2b2d31; padding: 20px; overflow-y: auto; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #2b2d31; }
+        .chat-header { padding: 16px; border-bottom: 1px solid #3c3f45; font-weight: 600; }
+        .messages-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .message-bubble { padding: 8px 14px; border-radius: 20px; max-width: 70%; display: flex; flex-direction: column; gap: 4px; }
+        .message-bubble.my-message { background: #248046; align-self: flex-end; }
+        .message-bubble.other-message { background: #1e1f22; align-self: flex-start; }
+        .message-sender { font-size: 0.75rem; opacity: 0.8; display: flex; align-items: center; gap: 6px; }
+        .message-text { word-wrap: break-word; }
+        .message-image { max-width: 200px; border-radius: 12px; margin-top: 4px; cursor: pointer; }
+        .message-input-area { padding: 16px; display: flex; gap: 12px; background: #1e1f22; border-top: 1px solid #3c3f45; }
+        .message-input-area input { flex: 1; background: #111214; border: none; border-radius: 28px; padding: 12px; color: white; }
+        .chat-item { cursor: pointer; padding: 10px; border-radius: 12px; margin-bottom: 4px; transition: 0.1s; display: flex; align-items: center; gap: 10px; }
+        .chat-item:hover { background: #3c3f45; }
+        .chat-item.active-chat { background: #5865F2; }
+        .group-exit-btn { background: #ed4245; padding: 2px 8px; font-size: 11px; margin-left: 8px; }
 
         /* ボイスチャット */
-        .voice-container {
-            padding: 24px;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-
-        .voice-room-card {
-            background: #1e1f22;
-            border-radius: 24px;
-            padding: 20px;
-        }
-
-        /* 設定 */
-        .settings-container {
-            padding: 24px;
-            max-width: 700px;
-            width: 100%;
-        }
-
-        .setting-group {
-            margin-bottom: 28px;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            margin: 8px 0;
-        }
-
-        .icon-grid {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin: 12px 0;
-        }
-
-        .icon-option {
-            font-size: 32px;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-            background: #111214;
-            transition: 0.1s;
-        }
-
-        .icon-option.selected {
-            background: #5865F2;
-        }
-
-        hr {
-            border-color: #3c3f45;
-            margin: 16px 0;
-        }
+        .voice-container { padding: 24px; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+        .voice-room-card { background: #1e1f22; border-radius: 24px; padding: 20px; }
+        .voice-message-log { max-height: 200px; overflow-y: auto; background: #111214; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 0.85rem; }
+        .voice-message-item { padding: 4px 0; border-bottom: 1px solid #2b2d31; }
+        .mic-control { display: flex; gap: 12px; margin: 12px 0; align-items: center; }
+        .mic-btn { background: #3c3f45; padding: 10px 20px; }
+        .mic-btn.active { background: #ed4245; }
+        .voice-text-input { display: flex; gap: 8px; margin-top: 12px; }
+        .voice-text-input input { flex: 1; background: #111214; border: none; border-radius: 28px; padding: 8px 12px; color: white; }
+        
+        .settings-container { padding: 24px; max-width: 700px; width: 100%; }
+        .setting-group { margin-bottom: 28px; }
+        input[type="range"] { width: 100%; margin: 8px 0; }
+        .icon-grid { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+        .icon-option { font-size: 32px; cursor: pointer; padding: 8px; border-radius: 50%; background: #111214; }
+        hr { border-color: #3c3f45; margin: 16px 0; }
+        .invite-notification { background: #5865F2; padding: 8px 12px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
@@ -414,132 +196,35 @@
         <div class="sidebar-icon" data-tab="settings"><i class="fas fa-sliders-h"></i></div>
     </div>
     <div class="content-area">
-        <!-- ホーム -->
-        <div id="homeView" class="tab-view">
-            <div class="home-container">
-                <div class="profile-card" id="profileSection">
-                    <div class="profile-icon" id="profileIconSpan">😀</div>
-                    <div class="profile-info">
-                        <h3 id="profileName">Loading...</h3>
-                        <div class="friend-code" id="friendCodeDisplay">コード: ********</div>
-                    </div>
-                </div>
-                <div class="friend-add-section">
-                    <h4><i class="fas fa-user-plus"></i> フレンド追加</h4>
-                    <div class="friend-add-row">
-                        <input type="text" id="addFriendInput" placeholder="8桁のフレンドコード">
-                        <button id="addFriendBtn">追加</button>
-                    </div>
-                </div>
-                <div class="friend-add-section">
-                    <h4><i class="fas fa-users"></i> フレンドリスト</h4>
-                    <ul id="friendListUl" class="friend-list"></ul>
-                </div>
-            </div>
-        </div>
-        <!-- つながる -->
-        <div id="connectView" class="tab-view">
-            <div class="connect-container">
-                <div class="section-card">
-                    <h3><i class="fas fa-globe"></i> 今日ログインしている人</h3>
-                    <div id="onlineUsersList"></div>
-                </div>
-                <div class="section-card">
-                    <h3><i class="fas fa-envelope-open-text"></i> つながりリクエスト</h3>
-                    <div id="requestsList"></div>
-                </div>
-            </div>
-        </div>
-        <!-- メッセージ -->
-        <div id="messagesView" class="tab-view">
-            <div class="messages-layout">
-                <div class="channels-list">
-                    <button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button>
-                    <div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px;"><i class="fas fa-sync-alt"></i></button></div>
-                    <ul id="chatListUl" style="list-style:none; margin-top:12px;"></ul>
-                </div>
-                <div class="chat-area">
-                    <div class="chat-header" id="currentChatName">チャットを選択</div>
-                    <div class="messages-history" id="messagesHistory"></div>
-                    <div class="message-input-area">
-                        <input type="text" id="messageInput" placeholder="メッセージを入力...">
-                        <button id="sendImageBtn"><i class="fas fa-image"></i></button>
-                        <button id="sendMsgBtn">送信</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- ボイスチャット -->
-        <div id="voiceView" class="tab-view">
-            <div class="voice-container">
-                <div class="voice-room-card">
-                    <h3><i class="fas fa-magic"></i> 魔法のボイスチャット</h3>
-                    <p>マイクON → 音声を文字変換 → 自動音声読み上げ (相手側)</p>
-                    <button id="createVoiceRoomBtn" class="button-primary">✨ フレンドと部屋を作成 ✨</button>
-                    <div id="voiceRoomStatus">現在、ボイスチャット未接続</div>
-                    <div id="voiceMembersArea" style="margin-top:12px;"></div>
-                    <button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button>
-                </div>
-                <div class="voice-room-card">
-                    <h4>声の変換プリセット (送信者側で適用)</h4>
-                    <div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div>
-                    <div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div>
-                    <div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div>
-                    <div>音量: <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"></div>
-                    <button id="testVoiceBtn">テスト発声</button>
-                </div>
-            </div>
-        </div>
-        <!-- 設定 -->
-        <div id="settingsView" class="tab-view">
-            <div class="settings-container">
-                <div class="setting-group">
-                    <h3>プロフィール変更</h3>
-                    <input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15">
-                    <button id="updateNameBtn">名前変更</button>
-                    <div class="icon-grid" id="iconPicker"></div>
-                </div>
-                <hr>
-                <div class="setting-group">
-                    <h3>声の微調整 (ボイスチャット読み上げ用)</h3>
-                    <p>現在の読み上げプリセット: <span id="currentVoicePreset">標準</span></p>
-                </div>
-            </div>
-        </div>
+        <div id="homeView" class="tab-view"><div class="home-container"><div class="profile-card"><div class="profile-icon" id="profileIconSpan">😀</div><div class="profile-info"><h3 id="profileName">Loading...</h3><div class="friend-code" id="friendCodeDisplay">コード: ********</div></div></div><div class="friend-add-section"><h4><i class="fas fa-user-plus"></i> フレンド追加</h4><div class="friend-add-row"><input type="text" id="addFriendInput" placeholder="8桁のフレンドコード"><button id="addFriendBtn">追加</button></div></div><div class="friend-add-section"><h4><i class="fas fa-users"></i> フレンドリスト</h4><ul id="friendListUl" class="friend-list"></ul></div></div></div>
+        <div id="connectView" class="tab-view"><div class="connect-container"><div class="section-card"><h3><i class="fas fa-globe"></i> オンラインユーザー</h3><div id="onlineUsersList"></div></div><div class="section-card"><h3><i class="fas fa-envelope-open-text"></i> フレンドリクエスト</h3><div id="requestsList"></div></div></div></div>
+        <div id="messagesView" class="tab-view"><div class="messages-layout"><div class="channels-list"><button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button><div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px;"><i class="fas fa-sync-alt"></i></button></div><div id="chatListContainer"></div></div><div class="chat-area"><div class="chat-header" id="currentChatName">チャットを選択</div><div class="messages-history" id="messagesHistory"></div><div class="message-input-area"><input type="text" id="messageInput" placeholder="メッセージを入力..."><button id="sendImageBtn"><i class="fas fa-image"></i></button><button id="sendMsgBtn">送信</button></div></div></div></div>
+        <div id="voiceView" class="tab-view"><div class="voice-container"><div class="voice-room-card"><h3><i class="fas fa-magic"></i> 魔法のボイスチャット</h3><p>マイクON → 音声を文字変換 → 自動音声読み上げ</p><div id="voiceInviteArea"></div><button id="startVoiceInviteBtn" class="button-primary">🎤 ボイスチャットを始める</button><div id="voiceRoomStatus" style="margin-top:12px;">未接続</div><div class="mic-control"><button id="toggleMicBtn" class="mic-btn">🎙️ マイクOFF</button><button id="sendVoiceTextBtn" class="mic-btn">📝 文字送信</button></div><div class="voice-text-input" id="voiceTextInputDiv" style="display:none;"><input type="text" id="voiceManualText" placeholder="テキストを入力して送信（相手に音声で読み上げ）"><button id="submitVoiceTextBtn">送信</button></div><div id="voiceMembersArea" style="margin-top:12px; font-size:0.9rem;"></div><div id="voiceMessageLog" class="voice-message-log"><strong>会話ログ (最大100件)</strong><div id="voiceLogList"></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div><div class="voice-room-card"><h4>声の変換プリセット</h4><div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div><div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div><div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div><div>音量: <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1"></div><button id="testVoiceBtn">テスト発声</button></div></div></div>
+        <div id="settingsView" class="tab-view"><div class="settings-container"><div class="setting-group"><h3>プロフィール変更</h3><input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15"><button id="updateNameBtn">名前変更</button><div class="icon-grid" id="iconPicker"></div></div><hr><div class="setting-group"><h3>声の微調整</h3><p>現在の読み上げプリセット: <span id="currentVoicePreset">標準</span></p></div></div></div>
     </div>
 </div>
 
 <script>
-    // Firebase初期化
-    const firebaseConfig = {
-        apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ",
-        authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com",
-        databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com",
-        projectId: "iikotowaruikoto-d5aa7",
-        storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app",
-        messagingSenderId: "455780219216",
-        appId: "1:455780219216:web:225461fcf24c1a46f69455",
-        measurementId: "G-YQD459DBSG"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com", databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", projectId: "iikotowaruikoto-d5aa7", storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app", messagingSenderId: "455780219216", appId: "1:455780219216:web:225461fcf24c1a46f69455", measurementId: "G-YQD459DBSG" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    let currentUser = null;
+    let currentChatId = null;
+    let currentChatType = null; // 'global', 'friend', 'group'
+    let voiceRoomId = null;
+    let recognition = null;
+    let isMicActive = false;
+    let voiceMessagesListener = null;
 
-    let currentUser = null; // { uid, name, friendCode, icon }
+    function generateFriendCode() { return Math.floor(10000000 + Math.random() * 90000000).toString(); }
 
-    // ユーティリティ
-    function generateFriendCode() {
-        return Math.floor(10000000 + Math.random() * 90000000).toString();
-    }
-
-    // ロビー アカウント作成
     document.getElementById('createAccountBtn').onclick = async () => {
         const name = document.getElementById('usernameInput').value.trim();
         if(!name) { document.getElementById('lobbyError').innerText = '名前を入力してください'; return; }
         const friendCode = generateFriendCode();
         const newUserRef = db.ref('users').push();
         const uid = newUserRef.key;
-        const userData = { uid, name, friendCode, icon: '😀', online: true, friends: {}, voiceRoom: null };
-        await newUserRef.set(userData);
+        await newUserRef.set({ uid, name, friendCode, icon: '😀', online: true, friends: {} });
         currentUser = { uid, name, friendCode, icon: '😀' };
         localStorage.setItem('forcord_user', JSON.stringify(currentUser));
         startApp();
@@ -548,26 +233,24 @@
     function startApp() {
         document.getElementById('lobbyScreen').style.display = 'none';
         document.getElementById('mainApp').style.display = 'flex';
+        db.ref(`users/${currentUser.uid}/online`).set(true);
+        window.addEventListener('beforeunload', () => { if(currentUser) db.ref(`users/${currentUser.uid}/online`).set(false); });
         loadUserData();
         initTabs();
-        initRealtimeListeners();
         loadIconPicker();
         setupVoiceSettings();
+        listenVoiceInvites();
     }
 
     async function loadUserData() {
-        if(!currentUser) return;
         const snap = await db.ref(`users/${currentUser.uid}`).once('value');
         const data = snap.val();
-        if(data) {
-            currentUser.name = data.name;
-            currentUser.friendCode = data.friendCode;
-            currentUser.icon = data.icon || '😀';
+        if(data) { currentUser.name = data.name; currentUser.friendCode = data.friendCode; currentUser.icon = data.icon || '😀';
             document.getElementById('profileName').innerText = currentUser.name;
             document.getElementById('friendCodeDisplay').innerText = `コード: ${currentUser.friendCode}`;
             document.getElementById('profileIconSpan').innerText = currentUser.icon;
         }
-        renderFriends();
+        await renderFriends();
         renderOnlineUsers();
         renderRequests();
         renderChatList();
@@ -578,9 +261,8 @@
         const friends = friendsSnap.val() || {};
         const list = document.getElementById('friendListUl');
         list.innerHTML = '';
-        for(let [friendId, val] of Object.entries(friends)) {
-            const friendSnap = await db.ref(`users/${friendId}`).once('value');
-            const fdata = friendSnap.val();
+        for(let [friendId] of Object.entries(friends)) {
+            const fdata = (await db.ref(`users/${friendId}`).once('value')).val();
             if(fdata) {
                 const li = document.createElement('li');
                 li.className = 'friend-item';
@@ -588,7 +270,7 @@
                 list.appendChild(li);
             }
         }
-        document.querySelectorAll('.removeFriendBtn').forEach(btn => btn.onclick = async (e) => {
+        document.querySelectorAll('.removeFriendBtn').forEach(btn => btn.onclick = async () => {
             const fid = btn.getAttribute('data-uid');
             await db.ref(`users/${currentUser.uid}/friends/${fid}`).remove();
             await db.ref(`users/${fid}/friends/${currentUser.uid}`).remove();
@@ -609,152 +291,301 @@
         } else alert("ユーザーが見つかりません");
     };
 
-    async function renderOnlineUsers() {
-        const usersSnap = await db.ref('users').once('value');
-        const container = document.getElementById('onlineUsersList');
-        container.innerHTML = '';
-        usersSnap.forEach(snap => {
-            const u = snap.val();
-            if(u.uid !== currentUser.uid && u.online && !currentUser.friends?.[u.uid]) {
+    function renderOnlineUsers() {
+        db.ref('users').on('value', (snap) => {
+            const container = document.getElementById('onlineUsersList');
+            container.innerHTML = '';
+            snap.forEach(userSnap => {
+                const u = userSnap.val();
+                if(u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) {
+                    const div = document.createElement('div');
+                    div.className = 'user-row';
+                    div.innerHTML = `<span>${u.icon || '😀'} ${u.name}</span><button data-uid="${u.uid}" class="connectReqBtn">つながる</button>`;
+                    container.appendChild(div);
+                }
+            });
+            document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async () => {
+                const target = btn.getAttribute('data-uid');
+                await db.ref(`requests/${target}/${currentUser.uid}`).set({ fromName: currentUser.name, fromIcon: currentUser.icon, fromUid: currentUser.uid });
+                alert("リクエスト送信しました");
+            });
+        });
+    }
+
+    function renderRequests() {
+        db.ref(`requests/${currentUser.uid}`).on('value', (snap) => {
+            const reqs = snap.val() || {};
+            const container = document.getElementById('requestsList');
+            container.innerHTML = '';
+            for(let [fromId, req] of Object.entries(reqs)) {
                 const div = document.createElement('div');
                 div.className = 'user-row';
-                div.innerHTML = `<span>${u.icon || '😀'} ${u.name} (${u.friendCode})</span><button data-uid="${u.uid}" class="connectReqBtn">つながる</button>`;
+                div.innerHTML = `<span>${req.fromIcon} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq">許可</button><button data-uid="${fromId}" class="rejectReq">拒否</button></div>`;
                 container.appendChild(div);
             }
-        });
-        document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async (e) => {
-            const target = btn.getAttribute('data-uid');
-            await db.ref(`requests/${target}/${currentUser.uid}`).set({ fromName: currentUser.name, fromIcon: currentUser.icon, fromUid: currentUser.uid });
-            alert("リクエスト送信しました");
-        });
-    }
-
-    async function renderRequests() {
-        const reqSnap = await db.ref(`requests/${currentUser.uid}`).once('value');
-        const reqs = reqSnap.val() || {};
-        const container = document.getElementById('requestsList');
-        container.innerHTML = '';
-        for(let [fromId, req] of Object.entries(reqs)) {
-            const div = document.createElement('div');
-            div.className = 'user-row';
-            div.innerHTML = `<span>${req.fromIcon} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq">許可</button><button data-uid="${fromId}" class="rejectReq">拒否</button></div>`;
-            container.appendChild(div);
-        }
-        document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async (e) => {
-            const fid = btn.getAttribute('data-uid');
-            await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true);
-            await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true);
-            await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
-            renderRequests(); renderFriends();
-        });
-        document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async (e) => {
-            const fid = btn.getAttribute('data-uid');
-            await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
-            renderRequests();
+            document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => {
+                const fid = btn.getAttribute('data-uid');
+                await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true);
+                await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true);
+                await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
+                renderFriends();
+            });
+            document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async () => {
+                const fid = btn.getAttribute('data-uid');
+                await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
+            });
         });
     }
 
-    // チャット簡易版 (グローバルチャット + グループ)
-    let currentChatId = null;
+    // チャット一覧: 全体 + フレンド個人 + グループ
     async function renderChatList() {
-        const groupsSnap = await db.ref(`groups`).once('value');
-        const listUl = document.getElementById('chatListUl');
-        listUl.innerHTML = '<li style="cursor:pointer" data-chat="global">🌍 全体チャット</li>';
+        const container = document.getElementById('chatListContainer');
+        container.innerHTML = '';
+        // 全体チャット
+        const globalDiv = document.createElement('div');
+        globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`;
+        globalDiv.innerHTML = '<i class="fas fa-globe"></i> 🌍 全体チャット';
+        globalDiv.onclick = () => openChat('global', 'global');
+        container.appendChild(globalDiv);
+        
+        // フレンド個人チャット
+        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+        const friends = friendsSnap.val() || {};
+        for(let friendId of Object.keys(friends)) {
+            const fdata = (await db.ref(`users/${friendId}`).once('value')).val();
+            if(fdata) {
+                const friendDiv = document.createElement('div');
+                friendDiv.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`;
+                friendDiv.innerHTML = `<i class="fas fa-user-friends"></i> 💬 ${fdata.icon} ${fdata.name}`;
+                friendDiv.onclick = () => openChat(`friend_${friendId}`, 'friend', friendId);
+                container.appendChild(friendDiv);
+            }
+        }
+        
+        // グループチャット
+        const groupsSnap = await db.ref('groups').once('value');
         groupsSnap.forEach(snap => {
             const group = snap.val();
             if(group.members && group.members[currentUser.uid]) {
-                const li = document.createElement('li');
-                li.style.cursor = 'pointer';
-                li.setAttribute('data-chat', snap.key);
-                li.innerText = `👥 ${group.name}`;
-                listUl.appendChild(li);
+                const groupDiv = document.createElement('div');
+                groupDiv.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`;
+                groupDiv.innerHTML = `<span><i class="fas fa-users"></i> 👥 ${group.name}</span><button class="group-exit-btn" data-group="${snap.key}">退出</button>`;
+                groupDiv.onclick = (e) => { if(e.target.className !== 'group-exit-btn') openChat(snap.key, 'group', null, group.name); };
+                container.appendChild(groupDiv);
             }
         });
-        document.querySelectorAll('[data-chat]').forEach(el => el.onclick = () => openChat(el.getAttribute('data-chat')));
-    }
-    function openChat(chatId) {
-        currentChatId = chatId;
-        document.getElementById('currentChatName').innerText = chatId === 'global' ? '全体チャット' : 'グループチャット';
-        loadMessages(chatId);
-    }
-    async function loadMessages(chatId) {
-        const path = chatId === 'global' ? 'globalMessages' : `groups/${chatId}/messages`;
-        const snap = await db.ref(path).limitToLast(50).once('value');
-        const history = document.getElementById('messagesHistory');
-        history.innerHTML = '';
-        const msgs = snap.val() || {};
-        Object.values(msgs).forEach(msg => {
-            const div = document.createElement('div');
-            div.className = 'message-bubble';
-            div.innerHTML = `<b>${msg.senderName}</b>: ${msg.text} ${msg.imageUrl ? `<br/><img src="${msg.imageUrl}" style="max-width:200px; border-radius:12px;"/>` : ''}`;
-            history.appendChild(div);
+        document.querySelectorAll('.group-exit-btn').forEach(btn => btn.onclick = async (e) => {
+            e.stopPropagation();
+            const groupId = btn.getAttribute('data-group');
+            await db.ref(`groups/${groupId}/members/${currentUser.uid}`).remove();
+            if(currentChatId === groupId) currentChatId = null;
+            renderChatList();
         });
     }
-    document.getElementById('sendMsgBtn').onclick = async () => {
+
+    function openChat(chatId, type, friendId = null, groupName = null) {
+        currentChatId = chatId;
+        currentChatType = type;
+        let displayName = '';
+        if(type === 'global') displayName = '全体チャット';
+        else if(type === 'friend') displayName = '個人チャット';
+        else displayName = groupName || 'グループ';
+        document.getElementById('currentChatName').innerText = displayName;
+        loadMessages();
+        renderChatList();
+    }
+
+    async function loadMessages() {
         if(!currentChatId) return;
-        const text = document.getElementById('messageInput').value;
+        let path = '';
+        if(currentChatType === 'global') path = 'globalMessages';
+        else if(currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`;
+        else path = `groups/${currentChatId}/messages`;
+        
+        db.ref(path).limitToLast(50).on('value', (snap) => {
+            const history = document.getElementById('messagesHistory');
+            history.innerHTML = '';
+            const msgs = snap.val() || {};
+            Object.values(msgs).sort((a,b) => (a.timestamp||0) - (b.timestamp||0)).forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message-bubble ${msg.senderId === currentUser.uid ? 'my-message' : 'other-message'}`;
+                div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div><div class="message-text">${escapeHtml(msg.text || '')}</div>${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}`;
+                history.appendChild(div);
+            });
+            history.scrollTop = history.scrollHeight;
+        });
+    }
+
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m) { if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;'; return m;}); }
+
+    document.getElementById('sendMsgBtn').onclick = async () => {
+        if(!currentChatId || !currentChatType) return;
+        const text = document.getElementById('messageInput').value.trim();
         if(!text) return;
-        const msgData = { senderId: currentUser.uid, senderName: currentUser.name, text, timestamp: Date.now() };
-        if(currentChatId === 'global') await db.ref('globalMessages').push(msgData);
+        const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text, timestamp: Date.now() };
+        if(currentChatType === 'global') await db.ref('globalMessages').push(msgData);
+        else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData);
         else await db.ref(`groups/${currentChatId}/messages`).push(msgData);
         document.getElementById('messageInput').value = '';
-        loadMessages(currentChatId);
     };
+
     document.getElementById('createGroupBtn').onclick = async () => {
         const groupName = prompt("グループ名");
         if(!groupName) return;
-        const newGroup = { name: groupName, members: { [currentUser.uid]: true }, messages: {} };
+        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+        const friendIds = Object.keys(friendsSnap.val() || {});
+        if(friendIds.length === 0) { alert("フレンドがいません"); return; }
+        const members = { [currentUser.uid]: true };
+        for(let fid of friendIds) members[fid] = true;
         const groupRef = db.ref('groups').push();
-        await groupRef.set(newGroup);
+        await groupRef.set({ name: groupName, members, createdAt: Date.now() });
         renderChatList();
     };
     document.getElementById('refreshChatsBtn').onclick = () => renderChatList();
+    document.getElementById('sendImageBtn').onclick = () => { alert("画像アップロード機能は簡易版のため、テキストのみ対応しています。"); };
 
-    // ボイスチャット: 音声認識→合成
-    let voiceRoomId = null;
-    let recognition = null;
-    document.getElementById('createVoiceRoomBtn').onclick = async () => {
-        const friendsList = Object.keys(currentUser.friends || {});
-        if(friendsList.length === 0) { alert("フレンドがいません"); return; }
-        const targetFriend = prompt("招待するフレンドのUID(最初の一人) : フレンドコードではありません。簡易版のためfriendListから選んでください。コンソール参照", friendsList[0]);
-        if(targetFriend && currentUser.friends[targetFriend]) {
-            voiceRoomId = `room_${Date.now()}`;
-            await db.ref(`voiceRooms/${voiceRoomId}`).set({ host: currentUser.uid, members: { [currentUser.uid]: true, [targetFriend]: true }, active: true });
-            await db.ref(`users/${currentUser.uid}/voiceRoom`).set(voiceRoomId);
-            await db.ref(`users/${targetFriend}/voiceRoom`).set(voiceRoomId);
-            listenVoiceRoom();
-        }
-    };
-    function listenVoiceRoom() {
-        if(voiceRoomId) {
-            db.ref(`voiceRooms/${voiceRoomId}/members`).on('value', snap => {
-                const members = snap.val() || {};
-                document.getElementById('voiceMembersArea').innerHTML = `メンバー: ${Object.keys(members).join(',')}`;
+    // ボイスチャット招待システム
+    function listenVoiceInvites() {
+        db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => {
+            const invite = snap.val();
+            const div = document.createElement('div');
+            div.className = 'invite-notification';
+            div.innerHTML = `<span>🎤 ${invite.fromName} からボイスチャット招待が届きました！</span><div><button data-invite="${snap.key}" data-room="${invite.roomId}" class="acceptVoiceInvite">参加</button><button data-invite="${snap.key}" class="rejectVoiceInvite">拒否</button></div>`;
+            document.getElementById('voiceInviteArea').prepend(div);
+            document.querySelectorAll('.acceptVoiceInvite').forEach(btn => btn.onclick = async () => {
+                const roomId = btn.getAttribute('data-room');
+                const inviteKey = btn.getAttribute('data-invite');
+                await db.ref(`voiceRooms/${roomId}/members/${currentUser.uid}`).set(true);
+                await db.ref(`users/${currentUser.uid}/voiceRoom`).set(roomId);
+                await db.ref(`voiceInvites/${currentUser.uid}/${inviteKey}`).remove();
+                joinVoiceRoom(roomId);
+                div.remove();
             });
-            startVoiceInput();
-        }
+            document.querySelectorAll('.rejectVoiceInvite').forEach(btn => btn.onclick = async () => {
+                const inviteKey = btn.getAttribute('data-invite');
+                await db.ref(`voiceInvites/${currentUser.uid}/${inviteKey}`).remove();
+                div.remove();
+            });
+        });
     }
-    function startVoiceInput() {
-        if(!('webkitSpeechRecognition' in window)) { alert("ブラウザ未対応"); return; }
+
+    document.getElementById('startVoiceInviteBtn').onclick = async () => {
+        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+        const friendIds = Object.keys(friendsSnap.val() || {});
+        if(friendIds.length === 0) { alert("フレンドがいません"); return; }
+        const friendList = [];
+        for(let fid of friendIds) {
+            const fdata = (await db.ref(`users/${fid}`).once('value')).val();
+            if(fdata) friendList.push({ uid: fid, name: fdata.name });
+        }
+        const select = prompt("招待するフレンドの名前を入力:\n" + friendList.map(f => `${f.name} (${f.uid})`).join('\n'));
+        const target = friendList.find(f => f.name === select || f.uid === select);
+        if(!target) { alert("フレンドが見つかりません"); return; }
+        const newRoomId = `room_${Date.now()}`;
+        await db.ref(`voiceRooms/${newRoomId}`).set({ host: currentUser.uid, members: { [currentUser.uid]: true }, active: true, createdAt: Date.now() });
+        await db.ref(`voiceInvites/${target.uid}`).push({ fromName: currentUser.name, fromUid: currentUser.uid, roomId: newRoomId });
+        await db.ref(`users/${currentUser.uid}/voiceRoom`).set(newRoomId);
+        joinVoiceRoom(newRoomId);
+        alert(`${target.name} に招待を送信しました`);
+    };
+
+    function joinVoiceRoom(roomId) {
+        if(voiceRoomId) leaveVoiceRoom();
+        voiceRoomId = roomId;
+        document.getElementById('voiceRoomStatus').innerHTML = `✅ ボイスチャット接続中 (ルーム: ${roomId})`;
+        db.ref(`voiceRooms/${roomId}/members`).on('value', (snap) => {
+            const members = snap.val() || {};
+            document.getElementById('voiceMembersArea').innerHTML = `👥 メンバー: ${Object.keys(members).map(m => m === currentUser.uid ? `${currentUser.name}(あなた)` : m).join(', ')}`;
+        });
+        // 会話ログ (最大100件)
+        db.ref(`voiceRooms/${roomId}/voiceLog`).limitToLast(100).on('value', (snap) => {
+            const logs = snap.val() || {};
+            const logDiv = document.getElementById('voiceLogList');
+            logDiv.innerHTML = '';
+            Object.values(logs).sort((a,b)=>a.timestamp-b.timestamp).forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'voice-message-item';
+                item.innerHTML = `<strong>${log.senderName}:</strong> ${log.text}`;
+                logDiv.appendChild(item);
+            });
+        });
+        startVoiceRecognition();
+    }
+
+    function startVoiceRecognition() {
+        if(!('webkitSpeechRecognition' in window)) return;
         recognition = new webkitSpeechRecognition();
         recognition.lang = 'ja-JP';
         recognition.interimResults = false;
         recognition.onresult = async (event) => {
             const text = event.results[0][0].transcript;
             if(text && voiceRoomId) {
-                const voiceMsg = { text, sender: currentUser.uid, senderName: currentUser.name };
-                await db.ref(`voiceRooms/${voiceRoomId}/voiceMessages`).push(voiceMsg);
+                const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() };
+                await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData);
+                // 相手に音声読み上げ
+                const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value');
+                membersSnap.forEach(memberSnap => {
+                    if(memberSnap.key !== currentUser.uid) {
+                        db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name });
+                    }
+                });
             }
         };
-        recognition.onend = () => { if(voiceRoomId) recognition.start(); };
-        recognition.start();
-        db.ref(`voiceRooms/${voiceRoomId}/voiceMessages`).on('child_added', snap => {
-            const data = snap.val();
-            if(data.sender !== currentUser.uid) {
-                speakText(data.text);
-            }
-        });
+        if(isMicActive) recognition.start();
+        recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); };
     }
+
+    // 音声読み上げリスナー
+    db.ref(`voiceSpeak/${currentUser?.uid}`).on('child_added', (snap) => {
+        const data = snap.val();
+        if(data) speakText(data.text);
+        snap.ref.remove();
+    });
+
+    document.getElementById('toggleMicBtn').onclick = () => {
+        isMicActive = !isMicActive;
+        const btn = document.getElementById('toggleMicBtn');
+        if(isMicActive) {
+            if(recognition) recognition.start();
+            btn.innerHTML = '🎙️ マイクON';
+            btn.classList.add('active');
+        } else {
+            if(recognition) recognition.stop();
+            btn.innerHTML = '🎙️ マイクOFF';
+            btn.classList.remove('active');
+        }
+    };
+    document.getElementById('sendVoiceTextBtn').onclick = () => {
+        const div = document.getElementById('voiceTextInputDiv');
+        div.style.display = div.style.display === 'none' ? 'flex' : 'none';
+    };
+    document.getElementById('submitVoiceTextBtn').onclick = async () => {
+        const text = document.getElementById('voiceManualText').value.trim();
+        if(text && voiceRoomId) {
+            const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() };
+            await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData);
+            const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value');
+            membersSnap.forEach(memberSnap => {
+                if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name });
+            });
+            document.getElementById('voiceManualText').value = '';
+        }
+    };
+    document.getElementById('leaveVoiceBtn').onclick = async () => { leaveVoiceRoom(); };
+    function leaveVoiceRoom() {
+        if(voiceRoomId) {
+            db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove();
+            db.ref(`users/${currentUser.uid}/voiceRoom`).remove();
+        }
+        if(recognition) recognition.stop();
+        isMicActive = false;
+        voiceRoomId = null;
+        document.getElementById('voiceRoomStatus').innerHTML = '未接続';
+        document.getElementById('voiceMembersArea').innerHTML = '';
+        document.getElementById('toggleMicBtn').innerHTML = '🎙️ マイクOFF';
+        document.getElementById('toggleMicBtn').classList.remove('active');
+    }
+
     let speechSynthesis = window.speechSynthesis;
     function speakText(text) {
         const utterance = new SpeechSynthesisUtterance(text);
@@ -762,24 +593,18 @@
         utterance.rate = parseFloat(document.getElementById('rateSlider').value);
         utterance.volume = parseFloat(document.getElementById('volumeSlider').value);
         const preset = localStorage.getItem('voicePreset') || 'standard';
-        if(preset === 'female') utterance.voice = speechSynthesis.getVoices().find(v => v.name.includes('Google 日本語') && v.name.includes('女性'));
-        else if(preset === 'robot') utterance.rate = 1.8;
-        else if(preset === 'alien') utterance.pitch = 1.6;
+        if(preset === 'female') utterance.voice = speechSynthesis.getVoices().find(v => v.lang === 'ja-JP' && v.name.includes('女性'));
+        else if(preset === 'robot') utterance.rate = 1.6;
+        else if(preset === 'alien') utterance.pitch = 1.5;
         speechSynthesis.speak(utterance);
     }
     function setupVoiceSettings() {
         document.querySelectorAll('[data-preset]').forEach(btn => btn.onclick = () => {
-            const preset = btn.getAttribute('data-preset');
-            localStorage.setItem('voicePreset', preset);
-            document.getElementById('currentVoicePreset').innerText = preset;
+            localStorage.setItem('voicePreset', btn.getAttribute('data-preset'));
+            document.getElementById('currentVoicePreset').innerText = btn.getAttribute('data-preset');
         });
         document.getElementById('testVoiceBtn').onclick = () => speakText("これはテストボイスです。");
     }
-    document.getElementById('leaveVoiceBtn').onclick = async () => {
-        if(voiceRoomId) await db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove();
-        if(recognition) recognition.stop();
-        voiceRoomId = null;
-    };
     function initTabs() {
         const tabs = document.querySelectorAll('.sidebar-icon');
         const views = ['home', 'connect', 'messages', 'voice', 'settings'];
@@ -789,9 +614,8 @@
                 document.getElementById(views[idx]+'View').classList.add('active-view');
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                if(views[idx]==='home') { loadUserData(); }
-                if(views[idx]==='connect') { renderOnlineUsers(); renderRequests(); }
-                if(views[idx]==='messages') { renderChatList(); }
+                if(views[idx]==='home') loadUserData();
+                if(views[idx]==='messages') renderChatList();
             };
         });
         document.getElementById('homeView').classList.add('active-view');
@@ -799,28 +623,17 @@
     }
     function loadIconPicker() {
         const icons = ['😀','😎','🥳','😺','🐶','🌸','🌟','🎮','⚡','💎'];
-        const container = document.getElementById('iconPicker');
         icons.forEach(ic => {
             const span = document.createElement('span');
-            span.innerText = ic;
-            span.className = 'icon-option';
-            span.onclick = async () => {
-                await db.ref(`users/${currentUser.uid}/icon`).set(ic);
-                currentUser.icon = ic;
-                loadUserData();
-            };
-            container.appendChild(span);
+            span.innerText = ic; span.className = 'icon-option';
+            span.onclick = async () => { await db.ref(`users/${currentUser.uid}/icon`).set(ic); currentUser.icon = ic; loadUserData(); };
+            document.getElementById('iconPicker').appendChild(span);
         });
     }
     document.getElementById('updateNameBtn').onclick = async () => {
         const newName = document.getElementById('changeNameInput').value.trim();
         if(newName) { await db.ref(`users/${currentUser.uid}/name`).set(newName); currentUser.name = newName; loadUserData(); }
     };
-    function initRealtimeListeners() {
-        window.addEventListener('beforeunload', () => { if(currentUser) db.ref(`users/${currentUser.uid}/online`).set(false); });
-        if(currentUser) db.ref(`users/${currentUser.uid}/online`).set(true);
-    }
-    // 既存ユーザー確認
     const stored = localStorage.getItem('forcord_user');
     if(stored) { currentUser = JSON.parse(stored); startApp(); }
 </script>
