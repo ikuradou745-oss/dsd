@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forcord - 完全版</title>
+  <title>Forcord - 完全安定版</title>
   <style>
     :root {
       --bg-color: #202225;
@@ -104,16 +104,16 @@
     .msg-bubble img { max-width: 200px; max-height: 200px; border-radius: 8px; cursor: pointer; margin-top: 5px; }
     .msg-row.self .msg-bubble { background-color: var(--neon-green); }
     .msg-row.other .msg-bubble { background-color: #ffffff; }
-    .msg-input-area { padding: 20px; background-color: var(--nav-bg); display: flex; gap: 10px; align-items: center; }
-    .msg-input-area input { flex: 1; background-color: var(--panel-bg); border: none; padding: 15px; border-radius: 8px; color: white; }
-    .image-upload-btn { background: var(--btn-bg); padding: 10px; border-radius: 8px; cursor: pointer; font-size: 20px; }
+    .msg-input-area { padding: 20px; background-color: var(--nav-bg); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .msg-input-area input { flex: 1; background-color: var(--panel-bg); border: none; padding: 15px; border-radius: 8px; color: white; min-width: 200px; }
+    .image-upload-btn { background: var(--btn-bg); padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; display: inline-block; }
 
     #settings-view { padding: 30px; overflow-y: auto; }
     .settings-group { background-color: var(--nav-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px; }
     .icon-selector { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; margin-top: 10px; }
     .icon-option { font-size: 24px; cursor: pointer; text-align: center; padding: 5px; border-radius: 4px; }
     .icon-option.selected { border-color: var(--neon-blue); background-color: rgba(0,243,255,0.2); border: 1px solid var(--neon-blue); }
-    .voice-preset-select { width: 100%; margin: 10px 0; }
+    .voice-preset-select { width: 100%; margin: 10px 0; padding: 8px; }
     .voice-slider { margin: 15px 0; }
 
     #voice-view { display: flex; flex-direction: column; padding: 20px; height: 100%; }
@@ -205,7 +205,8 @@
           <div class="msg-history" id="message-history"></div>
           <div class="msg-input-area">
             <input type="text" id="message-input" placeholder="メッセージを入力..." maxlength="500">
-            <label class="image-upload-btn" style="cursor: pointer;">📷<input type="file" id="image-input" accept="image/*" style="display: none;"></label>
+            <label class="image-upload-btn" id="image-upload-label">📷 画像アップロード</label>
+            <input type="file" id="image-input" accept="image/*" style="display: none;">
             <button class="primary-btn" id="send-msg-btn">送信</button>
           </div>
         </div>
@@ -323,7 +324,7 @@
     const state = {
       userId: null, userData: null, usersCache: {}, friends: [], chats: [], currentChatId: null,
       voiceRoomId: null, voiceRoomHost: null, recognition: null, isMicOn: false,
-      pendingInvitation: null, activeListeners: {}, lastProcessedTimestamp: 0
+      pendingInvitation: null, activeListeners: {}, processedVoiceMsgIds: new Set()
     };
 
     const utils = {
@@ -386,7 +387,6 @@
         document.getElementById('profile-name-display').innerText = state.userData.name;
         document.getElementById('profile-code-display').innerText = `コード: ${state.userData.friendCode}`;
         
-        // 音声設定UI
         const voiceSettings = state.userData.voiceSettings || { pitch: 1, rate: 1, volume: 1 };
         document.getElementById('voice-pitch').value = voiceSettings.pitch;
         document.getElementById('voice-rate').value = voiceSettings.rate;
@@ -401,16 +401,14 @@
         
         document.getElementById('voice-preset').onchange = () => {
           const preset = document.getElementById('voice-preset').value;
-          let pitch = 1, rate = 1, volume = 1;
+          let pitch = 1, rate = 1;
           if (preset === 'female') { pitch = 1.5; rate = 1.1; }
           else if (preset === 'robot') { pitch = 1; rate = 0.8; }
           else if (preset === 'alien') { pitch = 1.8; rate = 0.9; }
           document.getElementById('voice-pitch').value = pitch;
           document.getElementById('voice-rate').value = rate;
-          document.getElementById('voice-volume').value = volume;
           document.getElementById('pitch-value').innerText = pitch;
           document.getElementById('rate-value').innerText = rate;
-          document.getElementById('volume-value').innerText = volume;
         };
         
         document.getElementById('test-voice-btn').onclick = () => {
@@ -425,15 +423,32 @@
           alert("声の設定を保存しました");
         };
         
-        // 画像アップロード
-        document.getElementById('image-input').onchange = async (e) => {
-          const file = e.target.files[0];
-          if (!file || !state.currentChatId) return;
-          const url = await utils.uploadImage(file);
-          await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, image: url, timestamp: serverTimestamp() });
-          await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() });
-          document.getElementById('image-input').value = '';
-        };
+        // 画像アップロード修正
+        const imageLabel = document.getElementById('image-upload-label');
+        const imageInput = document.getElementById('image-input');
+        if (imageLabel && imageInput) {
+          imageLabel.onclick = (e) => {
+            e.preventDefault();
+            if (!state.currentChatId) {
+              alert("先にチャットを選択してください");
+              return;
+            }
+            imageInput.click();
+          };
+          imageInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file || !state.currentChatId) return;
+            try {
+              const url = await utils.uploadImage(file);
+              await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, image: url, timestamp: serverTimestamp() });
+              await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() });
+              imageInput.value = '';
+            } catch (err) {
+              console.error("画像アップロードエラー:", err);
+              alert("画像のアップロードに失敗しました");
+            }
+          };
+        }
       },
       switchView: (viewId) => {
         document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
@@ -505,19 +520,19 @@
           state.recognition.lang = 'ja-JP'; 
           state.recognition.interimResults = false;
           state.recognition.continuous = true; 
-          let lastText = '';
-          state.recognition.onresult = (e) => { 
-            if (!state.isMicOn || !state.voiceRoomId) return; 
+          let isProcessing = false;
+          state.recognition.onresult = async (e) => { 
+            if (!state.isMicOn || !state.voiceRoomId || isProcessing) return; 
+            isProcessing = true;
             for (let i = e.resultIndex; i < e.results.length; i++) {
               if (e.results[i].isFinal) {
                 const text = e.results[i][0].transcript.trim();
-                if (text && text !== lastText) {
-                  lastText = text;
-                  push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() });
-                  setTimeout(() => { lastText = ''; }, 1000);
+                if (text) {
+                  await push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() });
                 }
               }
             }
+            setTimeout(() => { isProcessing = false; }, 500);
           }; 
           state.recognition.onerror = (e) => console.log("音声認識エラー:", e); 
           state.recognition.onend = () => { 
@@ -630,11 +645,14 @@
         const msgQuery = query(ref(db, `chats/${chatId}/messages`), orderByChild('timestamp'), limitToLast(100)); 
         const unsubscribe = onValue(msgQuery, async (snap) => { 
           const hist = document.getElementById('message-history'); 
-          hist.innerHTML = ''; 
           if (snap.exists()) { 
             const msgs = []; 
             snap.forEach(c => msgs.push({ ...c.val(), key: c.key })); 
             msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+            
+            // スクロール位置を保持
+            const wasAtBottom = hist.scrollHeight - hist.clientHeight <= hist.scrollTop + 50;
+            hist.innerHTML = '';
             for (const m of msgs) { 
               const sender = await utils.getUserData(m.sender); 
               if (sender) { 
@@ -643,13 +661,17 @@
                 msgDiv.className = `msg-row ${isSelf ? 'self' : 'other'}`; 
                 let content = '';
                 if (m.text) content = `<div class="msg-bubble">${utils.escapeHTML(m.text)}</div>`;
-                if (m.image) content = `<div class="msg-bubble"><img src="${m.image}" alt="画像" style="max-width:200px; max-height:200px; border-radius:8px;"></div>`;
+                if (m.image) content = `<div class="msg-bubble"><img src="${m.image}" alt="画像" onclick="window.open('${m.image}')" style="max-width:200px; max-height:200px; border-radius:8px; cursor:pointer;"></div>`;
                 msgDiv.innerHTML = `<div class="message-block"><div class="msg-icon">${utils.escapeHTML(sender.icon)}</div><div class="msg-content"><div class="msg-sender">${utils.escapeHTML(sender.name)}</div>${content}</div></div>`; 
                 hist.appendChild(msgDiv); 
               } 
             } 
-            hist.scrollTop = hist.scrollHeight; 
-          } 
+            if (wasAtBottom) {
+              hist.scrollTop = hist.scrollHeight;
+            }
+          } else {
+            hist.innerHTML = '';
+          }
         }); 
         state.activeListeners.chat = unsubscribe; 
       },
@@ -745,6 +767,7 @@
         document.getElementById('vc-setup-area').classList.add('hidden'); 
         document.getElementById('vc-room-area').classList.remove('hidden'); 
         state.isMicOn = true; 
+        state.processedVoiceMsgIds.clear();
         const micBtn = document.getElementById('mic-toggle-btn');
         micBtn.innerHTML = "🎤 マイク ON"; 
         micBtn.className = "primary-btn"; 
@@ -761,23 +784,27 @@
           const msgs = [];
           snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
           msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+          
+          const wasAtBottom = logDiv.scrollHeight - logDiv.clientHeight <= logDiv.scrollTop + 50;
           logDiv.innerHTML = '';
           for (const msg of msgs) {
-            if (msg.timestamp <= state.lastProcessedTimestamp) continue;
             const sender = await utils.getUserData(msg.sender);
             const senderName = sender ? sender.name : '不明';
             const msgDiv = document.createElement('div');
             msgDiv.className = 'vc-text-entry';
-            msgDiv.innerHTML = `<div class="vc-text-sender">${utils.escapeHTML(senderName)}</div><div class="vc-text-message">${utils.escapeHTML(msg.text)}</div>`;
+            msgDiv.innerHTML = `<div class="vc-text-sender" style="color:var(--neon-blue);">${utils.escapeHTML(senderName)}</div><div class="vc-text-message">${utils.escapeHTML(msg.text || '')}</div>`;
             logDiv.appendChild(msgDiv);
-            if (msg.sender !== state.userId) {
+            
+            if (msg.sender !== state.userId && !state.processedVoiceMsgIds.has(msg.id)) {
+              state.processedVoiceMsgIds.add(msg.id);
               utils.playTTS(msg.text, sender?.voiceSettings);
               const memberEl = document.getElementById(`vc-m-${msg.sender}`);
               if (memberEl) { memberEl.classList.add('speaking-ring'); setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); }
             }
-            state.lastProcessedTimestamp = msg.timestamp;
           }
-          logDiv.scrollTop = logDiv.scrollHeight;
+          if (wasAtBottom) {
+            logDiv.scrollTop = logDiv.scrollHeight;
+          }
         });
         state.activeListeners.voice = unsubscribe;
         
@@ -817,7 +844,7 @@
         if (state.recognition) try { state.recognition.stop(); } catch(e) {} 
         state.isMicOn = false; 
         state.voiceRoomId = null; 
-        state.lastProcessedTimestamp = 0;
+        state.processedVoiceMsgIds.clear();
         document.getElementById('vc-room-area').classList.add('hidden'); 
         document.getElementById('vc-setup-area').classList.remove('hidden'); 
         app.updateOnlineFriendsList(); 
