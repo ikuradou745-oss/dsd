@@ -51,12 +51,15 @@
         .chat-area { flex: 1; display: flex; flex-direction: column; background: #2b2d31; }
         .chat-header { padding: 16px; border-bottom: 1px solid #3c3f45; font-weight: 600; }
         .messages-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .message-bubble { padding: 8px 14px; border-radius: 20px; max-width: 70%; display: flex; flex-direction: column; gap: 4px; }
+        .message-bubble { padding: 8px 14px; border-radius: 20px; max-width: 70%; display: flex; flex-direction: column; gap: 4px; position: relative; }
         .message-bubble.my-message { background: #248046; align-self: flex-end; }
         .message-bubble.other-message { background: #1e1f22; align-self: flex-start; }
         .message-sender { font-size: 0.75rem; opacity: 0.8; display: flex; align-items: center; gap: 6px; }
         .message-text { word-wrap: break-word; }
         .message-image { max-width: 200px; border-radius: 12px; margin-top: 4px; cursor: pointer; }
+        .read-status { font-size: 0.65rem; opacity: 0.6; margin-top: 4px; cursor: pointer; display: inline-block; }
+        .read-status:hover { opacity: 1; text-decoration: underline; }
+        .unread-badge { background: #ed4245; color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: bold; margin-left: 8px; }
         .message-input-area { padding: 16px; display: flex; gap: 12px; background: #1e1f22; border-top: 1px solid #3c3f45; }
         .message-input-area input { flex: 1; background: #111214; border: none; border-radius: 28px; padding: 12px; color: white; }
         .chat-item { cursor: pointer; padding: 10px; border-radius: 12px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
@@ -96,8 +99,8 @@
         .clearfix::after { content: ""; clear: both; display: table; }
         .voice-indicator { display: inline-block; width: 8px; height: 8px; background: #23a559; border-radius: 50%; margin-right: 6px; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-        .mic-on-animation { animation: micPulse 0.5s ease; }
-        @keyframes micPulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .voice-speaking { background: #23a559 !important; animation: speakPulse 0.3s ease; }
+        @keyframes speakPulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
@@ -141,6 +144,7 @@
         { name: 'へぇ〜〜', price: 7500 }, { name: '話聞けやボケェ', price: 10000 }
     ];
     let ownedStamps = [...defaultStamps];
+    let unreadCounts = {};
 
     function generateFriendCode() { return Math.floor(10000000 + Math.random() * 90000000).toString(); }
     document.getElementById('createAccountBtn').onclick = async () => {
@@ -167,9 +171,27 @@
         listenVoiceInvites();
         renderShop();
         setupGroupModal();
-        // 音声認識の権限確認
-        if('webkitSpeechRecognition' in window) console.log('音声認識対応ブラウザ');
+        startVoiceMessagePoller();
+        if('webkitSpeechRecognition' in window) console.log('音声認識対応');
         else alert("このブラウザは音声認識に対応していません。Chrome推奨");
+    }
+
+    // ポーリング方式で音声メッセージをチェック（確実に読み上げ）
+    let lastVoiceMessageTime = 0;
+    function startVoiceMessagePoller() {
+        setInterval(async () => {
+            if(!currentUser) return;
+            const snap = await db.ref(`voiceSpeak/${currentUser.uid}`).limitToLast(5).once('value');
+            const msgs = snap.val() || {};
+            Object.entries(msgs).forEach(([key, data]) => {
+                if(data && data.text && data.timestamp > lastVoiceMessageTime) {
+                    console.log(`ポーラー読み上げ: ${data.fromName}: ${data.text}`);
+                    speakText(data.text);
+                    lastVoiceMessageTime = data.timestamp;
+                    db.ref(`voiceSpeak/${currentUser.uid}/${key}`).remove();
+                }
+            });
+        }, 1000);
     }
 
     async function loadUserFull() {
@@ -184,7 +206,7 @@
             document.getElementById('profileIconSpan').innerText = currentUser.icon;
             updateCoinDisplay();
         }
-        await renderFriends(); renderOnlineUsers(); renderRequests(); renderChatList();
+        await renderFriends(); renderOnlineUsers(); renderRequests(); renderChatListWithUnread();
     }
 
     function updateCoinDisplay() {
@@ -219,19 +241,109 @@
     function renderOnlineUsers() { db.ref('users').on('value', (snap) => { const container = document.getElementById('onlineUsersList'); container.innerHTML = ''; snap.forEach(userSnap => { const u = userSnap.val(); if(u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) container.innerHTML += `<div class="user-row"><span>${u.icon} ${u.name}</span><button data-uid="${u.uid}" class="connectReqBtn">つながる</button></div>`; }); document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async () => { const target = btn.getAttribute('data-uid'); await db.ref(`requests/${target}/${currentUser.uid}`).set({ fromName: currentUser.name, fromIcon: currentUser.icon, fromUid: currentUser.uid }); alert("リクエスト送信しました"); }); }); }
     function renderRequests() { db.ref(`requests/${currentUser.uid}`).on('value', (snap) => { const reqs = snap.val() || {}; const container = document.getElementById('requestsList'); container.innerHTML = ''; for(let [fromId, req] of Object.entries(reqs)) container.innerHTML += `<div class="user-row"><span>${req.fromIcon} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq">許可</button><button data-uid="${fromId}" class="rejectReq">拒否</button></div></div>`; document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true); await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); renderFriends(); }); document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); }); }); }
 
-    async function renderChatList() {
+    async function renderChatListWithUnread() {
         const container = document.getElementById('chatListContainer'); container.innerHTML = '';
         const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>'; globalDiv.onclick = () => openChat('global', 'global'); container.appendChild(globalDiv);
         const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
-        for(let friendId of Object.keys(friendsSnap.val() || {})) { const fdata = (await db.ref(`users/${friendId}`).once('value')).val(); if(fdata) { const fd = document.createElement('div'); fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`; fd.innerHTML = `<div><i class="fas fa-user-friends"></i> 💬 ${fdata.icon} ${fdata.name}</div>`; fd.onclick = () => openChat(`friend_${friendId}`, 'friend'); container.appendChild(fd); } }
-        const groupsSnap = await db.ref('groups').once('value'); groupsSnap.forEach(snap => { const group = snap.val(); if(group.members && group.members[currentUser.uid]) { const gd = document.createElement('div'); gd.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`; gd.innerHTML = `<div><i class="fas fa-users"></i> 👥 ${group.name}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>`; gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') openChat(snap.key, 'group'); }; container.appendChild(gd); } });
-        document.querySelectorAll('.group-exit-btn').forEach(btn => btn.onclick = async (e) => { e.stopPropagation(); const groupId = btn.getAttribute('data-group'); await db.ref(`groups/${groupId}/members/${currentUser.uid}`).remove(); if(currentChatId === groupId) currentChatId = null; renderChatList(); });
+        for(let friendId of Object.keys(friendsSnap.val() || {})) { 
+            const fdata = (await db.ref(`users/${friendId}`).once('value')).val(); 
+            if(fdata) { 
+                const unread = unreadCounts[`friend_${friendId}`] || 0;
+                const fd = document.createElement('div'); 
+                fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`; 
+                fd.innerHTML = `<div><i class="fas fa-user-friends"></i> 💬 ${fdata.icon} ${fdata.name}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
+                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); }; 
+                container.appendChild(fd); 
+            } 
+        }
+        const groupsSnap = await db.ref('groups').once('value'); 
+        groupsSnap.forEach(snap => { 
+            const group = snap.val(); 
+            if(group.members && group.members[currentUser.uid]) { 
+                const unread = unreadCounts[snap.key] || 0;
+                const gd = document.createElement('div'); 
+                gd.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`; 
+                gd.innerHTML = `<div><i class="fas fa-users"></i> 👥 ${group.name}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
+                gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') { openChat(snap.key, 'group'); unreadCounts[snap.key] = 0; renderChatListWithUnread(); } }; 
+                container.appendChild(gd); 
+            } 
+        });
+        document.querySelectorAll('.group-exit-btn').forEach(btn => btn.onclick = async (e) => { e.stopPropagation(); const groupId = btn.getAttribute('data-group'); await db.ref(`groups/${groupId}/members/${currentUser.uid}`).remove(); if(currentChatId === groupId) currentChatId = null; renderChatListWithUnread(); });
     }
 
-    function openChat(chatId, type) { currentChatId = chatId; currentChatType = type; document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ'); loadMessages(); renderChatList(); }
-    function loadMessages() { if(!currentChatId) return; let path = ''; if(currentChatType === 'global') path = 'globalMessages'; else if(currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`; else path = `groups/${currentChatId}/messages`; db.ref(path).limitToLast(50).on('value', (snap) => { const history = document.getElementById('messagesHistory'); history.innerHTML = ''; const msgs = snap.val() || {}; Object.values(msgs).sort((a,b)=>a.timestamp-b.timestamp).forEach(msg => { const div = document.createElement('div'); div.className = `message-bubble ${msg.senderId === currentUser.uid ? 'my-message' : 'other-message'}`; div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div><div class="message-text">${escapeHtml(msg.text || '')}</div>${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}`; history.appendChild(div); }); history.scrollTop = history.scrollHeight; }); }
+    function openChat(chatId, type) { 
+        currentChatId = chatId; 
+        currentChatType = type; 
+        document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ'); 
+        loadMessagesWithRead(); 
+        renderChatListWithUnread(); 
+    }
+    
+    async function loadMessagesWithRead() { 
+        if(!currentChatId) return; 
+        let path = ''; 
+        if(currentChatType === 'global') path = 'globalMessages'; 
+        else if(currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`; 
+        else path = `groups/${currentChatId}/messages`; 
+        db.ref(path).limitToLast(50).on('value', async (snap) => { 
+            const msgs = snap.val() || {}; 
+            const history = document.getElementById('messagesHistory'); history.innerHTML = '';
+            let groupMembers = null;
+            if(currentChatType === 'group') groupMembers = (await db.ref(`groups/${currentChatId}/members`).once('value')).val() || {};
+            const memberCount = groupMembers ? Object.keys(groupMembers).length : 0;
+            Object.entries(msgs).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(async ([msgId, msg]) => {
+                const div = document.createElement('div');
+                div.className = `message-bubble ${msg.senderId === currentUser.uid ? 'my-message' : 'other-message'}`;
+                let readHtml = '';
+                if(msg.senderId === currentUser.uid) {
+                    const readBy = msg.readBy || {};
+                    const readCount = Object.keys(readBy).length;
+                    if(currentChatType === 'friend') {
+                        readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="${currentChatId}" data-type="friend">${readCount > 0 ? '既読' : '未読'}</span>`;
+                    } else if(currentChatType === 'group' && memberCount > 0) {
+                        readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="${currentChatId}" data-type="group" data-members="${memberCount}">${readCount >= memberCount ? '既読：全' : `既読：${readCount}`}</span>`;
+                    } else if(currentChatType === 'global') {
+                        readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="global" data-type="global">既読：${readCount}</span>`;
+                    }
+                }
+                div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div><div class="message-text">${escapeHtml(msg.text || '')}</div>${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}${readHtml}`;
+                history.appendChild(div);
+                
+                if(msg.senderId !== currentUser.uid && !msg.readBy?.[currentUser.uid]) {
+                    const readPath = currentChatType === 'global' ? `globalMessages/${msgId}/readBy/${currentUser.uid}` :
+                                    (currentChatType === 'friend' ? `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages/${msgId}/readBy/${currentUser.uid}` :
+                                    `groups/${currentChatId}/messages/${msgId}/readBy/${currentUser.uid}`);
+                    await db.ref(readPath).set(true);
+                    const chatKey = currentChatId === 'global' ? 'global' : (currentChatType === 'friend' ? `friend_${currentChatId.replace('friend_', '')}` : currentChatId);
+                    if(unreadCounts[chatKey]) delete unreadCounts[chatKey];
+                    renderChatListWithUnread();
+                }
+            });
+            history.scrollTop = history.scrollHeight;
+        });
+        document.querySelectorAll('.read-status').forEach(el => {
+            el.onclick = async (e) => {
+                e.stopPropagation();
+                const msgId = el.getAttribute('data-msg-id');
+                const chat = el.getAttribute('data-chat');
+                const type = el.getAttribute('data-type');
+                let readBy = {};
+                if(type === 'global') readBy = (await db.ref(`globalMessages/${msgId}/readBy`).once('value')).val() || {};
+                else if(type === 'friend') readBy = (await db.ref(`privateChats/${[currentUser.uid, chat.replace('friend_', '')].sort().join('_')}/messages/${msgId}/readBy`).once('value')).val() || {};
+                else readBy = (await db.ref(`groups/${chat}/messages/${msgId}/readBy`).once('value')).val() || {};
+                const readerNames = [];
+                for(let uid of Object.keys(readBy)) {
+                    if(uid !== currentUser.uid) {
+                        const userData = (await db.ref(`users/${uid}`).once('value')).val();
+                        if(userData) readerNames.push(userData.name);
+                    }
+                }
+                alert(`既読した人: ${readerNames.length > 0 ? readerNames.join(', ') : 'なし'}`);
+            };
+        });
+    }
 
-    async function sendMessageWithCooldown(text, isStamp = false) {
+    async function sendMessageWithCooldownAndRead(text, isStamp = false) {
         const now = Date.now();
         if(!isStamp && now - lastMessageTime < messageCooldown) { alert(`メッセージ送信は${(messageCooldown/1000).toFixed(1)}秒待ってください`); return false; }
         if(isStamp && now - lastStampTime < 10000) { alert("スタンプは10秒に1回のみ送信できます"); return false; }
@@ -241,8 +353,22 @@
         return true;
     }
 
-    document.getElementById('sendMsgBtn').onclick = async () => { if(!currentChatId) return; const text = document.getElementById('messageInput').value.trim(); if(!text) return; if(!await sendMessageWithCooldown(text)) return; const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text, timestamp: Date.now() }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); document.getElementById('messageInput').value = ''; };
-    document.getElementById('sendImageBtn').onclick = () => { const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.onchange = async (e) => { const file = e.target.files[0]; if(!file) return; const storageRef = storage.ref(`images/${Date.now()}_${file.name}`); await storageRef.put(file); const url = await storageRef.getDownloadURL(); const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, imageUrl: url, timestamp: Date.now() }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); }; fileInput.click(); };
+    document.getElementById('sendMsgBtn').onclick = async () => { 
+        if(!currentChatId) return; 
+        const text = document.getElementById('messageInput').value.trim(); 
+        if(!text) return; 
+        if(!await sendMessageWithCooldownAndRead(text)) return; 
+        const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text, timestamp: Date.now(), readBy: {} }; 
+        if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); 
+        else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); 
+        else await db.ref(`groups/${currentChatId}/messages`).push(msgData); 
+        document.getElementById('messageInput').value = ''; 
+        const chatKey = currentChatId === 'global' ? 'global' : (currentChatType === 'friend' ? `friend_${currentChatId.replace('friend_', '')}` : currentChatId);
+        unreadCounts[chatKey] = 0;
+        renderChatListWithUnread();
+    };
+    
+    document.getElementById('sendImageBtn').onclick = () => { const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.onchange = async (e) => { const file = e.target.files[0]; if(!file) return; const storageRef = storage.ref(`images/${Date.now()}_${file.name}`); await storageRef.put(file); const url = await storageRef.getDownloadURL(); const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, imageUrl: url, timestamp: Date.now(), readBy: {} }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); }; fileInput.click(); };
     
     function setupGroupModal() {
         const modal = document.getElementById('groupCreateModal');
@@ -265,18 +391,18 @@
             await groupRef.set({ name: groupName, members, createdAt: Date.now() });
             modal.style.display = 'none'; overlay.style.display = 'none';
             document.getElementById('groupNameInput').value = '';
-            renderChatList();
+            renderChatListWithUnread();
         };
         document.getElementById('cancelGroupBtn').onclick = () => { modal.style.display = 'none'; overlay.style.display = 'none'; };
     }
 
-    document.getElementById('refreshChatsBtn').onclick = () => renderChatList();
+    document.getElementById('refreshChatsBtn').onclick = () => renderChatListWithUnread();
 
     const stampSelector = document.getElementById('stampSelector');
     document.getElementById('sendStampBtn').onclick = () => { renderStampList(); stampSelector.style.display = stampSelector.style.display === 'none' ? 'block' : 'none'; };
-    function renderStampList() { const container = document.getElementById('stampList'); container.innerHTML = ''; ownedStamps.forEach(st => { const btn = document.createElement('div'); btn.className = 'stamp-item'; const emoji = stampEmojis[st] || '💬'; btn.innerHTML = `<div class="stamp-emoji">${emoji}</div><div class="stamp-text">${st}</div>`; btn.onclick = async () => { if(!currentChatId) return; if(await sendMessageWithCooldown(st, true)) { const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text: `${emoji} ${st}`, timestamp: Date.now() }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); stampSelector.style.display = 'none'; } }; container.appendChild(btn); }); }
+    function renderStampList() { const container = document.getElementById('stampList'); container.innerHTML = ''; ownedStamps.forEach(st => { const btn = document.createElement('div'); btn.className = 'stamp-item'; const emoji = stampEmojis[st] || '💬'; btn.innerHTML = `<div class="stamp-emoji">${emoji}</div><div class="stamp-text">${st}</div>`; btn.onclick = async () => { if(!currentChatId) return; if(await sendMessageWithCooldownAndRead(st, true)) { const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text: `${emoji} ${st}`, timestamp: Date.now(), readBy: {} }; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); stampSelector.style.display = 'none'; } }; container.appendChild(btn); }); }
 
-    // ボイスチャット - 完全実装
+    // ボイスチャット
     function listenVoiceInvites() { 
         db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => { 
             const invite = snap.val(); 
@@ -321,7 +447,7 @@
             const membersDiv = document.getElementById('voiceMembersList'); 
             membersDiv.innerHTML = ''; 
             Object.keys(members).forEach(m => { 
-                membersDiv.innerHTML += `<div class="member-item"><i class="fas fa-user-circle"></i> ${m === currentUser.uid ? currentUser.name + ' (あなた)' : (members[m]?.name || 'ユーザー')}</div>`; 
+                membersDiv.innerHTML += `<div class="member-item"><i class="fas fa-user-circle"></i> ${m === currentUser.uid ? currentUser.name + ' (あなた)' : 'ユーザー'}</div>`; 
             }); 
         }); 
         db.ref(`voiceRooms/${roomId}/voiceLog`).limitToLast(100).on('value', (snap) => { 
@@ -337,45 +463,30 @@
     }
     
     function startVoiceRecognition() { 
-        if(!('webkitSpeechRecognition' in window)) { alert("このブラウザは音声認識に対応していません。Chrome推奨"); return; }
+        if(!('webkitSpeechRecognition' in window)) return;
         if(recognition) recognition.stop();
         recognition = new webkitSpeechRecognition(); 
         recognition.lang = 'ja-JP'; 
         recognition.interimResults = false; 
-        recognition.continuous = false;
-        recognition.onstart = () => { console.log('音声認識開始'); };
+        recognition.continuous = true;
         recognition.onresult = async (event) => { 
-            const text = event.results[0][0].transcript; 
-            if(text && text.trim() && voiceRoomId) { 
-                console.log(`認識: ${text}`);
-                const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() }; 
-                await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
-                // 相手に音声読み上げ用データを送信
-                const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
-                membersSnap.forEach(memberSnap => { 
-                    if(memberSnap.key !== currentUser.uid) {
-                        db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp: Date.now() });
-                    }
-                }); 
-            } 
+            for(let i = event.resultIndex; i < event.results.length; i++) {
+                const text = event.results[i][0].transcript; 
+                if(text && text.trim() && voiceRoomId) { 
+                    const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp: Date.now() }; 
+                    await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
+                    const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
+                    membersSnap.forEach(memberSnap => { 
+                        if(memberSnap.key !== currentUser.uid) {
+                            db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp: Date.now() });
+                        }
+                    }); 
+                }
+            }
         }; 
         recognition.onerror = (e) => { console.error('音声認識エラー:', e); };
-        recognition.onend = () => { 
-            if(isMicActive && voiceRoomId) recognition.start(); 
-        }; 
+        recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); }; 
         if(isMicActive) recognition.start(); 
-    }
-    
-    // 音声読み上げリスナー
-    if(db.ref(`voiceSpeak/${currentUser?.uid}`)) {
-        db.ref(`voiceSpeak/${currentUser?.uid}`).on('child_added', (snap) => { 
-            const data = snap.val(); 
-            if(data && data.text) {
-                console.log(`読み上げ: ${data.fromName}さん: ${data.text}`);
-                speakText(data.text); 
-            }
-            snap.ref.remove(); 
-        });
     }
     
     document.getElementById('toggleMicBtn').onclick = () => { 
@@ -385,8 +496,6 @@
             if(recognition) recognition.start(); 
             btn.innerHTML = '<i class="fas fa-microphone"></i> マイクON <span class="voice-indicator"></span>'; 
             btn.style.background = '#23a559'; 
-            btn.classList.add('mic-on-animation');
-            setTimeout(() => btn.classList.remove('mic-on-animation'), 500);
         } else { 
             if(recognition) recognition.stop(); 
             btn.innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; 
@@ -410,7 +519,7 @@
         const preset = localStorage.getItem('voicePreset') || 'standard'; 
         const voices = speechSynthesis.getVoices();
         if(preset === 'female') {
-            const femaleVoice = voices.find(v => v.lang === 'ja-JP' && (v.name.includes('女性') || v.name.includes('Kyoko') || v.name.includes('Samantha')));
+            const femaleVoice = voices.find(v => v.lang === 'ja-JP' && (v.name.includes('女性') || v.name.includes('Kyoko')));
             if(femaleVoice) utterance.voice = femaleVoice;
         } else if(preset === 'robot') utterance.rate = 1.8; 
         else if(preset === 'alien') utterance.pitch = 1.7; 
@@ -433,7 +542,7 @@
         document.getElementById('buyMaxLenBtn')?.addEventListener('click', async () => { if(userCoins >= 500 && maxMessageLength < 3000) { userCoins -= 500; maxMessageLength += 5; await db.ref(`users/${currentUser.uid}/coins`).set(userCoins); await db.ref(`users/${currentUser.uid}/maxMessageLen`).set(maxMessageLength); updateCoinDisplay(); renderShop(); alert(`最大文字数が${maxMessageLength}文字になりました`); } else alert("コイン不足または上限(3000文字)です"); });
     }
 
-    function initTabs() { const tabs = document.querySelectorAll('.sidebar-icon'); const views = ['home', 'connect', 'messages', 'voice', 'shop', 'settings']; tabs.forEach((tab, idx) => { tab.onclick = () => { views.forEach(v => document.getElementById(v+'View').classList.remove('active-view')); document.getElementById(views[idx]+'View').classList.add('active-view'); tabs.forEach(t => t.classList.remove('active')); tab.classList.add('active'); if(views[idx]==='home') loadUserFull(); if(views[idx]==='messages') renderChatList(); if(views[idx]==='shop') renderShop(); }; }); document.getElementById('homeView').classList.add('active-view'); document.querySelector('.sidebar-icon').classList.add('active'); }
+    function initTabs() { const tabs = document.querySelectorAll('.sidebar-icon'); const views = ['home', 'connect', 'messages', 'voice', 'shop', 'settings']; tabs.forEach((tab, idx) => { tab.onclick = () => { views.forEach(v => document.getElementById(v+'View').classList.remove('active-view')); document.getElementById(views[idx]+'View').classList.add('active-view'); tabs.forEach(t => t.classList.remove('active')); tab.classList.add('active'); if(views[idx]==='home') loadUserFull(); if(views[idx]==='messages') renderChatListWithUnread(); if(views[idx]==='shop') renderShop(); }; }); document.getElementById('homeView').classList.add('active-view'); document.querySelector('.sidebar-icon').classList.add('active'); }
     function loadIconPicker() { const icons = ['😀','😎','🥳','😺','🐶','🌸','🌟','🎮','⚡','💎']; icons.forEach(ic => { const span = document.createElement('span'); span.innerText = ic; span.className = 'icon-option'; span.onclick = async () => { await db.ref(`users/${currentUser.uid}/icon`).set(ic); currentUser.icon = ic; loadUserFull(); }; document.getElementById('iconPicker').appendChild(span); }); }
     document.getElementById('updateNameBtn').onclick = async () => { const newName = document.getElementById('changeNameInput').value.trim(); if(newName) { await db.ref(`users/${currentUser.uid}/name`).set(newName); currentUser.name = newName; loadUserFull(); } };
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
