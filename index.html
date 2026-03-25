@@ -305,7 +305,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast, orderByChild, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, push, remove, update, onDisconnect, serverTimestamp, query, limitToLast, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
     const firebaseConfig = {
@@ -534,19 +534,16 @@
           state.recognition.lang = 'ja-JP'; 
           state.recognition.interimResults = false;
           state.recognition.continuous = true; 
-          let isProcessing = false;
-          state.recognition.onresult = async (e) => { 
-            if (!state.isMicOn || !state.voiceRoomId || isProcessing) return; 
-            isProcessing = true;
+          state.recognition.onresult = (e) => { 
+            if (!state.isMicOn || !state.voiceRoomId) return; 
             for (let i = e.resultIndex; i < e.results.length; i++) {
               if (e.results[i].isFinal) {
                 const text = e.results[i][0].transcript.trim();
                 if (text) {
-                  await push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() });
+                  push(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), { sender: state.userId, text: text, timestamp: serverTimestamp() });
                 }
               }
             }
-            setTimeout(() => { isProcessing = false; }, 500);
           }; 
           state.recognition.onerror = (e) => console.log("音声認識エラー:", e); 
           state.recognition.onend = () => { 
@@ -618,16 +615,20 @@
           snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); }); 
           state.chats = [];
           
-          // 重複防止のセットを追加
-          const uniqueChatIds = new Set();
+          const uniqueDirectFriends = new Set();
+          const uniqueGroups = new Set();
+          
           for (const chat of chats) {
-            if (uniqueChatIds.has(chat.id)) continue;
-            uniqueChatIds.add(chat.id);
-            
             if (chat.type === 'direct') {
               const other = Object.keys(chat.members).find(id => id !== state.userId);
-              if (other && state.friends.includes(other)) state.chats.push(chat);
+              if (other && state.friends.includes(other)) {
+                if (uniqueDirectFriends.has(other)) continue;
+                uniqueDirectFriends.add(other);
+                state.chats.push(chat);
+              }
             } else {
+              if (uniqueGroups.has(chat.id)) continue;
+              uniqueGroups.add(chat.id);
               state.chats.push(chat);
             }
           }
@@ -637,7 +638,7 @@
       },
       renderChatList: async () => { 
         const container = document.getElementById('chat-list-container'); 
-        container.innerHTML = ''; // 完全にクリアして再描画
+        container.innerHTML = ''; 
         for (const chat of state.chats) { 
           let name = "グループ", icon = "👥"; 
           if (chat.type === 'direct') { 
@@ -662,9 +663,8 @@
         const leaveBtn = document.getElementById('group-leave-btn');
         leaveBtn.style.display = type === 'group' ? 'block' : 'none';
         
-        // 【修正】前回のリスナーを「onValueの返り値関数」で確実に削除する
         if (state.activeListeners.chat) {
-          state.activeListeners.chat(); // 関数として実行して解除
+          state.activeListeners.chat(); 
           delete state.activeListeners.chat;
           delete state.activeListeners.chatId;
         }
@@ -674,7 +674,7 @@
         let displayedIds = new Set();
         state.activeListeners.chatId = chatId;
         
-        const msgQuery = query(ref(db, `chats/${chatId}/messages`), orderByChild('timestamp'), limitToLast(100)); 
+        const msgQuery = query(ref(db, `chats/${chatId}/messages`), limitToLast(100)); 
         const unsubscribe = onValue(msgQuery, async (snap) => { 
           if (!snap.exists()) { 
             hist.innerHTML = '';
@@ -683,7 +683,6 @@
           
           const msgs = [];
           snap.forEach(c => msgs.push({ ...c.val(), key: c.key })); 
-          msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
           
           const wasAtBottom = hist.scrollHeight - hist.clientHeight <= hist.scrollTop + 50;
           
@@ -806,9 +805,18 @@
         const micBtn = document.getElementById('mic-toggle-btn');
         micBtn.innerHTML = "🎤 マイク ON"; 
         micBtn.className = "primary-btn"; 
-        if (state.recognition) try { state.recognition.start(); } catch(e) {} 
         
-        // 【修正】前回のボイスチャットリスナーを確実に削除
+        if (state.recognition) {
+          state.recognition.onend = null; 
+          try { state.recognition.stop(); } catch(e) {}
+          setTimeout(() => {
+            state.recognition.onend = () => {
+              if (state.isMicOn && state.voiceRoomId) setTimeout(() => { try { state.recognition.start(); } catch(e) {} }, 100);
+            };
+            try { state.recognition.start(); } catch(e) {}
+          }, 300);
+        }
+        
         if (state.activeListeners.voice) {
           state.activeListeners.voice();
           delete state.activeListeners.voice;
@@ -824,7 +832,7 @@
         let displayedIds = new Set();
         state.activeListeners.voiceRoomId = state.voiceRoomId;
         
-        const msgQuery = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), orderByChild('timestamp'), limitToLast(100));
+        const msgQuery = query(ref(db, `voiceRooms/${state.voiceRoomId}/messages`), limitToLast(100));
         const unsubscribe = onValue(msgQuery, async (snap) => {
           if (!snap.exists()) { 
             logDiv.innerHTML = '<div style="color: var(--text-muted);">メッセージがここに表示されます</div>';
@@ -833,7 +841,6 @@
           
           const msgs = [];
           snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
-          msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
           
           const wasAtBottom = logDiv.scrollHeight - logDiv.clientHeight <= logDiv.scrollTop + 50;
           
@@ -904,10 +911,13 @@
           const snap = await get(ref(db, `voiceRooms/${state.voiceRoomId}/members`)); 
           if (!snap.exists()) await remove(ref(db, `voiceRooms/${state.voiceRoomId}`)); 
         } 
-        if (state.recognition) try { state.recognition.stop(); } catch(e) {} 
-        state.isMicOn = false; 
         
-        // 【修正】ここでも退出時に確実にリスナーを削除
+        state.isMicOn = false; 
+        if (state.recognition) {
+          state.recognition.onend = null; 
+          try { state.recognition.stop(); } catch(e) {}
+        }
+        
         if (state.activeListeners.voice) {
           state.activeListeners.voice();
           delete state.activeListeners.voice;
@@ -932,11 +942,15 @@
         if (state.isMicOn) { 
           btn.innerHTML = "🎤 マイク ON"; 
           btn.className = "primary-btn"; 
-          if (state.recognition && state.voiceRoomId) try { state.recognition.start(); } catch(e) {} 
+          if (state.recognition && state.voiceRoomId) {
+            setTimeout(() => { try { state.recognition.start(); } catch(e) {} }, 100);
+          } 
         } else { 
           btn.innerHTML = "🔇 マイク OFF"; 
           btn.className = "danger-btn"; 
-          if (state.recognition) try { state.recognition.stop(); } catch(e) {} 
+          if (state.recognition) {
+            try { state.recognition.stop(); } catch(e) {}
+          } 
         } 
       },
       showInviteMoreModal: async () => { 
@@ -962,7 +976,6 @@
       }
     };
 
-    // イベントリスナー登録
     document.getElementById('register-btn').onclick = () => app.register();
     document.getElementById('add-friend-btn').onclick = () => app.addFriend();
     document.getElementById('new-group-btn').onclick = () => app.openGroupModal();
@@ -971,7 +984,6 @@
     document.getElementById('group-leave-btn').onclick = () => app.leaveGroup();
     document.getElementById('send-msg-btn').onclick = () => app.sendMessage();
     
-    // 【新規】チャットリストの手動更新ボタンの機能
     const chatListRefreshBtn = document.getElementById('refresh-chat-list-btn');
     if(chatListRefreshBtn) {
       chatListRefreshBtn.onclick = async () => {
@@ -979,14 +991,21 @@
         const chats = [];
         snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); });
         state.chats = [];
-        const uniqueIds = new Set();
+        
+        const uniqueDirectFriends = new Set();
+        const uniqueGroups = new Set();
+        
         for (const chat of chats) {
-          if (uniqueIds.has(chat.id)) continue;
-          uniqueIds.add(chat.id);
           if (chat.type === 'direct') {
             const other = Object.keys(chat.members).find(id => id !== state.userId);
-            if (other && state.friends.includes(other)) state.chats.push(chat);
+            if (other && state.friends.includes(other)) {
+              if (uniqueDirectFriends.has(other)) continue;
+              uniqueDirectFriends.add(other);
+              state.chats.push(chat);
+            }
           } else {
+            if (uniqueGroups.has(chat.id)) continue;
+            uniqueGroups.add(chat.id);
             state.chats.push(chat);
           }
         }
