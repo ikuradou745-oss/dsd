@@ -324,7 +324,8 @@
     const state = {
       userId: null, userData: null, usersCache: {}, friends: [], chats: [], currentChatId: null,
       voiceRoomId: null, voiceRoomHost: null, recognition: null, isMicOn: false,
-      pendingInvitation: null, activeListeners: {}, processedVoiceMsgIds: new Set()
+      pendingInvitation: null, activeListeners: {}, processedVoiceMsgIds: new Set(),
+      lastMessageTimestamp: null
     };
 
     const utils = {
@@ -427,6 +428,7 @@
         const imageLabel = document.getElementById('image-upload-label');
         const imageInput = document.getElementById('image-input');
         if (imageLabel && imageInput) {
+          imageLabel.style.cursor = 'pointer';
           imageLabel.onclick = (e) => {
             e.preventDefault();
             if (!state.currentChatId) {
@@ -436,13 +438,14 @@
             imageInput.click();
           };
           imageInput.onchange = async (e) => {
-            const file = e.target.files[0];
+            const file = e.target.files?.[0];
             if (!file || !state.currentChatId) return;
             try {
               const url = await utils.uploadImage(file);
               await push(ref(db, `chats/${state.currentChatId}/messages`), { sender: state.userId, image: url, timestamp: serverTimestamp() });
               await update(ref(db, `chats/${state.currentChatId}`), { lastUpdated: serverTimestamp() });
               imageInput.value = '';
+              e.target.value = '';
             } catch (err) {
               console.error("画像アップロードエラー:", err);
               alert("画像のアップロードに失敗しました");
@@ -635,7 +638,8 @@
         } 
       },
       openChat: (chatId, title, type) => { 
-        state.currentChatId = chatId; 
+        state.currentChatId = chatId;
+        state.lastMessageTimestamp = null;
         document.getElementById('chat-placeholder').style.display = 'none'; 
         document.getElementById('chat-main-area').style.display = 'flex'; 
         document.getElementById('chat-title-display').innerText = title; 
@@ -652,20 +656,31 @@
             
             // スクロール位置を保持
             const wasAtBottom = hist.scrollHeight - hist.clientHeight <= hist.scrollTop + 50;
-            hist.innerHTML = '';
+            const messageElements = [];
+            
             for (const m of msgs) { 
               const sender = await utils.getUserData(m.sender); 
               if (sender) { 
                 const isSelf = m.sender === state.userId; 
                 const msgDiv = document.createElement('div'); 
                 msgDiv.className = `msg-row ${isSelf ? 'self' : 'other'}`; 
+                msgDiv.setAttribute('data-msg-id', m.key);
                 let content = '';
                 if (m.text) content = `<div class="msg-bubble">${utils.escapeHTML(m.text)}</div>`;
                 if (m.image) content = `<div class="msg-bubble"><img src="${m.image}" alt="画像" onclick="window.open('${m.image}')" style="max-width:200px; max-height:200px; border-radius:8px; cursor:pointer;"></div>`;
                 msgDiv.innerHTML = `<div class="message-block"><div class="msg-icon">${utils.escapeHTML(sender.icon)}</div><div class="msg-content"><div class="msg-sender">${utils.escapeHTML(sender.name)}</div>${content}</div></div>`; 
-                hist.appendChild(msgDiv); 
+                messageElements.push({ element: msgDiv, id: m.key });
               } 
-            } 
+            }
+            
+            // 既存のメッセージを保持して新しいメッセージだけ追加
+            const existingIds = new Set(Array.from(hist.querySelectorAll('[data-msg-id]')).map(el => el.getAttribute('data-msg-id')));
+            for (const { element, id } of messageElements) {
+              if (!existingIds.has(id)) {
+                hist.appendChild(element);
+              }
+            }
+            
             if (wasAtBottom) {
               hist.scrollTop = hist.scrollHeight;
             }
@@ -701,6 +716,7 @@
         checks.forEach(c => members[c.value] = true); 
         await set(push(ref(db, 'chats')), { type: 'group', name: name, members: members, lastUpdated: serverTimestamp() }); 
         document.getElementById('group-modal').classList.add('hidden'); 
+        document.getElementById('group-name-input').value = '';
       },
       leaveGroup: async () => { 
         if (state.currentChatId && confirm("退会しますか？")) { 
@@ -728,7 +744,7 @@
         const checks = document.querySelectorAll('.vc-friend-checkbox:checked'); 
         const roomRef = push(ref(db, 'voiceRooms')); 
         const roomId = roomRef.key; 
-        await set(roomRef, { host: state.userId, members: { [state.userId]: true } }); 
+        await set(roomRef, { host: state.userId, members: { [state.userId]: true }, createdAt: serverTimestamp() }); 
         state.voiceRoomId = roomId; 
         state.voiceRoomHost = state.userId; 
         checks.forEach(c => push(ref(db, `invitations/${c.value}`), { from: state.userId, roomId: roomId, timestamp: serverTimestamp() })); 
@@ -786,20 +802,23 @@
           msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
           
           const wasAtBottom = logDiv.scrollHeight - logDiv.clientHeight <= logDiv.scrollTop + 50;
-          logDiv.innerHTML = '';
+          
           for (const msg of msgs) {
-            const sender = await utils.getUserData(msg.sender);
-            const senderName = sender ? sender.name : '不明';
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'vc-text-entry';
-            msgDiv.innerHTML = `<div class="vc-text-sender" style="color:var(--neon-blue);">${utils.escapeHTML(senderName)}</div><div class="vc-text-message">${utils.escapeHTML(msg.text || '')}</div>`;
-            logDiv.appendChild(msgDiv);
-            
-            if (msg.sender !== state.userId && !state.processedVoiceMsgIds.has(msg.id)) {
+            if (!state.processedVoiceMsgIds.has(msg.id)) {
+              const sender = await utils.getUserData(msg.sender);
+              const senderName = sender ? sender.name : '不明';
+              const msgDiv = document.createElement('div');
+              msgDiv.className = 'vc-text-entry';
+              msgDiv.setAttribute('data-vc-msg-id', msg.id);
+              msgDiv.innerHTML = `<div class="vc-text-sender" style="color:var(--neon-blue);">${utils.escapeHTML(senderName)}</div><div class="vc-text-message">${utils.escapeHTML(msg.text || '')}</div>`;
+              logDiv.appendChild(msgDiv);
+              
               state.processedVoiceMsgIds.add(msg.id);
-              utils.playTTS(msg.text, sender?.voiceSettings);
-              const memberEl = document.getElementById(`vc-m-${msg.sender}`);
-              if (memberEl) { memberEl.classList.add('speaking-ring'); setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); }
+              if (msg.sender !== state.userId) {
+                utils.playTTS(msg.text, sender?.voiceSettings);
+                const memberEl = document.getElementById(`vc-m-${msg.sender}`);
+                if (memberEl) { memberEl.classList.add('speaking-ring'); setTimeout(() => memberEl.classList.remove('speaking-ring'), 2000); }
+              }
             }
           }
           if (wasAtBottom) {
@@ -843,7 +862,8 @@
         } 
         if (state.recognition) try { state.recognition.stop(); } catch(e) {} 
         state.isMicOn = false; 
-        state.voiceRoomId = null; 
+        state.voiceRoomId = null;
+        state.voiceRoomHost = null;
         state.processedVoiceMsgIds.clear();
         document.getElementById('vc-room-area').classList.add('hidden'); 
         document.getElementById('vc-setup-area').classList.remove('hidden'); 
