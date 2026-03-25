@@ -193,7 +193,10 @@
         <div class="msg-sidebar">
           <div class="msg-header">
             <span>チャット一覧</span>
-            <button class="neon-btn" style="padding: 4px 8px;" id="new-group-btn">+ グループ</button>
+            <div>
+              <button class="primary-btn" style="padding: 4px 8px; margin-right: 5px;" id="refresh-chat-list-btn">🔄</button>
+              <button class="neon-btn" style="padding: 4px 8px;" id="new-group-btn">+ グループ</button>
+            </div>
           </div>
           <div class="chat-list" id="chat-list-container"></div>
         </div>
@@ -207,7 +210,6 @@
             <input type="text" id="message-input" placeholder="メッセージを入力..." maxlength="500">
             <label class="image-upload-btn" id="image-upload-label">📷 画像</label>
             <input type="file" id="image-input" accept="image/*" style="display: none;">
-            <button class="primary-btn" id="refresh-msg-btn">🔄 更新</button>
             <button class="primary-btn" id="send-msg-btn">送信</button>
           </div>
         </div>
@@ -615,7 +617,13 @@
           const chats = []; 
           snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); }); 
           state.chats = [];
+          
+          // 重複防止のセットを追加
+          const uniqueChatIds = new Set();
           for (const chat of chats) {
+            if (uniqueChatIds.has(chat.id)) continue;
+            uniqueChatIds.add(chat.id);
+            
             if (chat.type === 'direct') {
               const other = Object.keys(chat.members).find(id => id !== state.userId);
               if (other && state.friends.includes(other)) state.chats.push(chat);
@@ -629,7 +637,7 @@
       },
       renderChatList: async () => { 
         const container = document.getElementById('chat-list-container'); 
-        container.innerHTML = ''; 
+        container.innerHTML = ''; // 完全にクリアして再描画
         for (const chat of state.chats) { 
           let name = "グループ", icon = "👥"; 
           if (chat.type === 'direct') { 
@@ -654,9 +662,9 @@
         const leaveBtn = document.getElementById('group-leave-btn');
         leaveBtn.style.display = type === 'group' ? 'block' : 'none';
         
-        // 前のリスナーを完全に削除
+        // 【修正】前回のリスナーを「onValueの返り値関数」で確実に削除する
         if (state.activeListeners.chat) {
-          off(ref(db, `chats/${state.activeListeners.chatId}/messages`));
+          state.activeListeners.chat(); // 関数として実行して解除
           delete state.activeListeners.chat;
           delete state.activeListeners.chatId;
         }
@@ -800,14 +808,14 @@
         micBtn.className = "primary-btn"; 
         if (state.recognition) try { state.recognition.start(); } catch(e) {} 
         
-        // 前のボイスリスナーを完全に削除
+        // 【修正】前回のボイスチャットリスナーを確実に削除
         if (state.activeListeners.voice) {
-          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}/messages`));
+          state.activeListeners.voice();
           delete state.activeListeners.voice;
           delete state.activeListeners.voiceRoomId;
         }
         if (state.activeListeners.voiceRoom) {
-          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}`));
+          state.activeListeners.voiceRoom();
           delete state.activeListeners.voiceRoom;
         }
         
@@ -899,12 +907,13 @@
         if (state.recognition) try { state.recognition.stop(); } catch(e) {} 
         state.isMicOn = false; 
         
+        // 【修正】ここでも退出時に確実にリスナーを削除
         if (state.activeListeners.voice) {
-          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}/messages`));
+          state.activeListeners.voice();
           delete state.activeListeners.voice;
         }
         if (state.activeListeners.voiceRoom) {
-          off(ref(db, `voiceRooms/${state.activeListeners.voiceRoomId}`));
+          state.activeListeners.voiceRoom();
           delete state.activeListeners.voiceRoom;
         }
         
@@ -961,23 +970,31 @@
     document.getElementById('confirm-group-btn').onclick = () => app.createGroup();
     document.getElementById('group-leave-btn').onclick = () => app.leaveGroup();
     document.getElementById('send-msg-btn').onclick = () => app.sendMessage();
-    document.getElementById('refresh-msg-btn').onclick = () => {
-      const hist = document.getElementById('message-history');
-      hist.innerHTML = '';
-      if (state.activeListeners.chat) {
-        off(ref(db, `chats/${state.activeListeners.chatId}/messages`));
-        delete state.activeListeners.chat;
-        delete state.activeListeners.chatId;
-      }
-      if (state.currentChatId) {
-        const listItem = document.querySelector(`[data-chat-id="${state.currentChatId}"]`);
-        if (listItem) {
-          const title = listItem.getAttribute('data-title');
-          const type = listItem.getAttribute('data-type');
-          app.openChat(state.currentChatId, title, type);
+    
+    // 【新規】チャットリストの手動更新ボタンの機能
+    const chatListRefreshBtn = document.getElementById('refresh-chat-list-btn');
+    if(chatListRefreshBtn) {
+      chatListRefreshBtn.onclick = async () => {
+        const snap = await get(ref(db, 'chats'));
+        const chats = [];
+        snap.forEach(c => { const v = c.val(); if (v.members && v.members[state.userId]) chats.push({ id: c.key, ...v }); });
+        state.chats = [];
+        const uniqueIds = new Set();
+        for (const chat of chats) {
+          if (uniqueIds.has(chat.id)) continue;
+          uniqueIds.add(chat.id);
+          if (chat.type === 'direct') {
+            const other = Object.keys(chat.members).find(id => id !== state.userId);
+            if (other && state.friends.includes(other)) state.chats.push(chat);
+          } else {
+            state.chats.push(chat);
+          }
         }
-      }
-    };
+        state.chats.sort((a,b) => (b.lastUpdated||0) - (a.lastUpdated||0));
+        app.renderChatList();
+      };
+    }
+
     document.getElementById('message-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') app.sendMessage(); });
     document.getElementById('create-vc-btn').onclick = () => app.createVoiceRoom();
     document.getElementById('mic-toggle-btn').onclick = () => app.toggleMic();
