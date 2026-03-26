@@ -60,7 +60,6 @@
         .message-image { max-width: 200px; border-radius: 12px; margin-top: 4px; cursor: pointer; }
         .message-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; font-size: 0.65rem; opacity: 0.6; }
         
-        /* スタンプ用の新しいスタイル */
         .message-stamp-container {
             display: flex;
             flex-direction: column;
@@ -95,7 +94,7 @@
         .voice-chat-panel { flex: 1; display: flex; flex-direction: column; background: #2b2d31; }
         .voice-log-area { flex: 1; overflow-y: auto; padding: 20px; }
         .voice-control-area { padding: 20px; background: #1e1f22; border-top: 1px solid #3c3f45; }
-        .voice-mic-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .voice-mic-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
         .overlay-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: white; font-size: 2rem; padding: 20px 40px; border-radius: 20px; z-index: 2000; animation: fadeOut 3s forwards; pointer-events: none; }
         @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
         .stamp-selector { position: fixed; bottom: 80px; right: 20px; background: #1e1f22; border-radius: 20px; padding: 15px; width: 350px; max-height: 450px; overflow-y: auto; display: none; z-index: 1000; border: 1px solid #5865F2; }
@@ -146,7 +145,7 @@
         <div id="homeView" class="tab-view"><div class="home-container"><div class="profile-card"><div class="profile-icon" id="profileIconSpan">😀</div><div class="profile-info"><h3 id="profileName">Loading...<span id="coinDisplay" class="coin-badge">💰 0コイン</span></h3><div class="friend-code" id="friendCodeDisplay">コード: ********</div><div class="info-text">✨ メッセージ1回で10コイン獲得！ ✨</div></div></div><div class="friend-add-section"><h4><i class="fas fa-user-plus"></i> フレンド追加</h4><div class="friend-add-row"><input type="text" id="addFriendInput" placeholder="8桁のフレンドコード"><button id="addFriendBtn">追加</button></div></div><div class="friend-add-section"><h4><i class="fas fa-users"></i> フレンドリスト</h4><ul id="friendListUl" class="friend-list"></ul></div><div id="newMessagesArea" style="margin-top: 20px;"></div></div></div>
         <div id="connectView" class="tab-view"><div class="connect-container"><div class="section-card"><h3><i class="fas fa-globe"></i> オンラインユーザー</h3><div id="onlineUsersList"></div></div><div class="section-card"><h3><i class="fas fa-envelope-open-text"></i> フレンドリクエスト</h3><div id="requestsList"></div></div></div></div>
         <div id="messagesView" class="tab-view"><div class="messages-layout"><div class="channels-list"><button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button><div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px; margin-left:8px;"><i class="fas fa-sync-alt"></i> 更新</button></div><div id="chatListContainer"></div></div><div class="chat-area"><div class="chat-header" id="chatHeader"><span id="currentChatName">チャットを選択</span><span id="groupMembersDisplay" class="group-members"></span></div><div class="messages-history" id="messagesHistory"></div><div class="message-input-area"><input type="text" id="messageInput" placeholder="メッセージを入力..."><button id="sendStampBtn"><i class="fas fa-smile"></i></button><button id="sendImageBtn"><i class="fas fa-image"></i></button><button id="sendMsgBtn">送信</button></div></div></div></div>
-        <div id="voiceView" class="tab-view"><div class="voice-layout"><div class="voice-members-panel"><h3><i class="fas fa-users"></i> 参加者</h3><div id="voiceMembersList"></div><div id="voiceAdminCommands" style="margin-top: 10px;"></div><button id="startVoiceInviteBtn" style="margin-top:20px; width:100%; background:#5865F2;">🎤 ボイスチャットを始める</button></div><div class="voice-chat-panel"><div class="voice-log-area"><div id="voiceLogList" style="display:flex; flex-direction:column; gap:6px;"></div></div><div class="voice-control-area"><div id="voiceRoomStatus" style="margin-bottom:12px; padding:8px; background:#111214; border-radius:12px;">⚪ 未接続</div><div class="voice-mic-row"><button id="toggleMicBtn" style="background:#3c3f45;"><i class="fas fa-microphone-slash"></i> マイクOFF</button><button id="sendVoiceTextBtn"><i class="fas fa-keyboard"></i> 文字送信</button></div><div id="voiceTextInputDiv" style="display:none; margin-top:12px;"><div style="display:flex; gap:8px;"><input type="text" id="voiceManualText" placeholder="テキストを入力 (音声で読み上げ)" style="flex:1; background:#111214; border:none; border-radius:28px; padding:8px 12px; color:white;"><button id="submitVoiceTextBtn">送信</button></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div></div></div></div>
+        <div id="voiceView" class="tab-view"><div class="voice-layout"><div class="voice-members-panel"><h3><i class="fas fa-users"></i> 参加者</h3><div id="voiceMembersList"></div><div id="voiceAdminCommands" style="margin-top: 10px;"></div><button id="startVoiceInviteBtn" style="margin-top:20px; width:100%; background:#5865F2;">🎤 ボイスチャットを始める</button></div><div class="voice-chat-panel"><div class="voice-log-area"><div id="voiceLogList" style="display:flex; flex-direction:column; gap:6px;"></div></div><div class="voice-control-area"><div id="voiceRoomStatus" style="margin-bottom:12px; padding:8px; background:#111214; border-radius:12px;">⚪ 未接続</div><div class="voice-mic-row"><button id="toggleMicBtn" style="background:#3c3f45;"><i class="fas fa-microphone-slash"></i> マイクOFF</button><select id="voiceRecogMode" style="background:#111214; color:white; border:1px solid #3c3f45; border-radius:12px; padding:8px; outline:none; cursor:pointer;"><option value="voice">🗣️ 声のみ聞き取り</option><option value="all">⚡ 全部聞き取り (高感度)</option></select><button id="sendVoiceTextBtn"><i class="fas fa-keyboard"></i> 文字送信</button></div><div id="voiceTextInputDiv" style="display:none; margin-top:12px;"><div style="display:flex; gap:8px;"><input type="text" id="voiceManualText" placeholder="テキストを入力 (音声で読み上げ)" style="flex:1; background:#111214; border:none; border-radius:28px; padding:8px 12px; color:white;"><button id="submitVoiceTextBtn">送信</button></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div></div></div></div>
         <div id="shopView" class="tab-view"><div class="settings-container"><h2><i class="fas fa-store"></i> ショップ <span id="shopCoinDisplay" class="coin-badge">💰 0コイン</span></h2><div class="info-text" style="margin-bottom:16px;">💡 メッセージを送ると10コインGET！</div><div class="setting-group"><h3>📱 スタンプ</h3><div id="stampShop"></div><h3>⚡ アップグレード</h3><div id="upgradeShop"></div></div></div></div>
         <div id="settingsView" class="tab-view"><div class="settings-container"><div class="setting-group"><h3>プロフィール変更</h3><input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15"><button id="updateNameBtn">名前変更</button><div class="icon-grid" id="iconPicker"></div></div><hr><div class="setting-group"><h3>🎤 声の変換プリセット (相手に聞こえる声)</h3><div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div><div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div><div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div><div>音量: <input type="range" id="volumeSlider" min="0" max="1.5" step="0.05" value="1"></div><button id="testVoiceBtn">テスト発声</button><p>現在のプリセット: <span id="currentVoicePreset">標準</span></p></div></div></div>
     </div>
@@ -163,6 +162,8 @@
     const storage = firebase.storage();
     let currentUser = null, currentChatId = null, currentChatType = null, voiceRoomId = null, recognition = null, isMicActive = false;
     let lastMessageTime = 0, lastStampTime = 0, userCoins = 0, messageCooldown = 2500, maxMessageLength = 200;
+    let lastVoiceManualTime = 0; // ボイスチャットテキスト送信のクールダウン管理用
+
     const defaultStamps = ['やっほー！', 'おーい！', 'バイバイ！', 'ボイチャできる？'];
     const stampEmojis = { 'やっほー！': '👋', 'おーい！': '📣', 'バイバイ！': '👋', 'ボイチャできる？': '🎤', 'Yes!!!': '✅', 'No!!!': '❌', 'そろそろやめるかも': '😴', 'よろしくぅ！': '🙌', 'わからん': '🤔', 'うんうん': '👍', 'へぇ〜〜': '😮', '話聞けやボケェ': '💢' };
     const shopStamps = [
@@ -173,7 +174,6 @@
     let ownedStamps = [...defaultStamps];
     let unreadCounts = {};
     
-    // 自分の音声設定を取得する関数（相手に送るため）
     function getMyVoiceSettings() {
         return {
             pitch: parseFloat(document.getElementById('pitchSlider').value),
@@ -219,7 +219,6 @@
 
     let lastVoiceMessageTime = 0;
     function startVoiceMessagePoller() {
-        // 毎秒（1000ms）チェックして読み上げ
         setInterval(async () => {
             if(!currentUser) return;
             const snap = await db.ref(`voiceSpeak/${currentUser.uid}`).limitToLast(10).once('value');
@@ -227,7 +226,7 @@
             Object.entries(msgs).forEach(([key, data]) => {
                 if(data && data.text && data.timestamp > lastVoiceMessageTime) {
                     console.log("🎤 音声読み上げ:", data.fromName, ":", data.text);
-                    speakText(data.text, data.voiceSettings); // 送信者の設定を使って読み上げ
+                    speakText(data.text, data.voiceSettings);
                     lastVoiceMessageTime = data.timestamp;
                     db.ref(`voiceSpeak/${currentUser.uid}/${key}`).remove();
                 }
@@ -283,8 +282,17 @@
         div.className = 'new-message-notice';
         div.setAttribute('data-friend', friendId);
         div.innerHTML = `<span><strong>${senderName || '不明'}</strong>さんからメッセージが来ています！<br><small>${text ? text.substring(0,30) : ''}${text && text.length>30?'...':''}</small></span><button class="goto-chat-btn" data-friend="${friendId}">見に行く</button>`;
+        
+        // 通知を見た（見に行くボタンを押した）ら通知を消してチャット画面へ飛ぶ
+        const btn = div.querySelector('.goto-chat-btn');
+        btn.onclick = () => {
+            openChat(`friend_${friendId}`, 'friend');
+            document.querySelector('.sidebar-icon[data-tab="messages"]').click();
+            div.remove();
+        };
+        
         area.prepend(div);
-        setTimeout(() => div.remove(), 10000);
+        setTimeout(() => { if(div.parentNode) div.remove(); }, 15000);
     }
 
     async function loadUserFull() {
@@ -372,10 +380,22 @@
         document.getElementById('chatListContainer')?.querySelectorAll('.group-exit-btn').forEach(btn => btn.onclick = async (e) => { e.stopPropagation(); const groupId = btn.getAttribute('data-group'); await db.ref(`groups/${groupId}/members/${currentUser.uid}`).remove(); if(currentChatId === groupId) currentChatId = null; renderChatListWithUnread(); });
     }
 
-    function openChat(chatId, type) { currentChatId = chatId; currentChatType = type; document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ'); loadGroupMembersDisplay(); loadMessagesWithRead(); renderChatListWithUnread(); if(type === 'friend') { const notice = document.querySelector(`.new-message-notice[data-friend="${chatId.replace('friend_', '')}"]`); if(notice) notice.remove(); } }
+    function openChat(chatId, type) { 
+        currentChatId = chatId; 
+        currentChatType = type; 
+        document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ'); 
+        loadGroupMembersDisplay(); 
+        loadMessagesWithRead(); 
+        renderChatListWithUnread(); 
+        
+        if(type === 'friend') { 
+            // チャットを開いたら該当する通知を消す
+            const notice = document.querySelector(`.new-message-notice[data-friend="${chatId.replace('friend_', '')}"]`); 
+            if(notice) notice.remove(); 
+        } 
+    }
     async function loadGroupMembersDisplay() { const displaySpan = document.getElementById('groupMembersDisplay'); if(currentChatType === 'group' && currentChatId) { const membersSnap = await db.ref(`groups/${currentChatId}/members`).once('value'); const members = membersSnap.val() || {}; const names = []; for(let uid of Object.keys(members)) { if(uid !== currentUser.uid) { const userData = (await db.ref(`users/${uid}`).once('value')).val(); if(userData && userData.name) names.push(userData.name); } } displaySpan.innerText = names.length ? `メンバー: ${names.join(', ')}` : ''; } else { displaySpan.innerText = ''; } }
     async function loadMessagesWithRead() { if(!currentChatId) return; let path = ''; if(currentChatType === 'global') path = 'globalMessages'; else if(currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`; else path = `groups/${currentChatId}/messages`; db.ref(path).limitToLast(50).off(); db.ref(path).limitToLast(50).on('value', async (snap) => { const msgs = snap.val() || {}; const history = document.getElementById('messagesHistory'); history.innerHTML = ''; let groupMembers = null; if(currentChatType === 'group') groupMembers = (await db.ref(`groups/${currentChatId}/members`).once('value')).val() || {}; const memberCount = groupMembers ? Object.keys(groupMembers).length : 0; const sortedMsgs = Object.entries(msgs).sort((a,b)=>a[1].timestamp-b[1].timestamp); for(let [msgId, msg] of sortedMsgs) { if(!msg || !msg.senderName) continue; const div = document.createElement('div'); div.className = `message-bubble ${msg.senderId === currentUser.uid ? 'my-message' : 'other-message'}`; let readHtml = ''; if(msg.senderId === currentUser.uid) { const readBy = msg.readBy || {}; const readCount = Object.keys(readBy).length; if(currentChatType === 'friend') readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="${currentChatId}" data-type="friend">${readCount > 0 ? '既読' : '未読'}</span>`; else if(currentChatType === 'group' && memberCount > 0) readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="${currentChatId}" data-type="group">${readCount >= memberCount ? '既読：全' : `既読：${readCount}`}</span>`; else if(currentChatType === 'global') readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="global" data-type="global">既読：${readCount}</span>`; } 
-        // スタンプかどうかで表示を分ける
         if (msg.isStamp) {
             div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div>
                              <div class="message-stamp-container">
@@ -411,13 +431,119 @@
     document.getElementById('closeFriendModal').onclick = () => { document.getElementById('friendSelectModal').style.display = 'none'; overlay.style.display = 'none'; };
     overlay.onclick = () => { document.getElementById('friendSelectModal').style.display = 'none'; document.getElementById('groupCreateModal').style.display = 'none'; overlay.style.display = 'none'; };
 
-    function joinVoiceRoom(roomId) { if(voiceRoomId) leaveVoiceRoom(); voiceRoomId = roomId; document.getElementById('voiceRoomStatus').innerHTML = '🎙️ ボイスチャット接続中 <span class="voice-indicator"></span>'; setupVoiceAdminCommands(); db.ref(`voiceRooms/${roomId}/members`).on('value', (snap) => { const members = snap.val() || {}; const membersDiv = document.getElementById('voiceMembersList'); membersDiv.innerHTML = ''; Object.keys(members).forEach(m => { membersDiv.innerHTML += `<div class="member-item"><i class="fas fa-user-circle"></i> ${m === currentUser.uid ? currentUser.name + ' (あなた)' : 'ユーザー'}</div>`; }); }); db.ref(`voiceRooms/${roomId}/voiceLog`).limitToLast(100).on('value', (snap) => { const logs = snap.val() || {}; const logDiv = document.getElementById('voiceLogList'); logDiv.innerHTML = ''; Object.values(logs).sort((a,b)=>a.timestamp-b.timestamp).forEach(log => { if(log && log.senderName) logDiv.innerHTML += `<div class="voice-message-item"><strong>${log.senderName}:</strong> ${log.text}</div>`; }); logDiv.scrollTop = logDiv.scrollHeight; }); startVoiceRecognition(); }
-    function startVoiceRecognition() { if(!('webkitSpeechRecognition' in window)) return; if(recognition) recognition.stop(); recognition = new webkitSpeechRecognition(); recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.continuous = true; recognition.onresult = async (event) => { for(let i = event.resultIndex; i < event.results.length; i++) { const text = event.results[i][0].transcript; if(text && text.trim() && voiceRoomId) { console.log("🎤 音声認識:", text); const timestamp = Date.now(); const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp }; await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); const vSettings = getMyVoiceSettings(); membersSnap.forEach(memberSnap => { if(memberSnap.key !== currentUser.uid) { db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp, voiceSettings: vSettings }); } }); } } }; recognition.onerror = (e) => { console.error('音声認識エラー:', e); }; recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); }; if(isMicActive) recognition.start(); }
+    // ボイス認識モード変更時にマイクONなら再起動させる
+    document.getElementById('voiceRecogMode').addEventListener('change', () => {
+        if(isMicActive) {
+            startVoiceRecognition(); 
+        }
+    });
+
+    function joinVoiceRoom(roomId) { 
+        if(voiceRoomId) leaveVoiceRoom(); 
+        voiceRoomId = roomId; 
+        document.getElementById('voiceRoomStatus').innerHTML = '🎙️ ボイスチャット接続中 <span class="voice-indicator"></span>'; 
+        setupVoiceAdminCommands(); 
+        db.ref(`voiceRooms/${roomId}/members`).on('value', (snap) => { const members = snap.val() || {}; const membersDiv = document.getElementById('voiceMembersList'); membersDiv.innerHTML = ''; Object.keys(members).forEach(m => { membersDiv.innerHTML += `<div class="member-item"><i class="fas fa-user-circle"></i> ${m === currentUser.uid ? currentUser.name + ' (あなた)' : 'ユーザー'}</div>`; }); }); 
+        db.ref(`voiceRooms/${roomId}/voiceLog`).limitToLast(100).on('value', (snap) => { const logs = snap.val() || {}; const logDiv = document.getElementById('voiceLogList'); logDiv.innerHTML = ''; Object.values(logs).sort((a,b)=>a.timestamp-b.timestamp).forEach(log => { if(log && log.senderName) logDiv.innerHTML += `<div class="voice-message-item"><strong>${log.senderName}:</strong> ${log.text}</div>`; }); logDiv.scrollTop = logDiv.scrollHeight; }); 
+        startVoiceRecognition(); 
+    }
+    
+    function startVoiceRecognition() { 
+        if(!('webkitSpeechRecognition' in window)) return; 
+        if(recognition) recognition.stop(); 
+        recognition = new webkitSpeechRecognition(); 
+        recognition.lang = 'ja-JP'; 
+        
+        const mode = document.getElementById('voiceRecogMode').value;
+        // 全部聞き取りモードの時は、より早く反応するように途中の結果も拾う
+        recognition.interimResults = (mode === 'all'); 
+        recognition.continuous = true; 
+        
+        recognition.onresult = async (event) => { 
+            for(let i = event.resultIndex; i < event.results.length; i++) { 
+                const text = event.results[i][0].transcript; 
+                const isFinal = event.results[i].isFinal;
+                
+                if(text && text.trim() && voiceRoomId) { 
+                    // 声のみ聞き取りモードの場合は、最終決定された文章のみ処理
+                    if(mode === 'voice' && !isFinal) continue;
+
+                    console.log("🎤 音声認識:", text); 
+                    const timestamp = Date.now(); 
+                    const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp }; 
+                    await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
+                    const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
+                    const vSettings = getMyVoiceSettings(); 
+                    membersSnap.forEach(memberSnap => { 
+                        if(memberSnap.key !== currentUser.uid) { 
+                            db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp, voiceSettings: vSettings }); 
+                        } 
+                    }); 
+                    
+                    // 全部聞き取りモードで反応した場合、連続発火を防ぎつつすぐ次を聞き取るために再起動
+                    if(mode === 'all' && !isFinal) {
+                        recognition.stop();
+                        break;
+                    }
+                } 
+            } 
+        }; 
+        recognition.onerror = (e) => { console.error('音声認識エラー:', e); }; 
+        recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); }; 
+        if(isMicActive) recognition.start(); 
+    }
+    
     document.getElementById('toggleMicBtn').onclick = () => { isMicActive = !isMicActive; const btn = document.getElementById('toggleMicBtn'); if(isMicActive) { if(recognition) recognition.start(); btn.innerHTML = '<i class="fas fa-microphone"></i> マイクON <span class="voice-indicator"></span>'; btn.style.background = '#23a559'; } else { if(recognition) recognition.stop(); btn.innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; btn.style.background = '#3c3f45'; } };
     document.getElementById('sendVoiceTextBtn').onclick = () => { const div = document.getElementById('voiceTextInputDiv'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; };
-    document.getElementById('submitVoiceTextBtn').onclick = async () => { const text = document.getElementById('voiceManualText').value.trim(); if(text && voiceRoomId) { const timestamp = Date.now(); const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp }; await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); const vSettings = getMyVoiceSettings(); membersSnap.forEach(memberSnap => { if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp, voiceSettings: vSettings }); }); document.getElementById('voiceManualText').value = ''; } };
+    
+    document.getElementById('submitVoiceTextBtn').onclick = async () => { 
+        const text = document.getElementById('voiceManualText').value.trim(); 
+        if(!text) return; 
+        
+        if(text.length > 200) {
+            alert("ボイチャのテキスト送信は200文字までです！");
+            return;
+        }
+
+        const now = Date.now();
+        if(now - lastVoiceManualTime < 5000) {
+            alert("ボイチャのテキスト送信は5秒間のクールダウンがあります！");
+            return;
+        }
+        lastVoiceManualTime = now;
+
+        if(voiceRoomId) { 
+            const timestamp = Date.now(); 
+            const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp }; 
+            await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
+            const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
+            const vSettings = getMyVoiceSettings(); 
+            membersSnap.forEach(memberSnap => { 
+                if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp, voiceSettings: vSettings }); 
+            }); 
+            document.getElementById('voiceManualText').value = ''; 
+        } 
+    };
+    
     document.getElementById('leaveVoiceBtn').onclick = () => leaveVoiceRoom();
-    function leaveVoiceRoom() { if(voiceRoomId) { db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove(); db.ref(`users/${currentUser.uid}/voiceRoom`).remove(); } if(recognition) recognition.stop(); isMicActive = false; voiceRoomId = null; document.getElementById('voiceRoomStatus').innerHTML = '⚪ 未接続'; document.getElementById('voiceMembersList').innerHTML = ''; document.getElementById('toggleMicBtn').innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; document.getElementById('toggleMicBtn').style.background = '#3c3f45'; }
+    
+    function leaveVoiceRoom() { 
+        if(voiceRoomId) { 
+            db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove(); 
+            db.ref(`users/${currentUser.uid}/voiceRoom`).remove(); 
+        } 
+        if(recognition) recognition.stop(); 
+        isMicActive = false; 
+        voiceRoomId = null; 
+        
+        // 退出したらこれまでの履歴をまっさらにする
+        document.getElementById('voiceRoomStatus').innerHTML = '⚪ 未接続'; 
+        document.getElementById('voiceMembersList').innerHTML = ''; 
+        document.getElementById('voiceLogList').innerHTML = ''; 
+        
+        document.getElementById('toggleMicBtn').innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; 
+        document.getElementById('toggleMicBtn').style.background = '#3c3f45'; 
+    }
 
     let speechSynthesis = window.speechSynthesis; let currentUtterance = null;
     function speakText(text, settings = null) { 
@@ -425,7 +551,6 @@
         if(currentUtterance) speechSynthesis.cancel(); 
         const utterance = new SpeechSynthesisUtterance(text); 
         
-        // 設定が渡されていればそれを使用し、なければ自分の設定を使用
         const pitch = settings && settings.pitch !== undefined ? parseFloat(settings.pitch) : parseFloat(document.getElementById('pitchSlider').value);
         const rate = settings && settings.rate !== undefined ? parseFloat(settings.rate) : parseFloat(document.getElementById('rateSlider').value);
         let volume = settings && settings.volume !== undefined ? parseFloat(settings.volume) : parseFloat(document.getElementById('volumeSlider').value);
