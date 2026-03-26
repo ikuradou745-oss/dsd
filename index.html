@@ -149,6 +149,7 @@
     let ownedStamps = [...defaultStamps];
     let unreadCounts = {};
     let lastSeenMessageTimes = {};
+    let activeMessageListeners = new Set();
     
     function playNotificationSound() {
         try {
@@ -219,11 +220,9 @@
             const msg = snap.val();
             if(msg && msg.senderId !== currentUser.uid && currentChatId !== 'global') {
                 const chatKey = 'global';
-                if(!lastSeenMessageTimes[chatKey] || msg.timestamp > lastSeenMessageTimes[chatKey]) {
-                    unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
-                    renderChatListWithUnread();
-                    playNotificationSound();
-                }
+                unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
+                renderChatListWithUnread();
+                playNotificationSound();
             }
         });
         db.ref(`users/${currentUser.uid}/friends`).once('value', (friendsSnap) => {
@@ -233,12 +232,10 @@
                     const msg = snap.val();
                     if(msg && msg.senderId !== currentUser.uid && currentChatId !== `friend_${friendId}`) {
                         const chatKey = `friend_${friendId}`;
-                        if(!lastSeenMessageTimes[chatKey] || msg.timestamp > lastSeenMessageTimes[chatKey]) {
-                            unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
-                            renderChatListWithUnread();
-                            playNotificationSound();
-                            addNewMessageNotice(friendId, msg.senderName, msg.text);
-                        }
+                        unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
+                        renderChatListWithUnread();
+                        playNotificationSound();
+                        addNewMessageNotice(friendId, msg.senderName, msg.text);
                     }
                 });
             }
@@ -251,11 +248,9 @@
                         const msg = snap.val();
                         if(msg && msg.senderId !== currentUser.uid && currentChatId !== groupSnap.key) {
                             const chatKey = groupSnap.key;
-                            if(!lastSeenMessageTimes[chatKey] || msg.timestamp > lastSeenMessageTimes[chatKey]) {
-                                unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
-                                renderChatListWithUnread();
-                                playNotificationSound();
-                            }
+                            unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
+                            renderChatListWithUnread();
+                            playNotificationSound();
                         }
                     });
                 }
@@ -270,12 +265,8 @@
         const div = document.createElement('div');
         div.className = 'new-message-notice';
         div.setAttribute('data-friend', friendId);
-        div.innerHTML = `<span><strong>${senderName}</strong>さんからメッセージが来ています！<br><small>${text.substring(0,30)}${text.length>30?'...':''}</small></span><button class="goto-chat-btn" data-friend="${friendId}">見に行く</button>`;
+        div.innerHTML = `<span><strong>${senderName || '不明'}</strong>さんからメッセージが来ています！<br><small>${text ? text.substring(0,30) : ''}${text && text.length>30?'...':''}</small></span><button class="goto-chat-btn" data-friend="${friendId}">見に行く</button>`;
         area.prepend(div);
-        document.querySelectorAll('.goto-chat-btn').forEach(btn => btn.onclick = () => {
-            openChat(`friend_${friendId}`, 'friend');
-            div.remove();
-        });
         setTimeout(() => div.remove(), 10000);
     }
 
@@ -323,22 +314,19 @@
         else alert("ユーザーが見つかりません");
     };
 
-    // オンラインユーザー表示とフレンドリクエスト送信（修正）
     function renderOnlineUsers() { 
         db.ref('users').on('value', (snap) => { 
             const container = document.getElementById('onlineUsersList'); 
             container.innerHTML = ''; 
             snap.forEach(userSnap => { 
                 const u = userSnap.val(); 
-                if(u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) {
-                    container.innerHTML += `<div class="user-row"><span>${u.icon} ${u.name}</span><button data-uid="${u.uid}" data-name="${u.name}" data-icon="${u.icon}" class="connectReqBtn">つながる</button></div>`;
+                if(u && u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) {
+                    container.innerHTML += `<div class="user-row"><span>${u.icon || '😀'} ${u.name || 'ユーザー'}</span><button data-uid="${u.uid}" data-name="${u.name}" class="connectReqBtn">つながる</button></div>`;
                 }
             }); 
             document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async () => { 
                 const target = btn.getAttribute('data-uid');
                 const targetName = btn.getAttribute('data-name');
-                const targetIcon = btn.getAttribute('data-icon');
-                // リクエストを送信（相手のrequests配下に保存）
                 await db.ref(`requests/${target}/${currentUser.uid}`).set({ 
                     fromName: currentUser.name, 
                     fromIcon: currentUser.icon, 
@@ -351,7 +339,6 @@
         }); 
     }
     
-    // フレンドリクエスト受信表示（リアルタイム監視）
     function renderRequests() { 
         db.ref(`requests/${currentUser.uid}`).on('value', (snap) => { 
             const reqs = snap.val() || {}; 
@@ -362,16 +349,17 @@
                 container.innerHTML = '<div class="info-text">フレンドリクエストはありません</div>';
             } else {
                 for(let [fromId, req] of Object.entries(reqs)) {
-                    container.innerHTML += `<div class="user-row" data-request-id="${fromId}">
-                        <span><i class="fas fa-user-plus"></i> ${req.fromIcon} ${req.fromName}</span>
-                        <div>
-                            <button data-uid="${fromId}" class="acceptReq" style="background:#23a559; margin-right:8px;">✅ 許可</button>
-                            <button data-uid="${fromId}" class="rejectReq" style="background:#ed4245;">❌ 拒否</button>
-                        </div>
-                    </div>`;
+                    if(req && req.fromName) {
+                        container.innerHTML += `<div class="user-row" data-request-id="${fromId}">
+                            <span><i class="fas fa-user-plus"></i> ${req.fromIcon || '😀'} ${req.fromName}</span>
+                            <div>
+                                <button data-uid="${fromId}" class="acceptReq" style="background:#23a559; margin-right:8px;">✅ 許可</button>
+                                <button data-uid="${fromId}" class="rejectReq" style="background:#ed4245;">❌ 拒否</button>
+                            </div>
+                        </div>`;
+                    }
                 }
             }
-            // イベントリスナーを再設定
             document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => { 
                 const fid = btn.getAttribute('data-uid'); 
                 await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true); 
@@ -395,7 +383,7 @@
         const container = document.getElementById('chatListContainer');
         if(!container) return;
         container.innerHTML = '';
-        const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>' + (unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''); globalDiv.onclick = () => { openChat('global', 'global'); unreadCounts['global'] = 0; lastSeenMessageTimes['global'] = Date.now(); renderChatListWithUnread(); }; container.appendChild(globalDiv);
+        const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>' + (unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''); globalDiv.onclick = () => { openChat('global', 'global'); unreadCounts['global'] = 0; renderChatListWithUnread(); }; container.appendChild(globalDiv);
         const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
         for(let friendId of Object.keys(friendsSnap.val() || {})) { 
             const fdata = (await db.ref(`users/${friendId}`).once('value')).val(); 
@@ -404,19 +392,19 @@
                 const fd = document.createElement('div'); 
                 fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`; 
                 fd.innerHTML = `<div><i class="fas fa-user-friends"></i> 💬 ${fdata.icon} ${fdata.name}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
-                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; lastSeenMessageTimes[`friend_${friendId}`] = Date.now(); renderChatListWithUnread(); }; 
+                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); }; 
                 container.appendChild(fd); 
             } 
         }
         const groupsSnap = await db.ref('groups').once('value'); 
         groupsSnap.forEach(snap => { 
             const group = snap.val(); 
-            if(group.members && group.members[currentUser.uid]) { 
+            if(group && group.members && group.members[currentUser.uid]) { 
                 const unread = unreadCounts[snap.key] || 0;
                 const gd = document.createElement('div'); 
                 gd.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`; 
-                gd.innerHTML = `<div><i class="fas fa-users"></i> 👥 ${group.name}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
-                gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') { openChat(snap.key, 'group'); unreadCounts[snap.key] = 0; lastSeenMessageTimes[snap.key] = Date.now(); renderChatListWithUnread(); } }; 
+                gd.innerHTML = `<div><i class="fas fa-users"></i> 👥 ${group.name || 'グループ'}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
+                gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') { openChat(snap.key, 'group'); unreadCounts[snap.key] = 0; renderChatListWithUnread(); } }; 
                 container.appendChild(gd); 
             } 
         });
@@ -430,6 +418,12 @@
         loadGroupMembersDisplay();
         loadMessagesWithRead(); 
         renderChatListWithUnread(); 
+        // 新着通知エリアから該当する通知を削除
+        if(type === 'friend') {
+            const friendId = chatId.replace('friend_', '');
+            const notice = document.querySelector(`.new-message-notice[data-friend="${friendId}"]`);
+            if(notice) notice.remove();
+        }
     }
     
     async function loadGroupMembersDisplay() {
@@ -441,7 +435,7 @@
             for(let uid of Object.keys(members)) {
                 if(uid !== currentUser.uid) {
                     const userData = (await db.ref(`users/${uid}`).once('value')).val();
-                    if(userData) names.push(userData.name);
+                    if(userData && userData.name) names.push(userData.name);
                 }
             }
             displaySpan.innerText = names.length ? `メンバー: ${names.join(', ')}` : '';
@@ -456,13 +450,16 @@
         if(currentChatType === 'global') path = 'globalMessages'; 
         else if(currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`; 
         else path = `groups/${currentChatId}/messages`; 
+        db.ref(path).limitToLast(50).off();
         db.ref(path).limitToLast(50).on('value', async (snap) => { 
             const msgs = snap.val() || {}; 
             const history = document.getElementById('messagesHistory'); history.innerHTML = '';
             let groupMembers = null;
             if(currentChatType === 'group') groupMembers = (await db.ref(`groups/${currentChatId}/members`).once('value')).val() || {};
             const memberCount = groupMembers ? Object.keys(groupMembers).length : 0;
-            Object.entries(msgs).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(async ([msgId, msg]) => {
+            const sortedMsgs = Object.entries(msgs).sort((a,b)=>a[1].timestamp-b[1].timestamp);
+            for(let [msgId, msg] of sortedMsgs) {
+                if(!msg || !msg.senderName) continue;
                 const div = document.createElement('div');
                 div.className = `message-bubble ${msg.senderId === currentUser.uid ? 'my-message' : 'other-message'}`;
                 let readHtml = '';
@@ -489,29 +486,31 @@
                     if(unreadCounts[chatKey]) delete unreadCounts[chatKey];
                     renderChatListWithUnread();
                 }
-            });
+            }
             history.scrollTop = history.scrollHeight;
         });
-        document.querySelectorAll('.read-status').forEach(el => {
-            el.onclick = async (e) => {
-                e.stopPropagation();
-                const msgId = el.getAttribute('data-msg-id');
-                const chat = el.getAttribute('data-chat');
-                const type = el.getAttribute('data-type');
-                let readBy = {};
-                if(type === 'global') readBy = (await db.ref(`globalMessages/${msgId}/readBy`).once('value')).val() || {};
-                else if(type === 'friend') readBy = (await db.ref(`privateChats/${[currentUser.uid, chat.replace('friend_', '')].sort().join('_')}/messages/${msgId}/readBy`).once('value')).val() || {};
-                else readBy = (await db.ref(`groups/${chat}/messages/${msgId}/readBy`).once('value')).val() || {};
-                const readerNames = [];
-                for(let uid of Object.keys(readBy)) {
-                    if(uid !== currentUser.uid) {
-                        const userData = (await db.ref(`users/${uid}`).once('value')).val();
-                        if(userData) readerNames.push(userData.name);
+        setTimeout(() => {
+            document.querySelectorAll('.read-status').forEach(el => {
+                el.onclick = async (e) => {
+                    e.stopPropagation();
+                    const msgId = el.getAttribute('data-msg-id');
+                    const chat = el.getAttribute('data-chat');
+                    const type = el.getAttribute('data-type');
+                    let readBy = {};
+                    if(type === 'global') readBy = (await db.ref(`globalMessages/${msgId}/readBy`).once('value')).val() || {};
+                    else if(type === 'friend') readBy = (await db.ref(`privateChats/${[currentUser.uid, chat.replace('friend_', '')].sort().join('_')}/messages/${msgId}/readBy`).once('value')).val() || {};
+                    else readBy = (await db.ref(`groups/${chat}/messages/${msgId}/readBy`).once('value')).val() || {};
+                    const readerNames = [];
+                    for(let uid of Object.keys(readBy)) {
+                        if(uid !== currentUser.uid) {
+                            const userData = (await db.ref(`users/${uid}`).once('value')).val();
+                            if(userData && userData.name) readerNames.push(userData.name);
+                        }
                     }
-                }
-                alert(`既読した人: ${readerNames.length > 0 ? readerNames.join(', ') : 'なし'}`);
-            };
-        });
+                    alert(`既読した人: ${readerNames.length > 0 ? readerNames.join(', ') : 'なし'}`);
+                };
+            });
+        }, 100);
     }
 
     async function sendMessageWithCooldownAndRead(text, isStamp = false) {
@@ -549,7 +548,7 @@
             const memberList = document.getElementById('groupMembersList'); memberList.innerHTML = '';
             for(let [fid] of Object.entries(friends)) {
                 const fdata = (await db.ref(`users/${fid}`).once('value')).val();
-                if(fdata) memberList.innerHTML += `<label class="member-checkbox"><input type="checkbox" value="${fid}"> ${fdata.icon} ${fdata.name}</label>`;
+                if(fdata && fdata.name) memberList.innerHTML += `<label class="member-checkbox"><input type="checkbox" value="${fid}"> ${fdata.icon} ${fdata.name}</label>`;
             }
             modal.style.display = 'block'; overlay.style.display = 'block';
         };
@@ -579,7 +578,7 @@
             const inviteArea = document.getElementById('globalInviteArea');
             const div = document.createElement('div'); 
             div.className = 'invite-notification'; 
-            div.innerHTML = `<span>🎤 <strong>${invite.fromName}</strong> さんからボイチャの招待が来ています！</span><div><button data-room="${invite.roomId}" data-key="${snap.key}" class="acceptVoiceInvite" style="background:#23a559; margin-right:8px;">✅ 許可</button><button data-key="${snap.key}" class="rejectVoiceInvite" style="background:#ed4245;">❌ 拒否</button></div>`; 
+            div.innerHTML = `<span>🎤 <strong>${invite.fromName || '不明'}</strong> さんからボイチャの招待が来ています！</span><div><button data-room="${invite.roomId}" data-key="${snap.key}" class="acceptVoiceInvite" style="background:#23a559; margin-right:8px;">✅ 許可</button><button data-key="${snap.key}" class="rejectVoiceInvite" style="background:#ed4245;">❌ 拒否</button></div>`; 
             inviteArea.prepend(div);
             setTimeout(() => { if(div.parentNode) div.remove(); }, 30000);
             document.querySelectorAll('.acceptVoiceInvite').forEach(btn => btn.onclick = async () => { 
@@ -603,8 +602,8 @@
         const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
         const friendIds = Object.keys(friendsSnap.val() || {});
         if(friendIds.length === 0) { alert("フレンドがいません"); return; }
-        const friendList = []; for(let fid of friendIds) { const fdata = (await db.ref(`users/${fid}`).once('value')).val(); if(fdata) friendList.push({ uid: fid, name: fdata.name, icon: fdata.icon }); }
-        const modal = document.getElementById('friendSelectModal'); const listDiv = document.getElementById('friendSelectList'); listDiv.innerHTML = ''; friendList.forEach(f => { const item = document.createElement('div'); item.className = 'friend-select-item'; item.innerHTML = `${f.icon} ${f.name}`; item.onclick = async () => { const newRoomId = `room_${Date.now()}`; await db.ref(`voiceRooms/${newRoomId}`).set({ host: currentUser.uid, members: { [currentUser.uid]: true }, active: true, createdAt: Date.now() }); await db.ref(`voiceInvites/${f.uid}`).push({ fromName: currentUser.name, fromUid: currentUser.uid, roomId: newRoomId }); await db.ref(`users/${currentUser.uid}/voiceRoom`).set(newRoomId); joinVoiceRoom(newRoomId); modal.style.display = 'none'; overlay.style.display = 'none'; alert(`${f.name} に招待を送信しました`); }; listDiv.appendChild(item); }); modal.style.display = 'block'; overlay.style.display = 'block'; };
+        const friendList = []; for(let fid of friendIds) { const fdata = (await db.ref(`users/${fid}`).once('value')).val(); if(fdata && fdata.name) friendList.push({ uid: fid, name: fdata.name, icon: fdata.icon }); }
+        const modal = document.getElementById('friendSelectModal'); const listDiv = document.getElementById('friendSelectList'); listDiv.innerHTML = ''; friendList.forEach(f => { const item = document.createElement('div'); item.className = 'friend-select-item'; item.innerHTML = `${f.icon || '😀'} ${f.name}`; item.onclick = async () => { const newRoomId = `room_${Date.now()}`; await db.ref(`voiceRooms/${newRoomId}`).set({ host: currentUser.uid, members: { [currentUser.uid]: true }, active: true, createdAt: Date.now() }); await db.ref(`voiceInvites/${f.uid}`).push({ fromName: currentUser.name, fromUid: currentUser.uid, roomId: newRoomId }); await db.ref(`users/${currentUser.uid}/voiceRoom`).set(newRoomId); joinVoiceRoom(newRoomId); modal.style.display = 'none'; overlay.style.display = 'none'; alert(`${f.name} に招待を送信しました`); }; listDiv.appendChild(item); }); modal.style.display = 'block'; overlay.style.display = 'block'; };
     document.getElementById('closeFriendModal').onclick = () => { document.getElementById('friendSelectModal').style.display = 'none'; overlay.style.display = 'none'; };
     overlay.onclick = () => { document.getElementById('friendSelectModal').style.display = 'none'; document.getElementById('groupCreateModal').style.display = 'none'; overlay.style.display = 'none'; };
 
@@ -625,7 +624,7 @@
             const logDiv = document.getElementById('voiceLogList'); 
             logDiv.innerHTML = ''; 
             Object.values(logs).sort((a,b)=>a.timestamp-b.timestamp).forEach(log => { 
-                logDiv.innerHTML += `<div class="voice-message-item"><strong>${log.senderName}:</strong> ${log.text}</div>`; 
+                if(log && log.senderName) logDiv.innerHTML += `<div class="voice-message-item"><strong>${log.senderName}:</strong> ${log.text}</div>`; 
             }); 
             logDiv.scrollTop = logDiv.scrollHeight; 
         }); 
