@@ -148,7 +148,23 @@
     ];
     let ownedStamps = [...defaultStamps];
     let unreadCounts = {};
-    let recentMessages = []; // 新着メッセージ通知用
+    let lastSeenMessageTimes = {}; // 各チャットの最終確認時間
+    
+    // 着信音生成
+    function playNotificationSound() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = 880;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3);
+            oscillator.stop(audioCtx.currentTime + 0.3);
+        } catch(e) { console.log('音声再生エラー'); }
+    }
 
     function formatTime(timestamp) { if(!timestamp) return ''; const d = new Date(timestamp); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; }
     function generateFriendCode() { return Math.floor(10000000 + Math.random() * 90000000).toString(); }
@@ -199,20 +215,57 @@
         }, 1000);
     }
 
+    // 新着メッセージ監視（着信音と通知マーク）
     function startNewMessageListener() {
-        setInterval(async () => {
-            if(!currentUser || currentChatId) return;
-            const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
-            for(let fid of Object.keys(friendsSnap.val() || {})) {
-                const path = `privateChats/${[currentUser.uid, fid].sort().join('_')}/messages`;
-                const snap = await db.ref(path).limitToLast(1).once('value');
-                snap.forEach(msg => {
-                    if(msg.val().senderId !== currentUser.uid && !msg.val().readBy?.[currentUser.uid]) {
-                        addNewMessageNotice(fid, msg.val().senderName, msg.val().text);
+        // 全体チャット監視
+        db.ref('globalMessages').limitToLast(10).on('child_added', (snap) => {
+            const msg = snap.val();
+            if(msg && msg.senderId !== currentUser.uid && currentChatId !== 'global') {
+                const chatKey = 'global';
+                if(!lastSeenMessageTimes[chatKey] || msg.timestamp > lastSeenMessageTimes[chatKey]) {
+                    unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
+                    renderChatListWithUnread();
+                    playNotificationSound();
+                }
+            }
+        });
+        // フレンドチャット監視
+        db.ref(`users/${currentUser.uid}/friends`).once('value', (friendsSnap) => {
+            for(let friendId of Object.keys(friendsSnap.val() || {})) {
+                const path = `privateChats/${[currentUser.uid, friendId].sort().join('_')}/messages`;
+                db.ref(path).limitToLast(10).on('child_added', (snap) => {
+                    const msg = snap.val();
+                    if(msg && msg.senderId !== currentUser.uid && currentChatId !== `friend_${friendId}`) {
+                        const chatKey = `friend_${friendId}`;
+                        if(!lastSeenMessageTimes[chatKey] || msg.timestamp > lastSeenMessageTimes[chatKey]) {
+                            unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
+                            renderChatListWithUnread();
+                            playNotificationSound();
+                            addNewMessageNotice(friendId, msg.senderName, msg.text);
+                        }
                     }
                 });
             }
-        }, 3000);
+        });
+        // グループチャット監視
+        db.ref('groups').on('value', (groupsSnap) => {
+            groupsSnap.forEach(groupSnap => {
+                const group = groupSnap.val();
+                if(group.members && group.members[currentUser.uid]) {
+                    db.ref(`groups/${groupSnap.key}/messages`).limitToLast(10).on('child_added', (snap) => {
+                        const msg = snap.val();
+                        if(msg && msg.senderId !== currentUser.uid && currentChatId !== groupSnap.key) {
+                            const chatKey = groupSnap.key;
+                            if(!lastSeenMessageTimes[chatKey] || msg.timestamp > lastSeenMessageTimes[chatKey]) {
+                                unreadCounts[chatKey] = (unreadCounts[chatKey] || 0) + 1;
+                                renderChatListWithUnread();
+                                playNotificationSound();
+                            }
+                        }
+                    });
+                }
+            });
+        });
     }
 
     function addNewMessageNotice(friendId, senderName, text) {
@@ -282,7 +335,7 @@
         const container = document.getElementById('chatListContainer');
         if(!container) return;
         container.innerHTML = '';
-        const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>'; globalDiv.onclick = () => openChat('global', 'global'); container.appendChild(globalDiv);
+        const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>' + (unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''); globalDiv.onclick = () => { openChat('global', 'global'); unreadCounts['global'] = 0; lastSeenMessageTimes['global'] = Date.now(); renderChatListWithUnread(); }; container.appendChild(globalDiv);
         const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
         for(let friendId of Object.keys(friendsSnap.val() || {})) { 
             const fdata = (await db.ref(`users/${friendId}`).once('value')).val(); 
@@ -291,7 +344,7 @@
                 const fd = document.createElement('div'); 
                 fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`; 
                 fd.innerHTML = `<div><i class="fas fa-user-friends"></i> 💬 ${fdata.icon} ${fdata.name}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
-                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); }; 
+                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; lastSeenMessageTimes[`friend_${friendId}`] = Date.now(); renderChatListWithUnread(); }; 
                 container.appendChild(fd); 
             } 
         }
@@ -303,7 +356,7 @@
                 const gd = document.createElement('div'); 
                 gd.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`; 
                 gd.innerHTML = `<div><i class="fas fa-users"></i> 👥 ${group.name}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
-                gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') { openChat(snap.key, 'group'); unreadCounts[snap.key] = 0; renderChatListWithUnread(); } }; 
+                gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') { openChat(snap.key, 'group'); unreadCounts[snap.key] = 0; lastSeenMessageTimes[snap.key] = Date.now(); renderChatListWithUnread(); } }; 
                 container.appendChild(gd); 
             } 
         });
@@ -572,7 +625,7 @@
         const utterance = new SpeechSynthesisUtterance(text); 
         utterance.pitch = parseFloat(document.getElementById('pitchSlider').value); 
         utterance.rate = parseFloat(document.getElementById('rateSlider').value); 
-        utterance.volume = parseFloat(document.getElementById('volumeSlider').value) * 1.2; // 音量UP
+        utterance.volume = parseFloat(document.getElementById('volumeSlider').value) * 1.2;
         const preset = localStorage.getItem('voicePreset') || 'standard'; 
         const voices = speechSynthesis.getVoices();
         if(preset === 'female') {
