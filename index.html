@@ -148,9 +148,8 @@
     ];
     let ownedStamps = [...defaultStamps];
     let unreadCounts = {};
-    let lastSeenMessageTimes = {}; // 各チャットの最終確認時間
+    let lastSeenMessageTimes = {};
     
-    // 着信音生成
     function playNotificationSound() {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -215,9 +214,7 @@
         }, 1000);
     }
 
-    // 新着メッセージ監視（着信音と通知マーク）
     function startNewMessageListener() {
-        // 全体チャット監視
         db.ref('globalMessages').limitToLast(10).on('child_added', (snap) => {
             const msg = snap.val();
             if(msg && msg.senderId !== currentUser.uid && currentChatId !== 'global') {
@@ -229,7 +226,6 @@
                 }
             }
         });
-        // フレンドチャット監視
         db.ref(`users/${currentUser.uid}/friends`).once('value', (friendsSnap) => {
             for(let friendId of Object.keys(friendsSnap.val() || {})) {
                 const path = `privateChats/${[currentUser.uid, friendId].sort().join('_')}/messages`;
@@ -247,7 +243,6 @@
                 });
             }
         });
-        // グループチャット監視
         db.ref('groups').on('value', (groupsSnap) => {
             groupsSnap.forEach(groupSnap => {
                 const group = groupSnap.val();
@@ -328,8 +323,73 @@
         else alert("ユーザーが見つかりません");
     };
 
-    function renderOnlineUsers() { db.ref('users').on('value', (snap) => { const container = document.getElementById('onlineUsersList'); container.innerHTML = ''; snap.forEach(userSnap => { const u = userSnap.val(); if(u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) container.innerHTML += `<div class="user-row"><span>${u.icon} ${u.name}</span><button data-uid="${u.uid}" class="connectReqBtn">つながる</button></div>`; }); document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async () => { const target = btn.getAttribute('data-uid'); await db.ref(`requests/${target}/${currentUser.uid}`).set({ fromName: currentUser.name, fromIcon: currentUser.icon, fromUid: currentUser.uid }); alert("リクエスト送信しました"); }); }); }
-    function renderRequests() { db.ref(`requests/${currentUser.uid}`).on('value', (snap) => { const reqs = snap.val() || {}; const container = document.getElementById('requestsList'); container.innerHTML = ''; for(let [fromId, req] of Object.entries(reqs)) container.innerHTML += `<div class="user-row"><span>${req.fromIcon} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq">許可</button><button data-uid="${fromId}" class="rejectReq">拒否</button></div></div>`; document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true); await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); renderFriends(); }); document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); }); }); }
+    // オンラインユーザー表示とフレンドリクエスト送信（修正）
+    function renderOnlineUsers() { 
+        db.ref('users').on('value', (snap) => { 
+            const container = document.getElementById('onlineUsersList'); 
+            container.innerHTML = ''; 
+            snap.forEach(userSnap => { 
+                const u = userSnap.val(); 
+                if(u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) {
+                    container.innerHTML += `<div class="user-row"><span>${u.icon} ${u.name}</span><button data-uid="${u.uid}" data-name="${u.name}" data-icon="${u.icon}" class="connectReqBtn">つながる</button></div>`;
+                }
+            }); 
+            document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async () => { 
+                const target = btn.getAttribute('data-uid');
+                const targetName = btn.getAttribute('data-name');
+                const targetIcon = btn.getAttribute('data-icon');
+                // リクエストを送信（相手のrequests配下に保存）
+                await db.ref(`requests/${target}/${currentUser.uid}`).set({ 
+                    fromName: currentUser.name, 
+                    fromIcon: currentUser.icon, 
+                    fromUid: currentUser.uid,
+                    timestamp: Date.now()
+                });
+                playNotificationSound();
+                alert(`${targetName}さんにフレンドリクエストを送信しました！`);
+            }); 
+        }); 
+    }
+    
+    // フレンドリクエスト受信表示（リアルタイム監視）
+    function renderRequests() { 
+        db.ref(`requests/${currentUser.uid}`).on('value', (snap) => { 
+            const reqs = snap.val() || {}; 
+            const container = document.getElementById('requestsList'); 
+            container.innerHTML = ''; 
+            const reqCount = Object.keys(reqs).length;
+            if(reqCount === 0) {
+                container.innerHTML = '<div class="info-text">フレンドリクエストはありません</div>';
+            } else {
+                for(let [fromId, req] of Object.entries(reqs)) {
+                    container.innerHTML += `<div class="user-row" data-request-id="${fromId}">
+                        <span><i class="fas fa-user-plus"></i> ${req.fromIcon} ${req.fromName}</span>
+                        <div>
+                            <button data-uid="${fromId}" class="acceptReq" style="background:#23a559; margin-right:8px;">✅ 許可</button>
+                            <button data-uid="${fromId}" class="rejectReq" style="background:#ed4245;">❌ 拒否</button>
+                        </div>
+                    </div>`;
+                }
+            }
+            // イベントリスナーを再設定
+            document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => { 
+                const fid = btn.getAttribute('data-uid'); 
+                await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true); 
+                await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true); 
+                await db.ref(`requests/${currentUser.uid}/${fid}`).remove();
+                playNotificationSound();
+                renderFriends(); 
+                renderRequests();
+                alert("フレンドになりました！");
+            }); 
+            document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async () => { 
+                const fid = btn.getAttribute('data-uid'); 
+                await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); 
+                renderRequests();
+                alert("リクエストを拒否しました");
+            }); 
+        }); 
+    }
 
     async function renderChatListWithUnread() {
         const container = document.getElementById('chatListContainer');
