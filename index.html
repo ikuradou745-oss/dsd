@@ -2,2430 +2,887 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Typing Game RPG</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Forcord - 新感覚ボイスチャット</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* CSSリセットと基本設定 */
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f0f0f; color: #ffffff; overflow: hidden; }
-        
-        /* 全体レイアウト */
-        #app-container { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
-        
-        /* 上側：ヘッダー */
-        #header { display: flex; align-items: center; justify-content: space-between; height: 60px; background: linear-gradient(180deg, #1a1a1a 0%, #111111 100%); padding: 0 20px; border-bottom: 1px solid #2a2a2a; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-        #header-left { display: flex; align-items: center; gap: 15px; }
-        #settings-btn, #greek-info-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #e0e0e0; transition: transform 0.3s ease; }
-        #settings-btn:hover, #greek-info-btn:hover { transform: scale(1.1); color: #ffffff; }
-        #coin-display { font-size: 18px; font-weight: bold; color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); display: flex; align-items: center; gap: 5px; }
-        #gold-coin-display { font-size: 18px; font-weight: bold; color: #ffaa00; text-shadow: 0 0 10px rgba(255, 170, 0, 0.5); display: flex; align-items: center; gap: 5px; margin-left: 15px; }
-        #raid-point-display { font-size: 18px; font-weight: bold; color: #ff5722; text-shadow: 0 0 10px rgba(255, 87, 34, 0.5); display: flex; align-items: center; gap: 5px; margin-left: 15px; }
-        #header-right { display: flex; align-items: center; gap: 10px; width: 350px; }
-        #level-display { font-size: 18px; font-weight: bold; white-space: nowrap; color: #e0e0e0; }
-        #xp-bar-container { width: 100%; height: 15px; background-color: #2a2a2a; border-radius: 10px; overflow: hidden; position: relative; border: 1px solid #444; }
-        #xp-bar-fill { height: 100%; background: linear-gradient(90deg, #6bcf7f, #4caf50); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px #4caf50; }
-        #xp-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; text-shadow: 1px 1px 2px black; }
-
-        /* 下側：メインコンテンツ */
-        #main-content { flex: 1; position: relative; background: radial-gradient(circle at 20% 30%, #1e1e1e, #121212); overflow-y: auto; padding: 20px; }
-        .screen { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; }
-        .screen.active { display: flex; }
-
-        /* メニュー画面 */
-        #menu-screen { justify-content: center; }
-        #menu-screen h1 { 
-            font-size: 64px; 
-            margin-bottom: 40px; 
-            text-shadow: 0 0 20px #00bcd4, 0 0 40px #00bcd4; 
-            color: #ffffff;
-            letter-spacing: 4px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #a0e9ff, #00bcd4, #007bff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-top: 0;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #1e1f22; color: #e1e3e8; height: 100vh; overflow: hidden; }
+        .lobby-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(145deg, #1a1b1e 0%, #111214 100%); display: flex; justify-content: center; align-items: center; z-index: 200; }
+        .lobby-card { background: #2b2d31; padding: 2.5rem; border-radius: 32px; text-align: center; width: 380px; border: 1px solid #3c3f45; }
+        .lobby-card h1 { font-size: 2.5rem; background: linear-gradient(135deg, #5865F2, #9b59b6); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 1.5rem; font-weight: 800; }
+        .lobby-card input { width: 100%; padding: 14px 18px; background: #1e1f22; border: 1px solid #3c3f45; border-radius: 28px; color: white; font-size: 1rem; outline: none; margin-bottom: 1rem; }
+        .lobby-card button { background: #5865F2; border: none; color: white; padding: 12px 20px; border-radius: 28px; font-weight: 600; cursor: pointer; width: 100%; }
+        .error-msg { color: #ed4245; margin-top: 10px; font-size: 0.85rem; }
+        .app-main { display: flex; height: 100vh; width: 100%; position: relative; }
+        .sidebar { width: 72px; background: #1e1f22; display: flex; flex-direction: column; align-items: center; padding-top: 20px; gap: 28px; border-right: 1px solid #2b2d31; }
+        .sidebar-icon { font-size: 28px; color: #949ba4; cursor: pointer; padding: 8px; border-radius: 16px; width: 48px; text-align: center; transition: 0.1s; }
+        .sidebar-icon.active { color: #e1e3e8; background: #3c3f45; }
+        .content-area { flex: 1; display: flex; background: #2b2d31; overflow: hidden; }
+        .tab-view { display: none; width: 100%; height: 100%; overflow-y: auto; }
+        .tab-view.active-view { display: flex; }
+        .global-invite-area { position: fixed; top: 16px; left: 88px; z-index: 1000; width: 320px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .global-invite-area > * { pointer-events: auto; }
+        .invite-notification { background: #2b2d31; border-left: 4px solid #5865F2; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; animation: slideDown 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        .home-container { display: flex; flex-direction: column; padding: 24px; width: 100%; gap: 28px; }
+        .profile-card { background: #1e1f22; border-radius: 24px; padding: 20px; display: flex; align-items: center; gap: 20px; border: 1px solid #3c3f45; }
+        .profile-icon { font-size: 52px; background: #2b2d31; width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .profile-info h3 { font-size: 1.4rem; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .friend-code { background: #111214; padding: 6px 12px; border-radius: 20px; font-family: monospace; font-size: 1rem; margin-top: 6px; display: inline-block; }
+        .coin-badge { background: #f0b90b; color: #1e1f22; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; }
+        .info-text { font-size: 0.7rem; color: #949ba4; margin-top: 4px; }
+        .friend-add-section { background: #1e1f22; border-radius: 20px; padding: 20px; }
+        .friend-add-row { display: flex; gap: 12px; margin-top: 10px; }
+        .friend-add-row input { flex: 1; background: #111214; border: 1px solid #3c3f45; border-radius: 28px; padding: 12px; color: white; }
+        button { background: #5865F2; border: none; border-radius: 28px; padding: 8px 18px; color: white; font-weight: 500; cursor: pointer; transition: 0.1s; }
+        button:hover { opacity: 0.9; }
+        .friend-list { list-style: none; margin-top: 12px; }
+        .friend-item { display: flex; justify-content: space-between; background: #111214; margin: 8px 0; padding: 10px 16px; border-radius: 20px; align-items: center; }
+        .connect-container { padding: 24px; width: 100%; display: flex; flex-direction: column; gap: 32px; }
+        .section-card { background: #1e1f22; border-radius: 20px; padding: 20px; }
+        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2b2d31; }
+        .messages-layout { display: flex; width: 100%; height: 100%; }
+        .channels-list { width: 280px; background: #1e1f22; border-right: 1px solid #2b2d31; padding: 20px; overflow-y: auto; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: #2b2d31; }
+        .chat-header { padding: 16px; border-bottom: 1px solid #3c3f45; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .group-members { font-size: 0.8rem; color: #949ba4; }
+        .messages-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .message-bubble { padding: 8px 14px; border-radius: 20px; max-width: 70%; display: flex; flex-direction: column; gap: 4px; position: relative; }
+        .message-bubble.my-message { background: #248046; align-self: flex-end; }
+        .message-bubble.other-message { background: #1e1f22; align-self: flex-start; }
+        .message-sender { font-size: 0.75rem; opacity: 0.8; display: flex; align-items: center; gap: 6px; }
+        .message-text { word-wrap: break-word; }
+        .message-image { max-width: 200px; border-radius: 12px; margin-top: 4px; cursor: pointer; }
+        .message-footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.65rem; opacity: 0.6; }
+        .reply-btn { background: none; border: none; color: #949ba4; cursor: pointer; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; margin-right: auto; }
+        .reply-btn:hover { background: #3c3f45; color: white; }
+        .reply-preview { background: #111214; border-left: 3px solid #5865F2; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; }
+        .reply-preview .cancel-reply { cursor: pointer; color: #ed4245; }
+        .reply-reference { background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 6px; margin-bottom: 6px; font-size: 0.75rem; border-left: 2px solid #5865F2; }
+        .reply-reference .reply-icon { margin-right: 4px; opacity: 0.7; }
+        .message-stamp-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 20px;
+            padding: 12px 24px;
+            min-width: 120px;
         }
-        #menu-screen .menu-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 30px; 
-            width: 80%; 
-            max-width: 700px; 
-            margin-top: 0; 
+        .message-stamp-emoji {
+            font-size: 3.5rem;
+            line-height: 1.2;
+            margin-bottom: 4px;
         }
-        .menu-btn { 
-            background: linear-gradient(145deg, #2c2c2c, #1f1f1f); 
-            color: #f0f0f0; 
-            border: none; 
-            padding: 35px 20px; 
-            font-size: 26px; 
-            border-radius: 24px; 
-            cursor: pointer; 
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
-            font-weight: bold; 
-            box-shadow: 0 8px 16px rgba(0,0,0,0.6), 0 2px 4px rgba(255,255,255,0.05) inset;
-            border: 1px solid #3a3a3a;
-            letter-spacing: 2px;
-            text-shadow: 1px 1px 2px black;
-        }
-        .menu-btn:hover { 
-            background: linear-gradient(145deg, #3a3a3a, #2a2a2a); 
-            border-color: #00bcd4; 
-            transform: translateY(-8px); 
-            box-shadow: 0 15px 25px rgba(0,0,0,0.7), 0 0 15px rgba(0, 188, 212, 0.4);
-            color: #ffffff;
-        }
-        .menu-btn.story-mode {
-            grid-column: span 2;
-            background: linear-gradient(145deg, #7b1fa2, #4a148c);
-            border-color: #9c27b0;
-        }
-        .menu-btn.raid-mode {
-            grid-column: span 2;
-            background: linear-gradient(145deg, #c62828, #b71c1c);
-            border-color: #ef5350;
-        }
-        .menu-btn.raid-mode.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-        .menu-btn.event-mode {
-            grid-column: span 2;
-            background: linear-gradient(145deg, #ff9800, #e65100);
-            border-color: #ffb74d;
-        }
-        .raid-timer-info {
-            grid-column: span 2;
-            text-align: center;
-            font-size: 18px;
-            color: #ff9800;
-            margin-top: -10px;
-            margin-bottom: 10px;
-        }
-
-        /* イベント応援画面 */
-        #event-screen { justify-content: flex-start; padding-top: 30px; }
-        #event-screen h2 { font-size: 40px; margin-bottom: 20px; color: #ff9800; text-shadow: 0 0 15px #ff9800; }
-        .event-content { width: 90%; max-width: 800px; display: flex; gap: 30px; }
-        .event-main { flex: 1; display: flex; flex-direction: column; align-items: center; }
-        #like-btn { 
-            font-size: 60px; 
-            background: none; 
-            border: none; 
-            cursor: pointer; 
-            transition: transform 0.1s ease; 
-            position: relative;
-        }
-        #like-btn:active { transform: scale(1.3); }
-        #like-count { font-size: 32px; font-weight: bold; margin: 10px 0; color: #ff9800; }
-        .event-ranking { flex: 1; background: rgba(20,20,20,0.7); padding: 15px; border-radius: 15px; border: 1px solid #333; max-height: 400px; overflow-y: auto; }
-        .event-ranking h3 { color: #ff9800; margin-bottom: 10px; }
-        .event-ranking-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #333; }
-        #event-announcement { margin-top: 20px; font-size: 18px; color: #4caf50; font-weight: bold; }
-        .like-animation { position: fixed; pointer-events: none; font-size: 24px; color: #ff9800; font-weight: bold; z-index: 600; animation: likeUp 1.5s ease-out forwards; }
-        @keyframes likeUp {
-            0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-100px); }
-        }
-
-        /* プレイ選択画面 */
-        #play-select-screen { justify-content: center; }
-        #play-select-screen h2 { font-size: 48px; margin-bottom: 50px; text-shadow: 0 0 15px #2196f3; }
-        #play-select-screen .select-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; width: 90%; max-width: 900px; }
-        .mode-btn { 
-            background: linear-gradient(145deg, #1e88e5, #1565c0); 
-            color: #fff; 
-            border: none; 
-            padding: 35px; 
-            font-size: 28px; 
-            border-radius: 24px; 
-            cursor: pointer; 
-            transition: all 0.3s ease; 
-            font-weight: bold; 
-            box-shadow: 0 8px 16px rgba(0,0,0,0.5), 0 2px 4px rgba(255,255,255,0.2) inset;
-            border: 1px solid #42a5f5;
-        }
-        .mode-btn.hard { background: linear-gradient(145deg, #e53935, #c62828); border-color: #ef5350; }
-        .mode-btn.story { background: linear-gradient(145deg, #7b1fa2, #4a148c); border-color: #9c27b0; }
-        .mode-btn:hover { filter: brightness(1.15); transform: translateY(-8px); box-shadow: 0 15px 25px rgba(0,0,0,0.6); }
-
-        /* ストーリーマップ画面 */
-        #story-map-screen { justify-content: center; }
-        #story-map-screen h2 { font-size: 40px; margin-bottom: 20px; color: #9c27b0; text-shadow: 0 0 15px #9c27b0; }
-        .stage-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; width: 90%; max-width: 1000px; margin: 20px 0; max-height: 500px; overflow-y: auto; padding: 10px; }
-        .stage-btn { 
-            background: linear-gradient(145deg, #333, #222); 
-            color: #fff; 
-            border: 2px solid #555; 
-            padding: 15px 5px; 
-            font-size: 14px; 
-            border-radius: 12px; 
-            cursor: pointer; 
-            transition: all 0.2s; 
+        .message-stamp-text {
+            font-size: 1rem;
             font-weight: bold;
-            text-align: center;
-        }
-        .stage-btn.completed { background: linear-gradient(145deg, #4caf50, #2e7d32); border-color: #81c784; cursor: not-allowed; opacity: 0.8; }
-        .stage-btn.current { background: linear-gradient(145deg, #2196f3, #1565c0); border-color: #64b5f6; box-shadow: 0 0 15px #2196f3; }
-        .stage-btn.locked { background: linear-gradient(145deg, #1a1a1a, #111); border-color: #444; color: #666; cursor: not-allowed; }
-        .stage-btn.current:hover { transform: scale(1.05); filter: brightness(1.2); }
-        .stage-btn.completed:hover { transform: none; filter: none; }
-        .stage-info { font-size: 18px; margin: 15px 0; color: #ccc; }
-
-        /* レイドマップ画面 */
-        #raid-map-screen { justify-content: center; }
-        #raid-map-screen h2 { font-size: 40px; margin-bottom: 20px; color: #ef5350; text-shadow: 0 0 15px #ef5350; }
-        .raid-stages-grid { display: flex; flex-direction: column; gap: 15px; width: 80%; max-width: 600px; margin: 20px 0; }
-        .raid-stage-btn { 
-            background: linear-gradient(145deg, #333, #222); 
-            color: #fff; 
-            border: 2px solid #ef5350; 
-            padding: 20px; 
-            font-size: 20px; 
-            border-radius: 15px; 
-            cursor: pointer; 
-            transition: all 0.2s; 
-            font-weight: bold;
-            text-align: center;
-        }
-        .raid-stage-btn.completed { background: linear-gradient(145deg, #4caf50, #2e7d32); border-color: #81c784; cursor: not-allowed; opacity: 0.8; }
-        .raid-stage-btn.current { background: linear-gradient(145deg, #ff5722, #d84315); border-color: #ff8a65; box-shadow: 0 0 15px #ff5722; }
-        .raid-stage-btn.locked { background: linear-gradient(145deg, #1a1a1a, #111); border-color: #444; color: #666; cursor: not-allowed; }
-        .raid-stage-btn.current:hover { transform: scale(1.02); filter: brightness(1.1); }
-        .raid-timer { font-size: 20px; color: #ff9800; margin: 10px 0; }
-
-        /* ゲーム画面 */
-        #game-screen { justify-content: center; position: relative; }
-        #story-target-container, #raid-target-container { 
-            position: absolute; 
-            top: 80px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            width: 400px; 
-            text-align: center; 
-        }
-        #story-target-info, #raid-target-info { 
-            font-size: 20px; 
-            font-weight: bold; 
-            color: #9c27b0; 
-            text-shadow: 0 0 10px #9c27b0; 
-            margin-bottom: 8px; 
-        }
-        #raid-target-info { color: #ef5350; text-shadow: 0 0 10px #ef5350; }
-        #story-target-bar-container, #raid-target-bar-container {
-            width: 100%;
-            height: 20px;
-            background-color: #2a2a2a;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #9c27b0;
-        }
-        #raid-target-bar-container { border-color: #ef5350; }
-        #story-target-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ce93d8, #9c27b0, #7b1fa2);
-            width: 0%;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px #9c27b0;
-        }
-        #raid-target-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ffab91, #ff5722, #d84315);
-            width: 0%;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px #ff5722;
-        }
-        #story-target-text, #raid-target-text {
-            margin-top: 5px;
-            font-size: 16px;
-            color: #ccc;
-        }
-        #game-info { position: absolute; top: 30px; width: 100%; display: flex; justify-content: space-around; font-size: 28px; font-weight: bold; text-shadow: 2px 2px 4px black; }
-        #typing-area { text-align: center; margin-top: 20px; }
-        #japanese-text { font-size: 56px; margin-bottom: 20px; font-weight: bold; text-shadow: 2px 2px 8px rgba(0,0,0,0.8); }
-        #romaji-text { font-size: 44px; letter-spacing: 4px; font-family: 'Courier New', monospace; }
-        .typed { color: #76ff03; text-shadow: 0 0 15px #76ff03; }
-        .untyped { color: #b0bec5; }
-        .untyped-hidden { color: transparent; }
-
-        /* 妨害エフェクト */
-        #game-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 500; transition: background-color 0.5s ease; }
-        #game-message { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 64px; font-weight: bold; color: #00bcd4; text-shadow: 0 0 30px #00bcd4; z-index: 501; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; text-align: center; }
-        #time-reduce-animation { position: fixed; top: 30px; right: 30px; font-size: 48px; font-weight: bold; color: #ff5252; text-shadow: 0 0 20px #ff5252; z-index: 501; opacity: 0; pointer-events: none; }
-        
-        /* 時間伸ばしミニゲーム */
-        #time-extend-game { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: rgba(0,0,0,0.9); border-radius: 20px; padding: 30px; text-align: center; z-index: 600; border: 2px solid #4caf50; display: none; }
-        #time-extend-bar-container { width: 100%; height: 30px; background: #333; border-radius: 15px; margin: 20px 0; position: relative; overflow: hidden; }
-        #time-extend-bar { height: 100%; width: 5px; background: #4caf50; position: absolute; }
-        #time-extend-marker { position: absolute; top: -5px; left: 50%; transform: translateX(-50%); width: 10px; height: 40px; background: #ffd700; border-radius: 5px; z-index: 1; }
-        #time-extend-center { position: absolute; top: -5px; left: 50%; transform: translateX(-50%); width: 20px; height: 40px; background: rgba(255,215,0,0.3); border-radius: 5px; }
-        #time-extend-perfect { position: absolute; top: -5px; left: 50%; transform: translateX(-50%); width: 6px; height: 40px; background: #ff5252; border-radius: 3px; }
-        
-        #skill-button-container { position: absolute; bottom: 50px; right: 50px; }
-        #skill-btn { 
-            background: radial-gradient(circle at 30% 30%, #ab47bc, #6a1b9a); 
-            color: #fff; 
-            border: none; 
-            padding: 20px; 
-            font-size: 20px; 
-            border-radius: 50%; 
-            width: 110px; 
-            height: 110px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            box-shadow: 0 0 25px #ce93d8, 0 4px 8px black; 
-            position: relative; 
-            overflow: hidden; 
-            border: 2px solid #e1bee7;
-        }
-        #skill-btn:disabled { background: #424242; box-shadow: none; cursor: not-allowed; color: #9e9e9e; border-color: #616161; }
-        #skill-cooldown-overlay { position: absolute; bottom: 0; left: 0; width: 100%; background-color: rgba(0,0,0,0.6); height: 0%; transition: height 0.1s linear; }
-
-        /* パッシブコンボエフェクト */
-        .passive-effect { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; color: #ff9800; text-shadow: 0 0 30px #ff9800; z-index: 502; opacity: 0; pointer-events: none; animation: passiveFade 2s ease-out forwards; }
-        @keyframes passiveFade {
-            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
         }
 
-        /* リザルト画面 */
-        #result-screen { justify-content: center; }
-        .result-box { 
-            background: rgba(30, 30, 30, 0.9); 
-            backdrop-filter: blur(5px);
-            padding: 40px; 
-            border-radius: 30px; 
-            text-align: center; 
-            border: 1px solid #444; 
-            box-shadow: 0 20px 30px rgba(0,0,0,0.7);
-            max-width: 500px;
-        }
-        .result-item { font-size: 28px; margin: 15px 0; }
-        .back-btn { 
-            margin-top: 30px; 
-            background: linear-gradient(145deg, #424242, #212121); 
-            color: white; 
-            border: none; 
-            padding: 15px 35px; 
-            font-size: 20px; 
-            border-radius: 50px; 
-            cursor: pointer; 
-            font-weight: bold;
-            border: 1px solid #555;
-            transition: all 0.2s;
-        }
-        .back-btn:hover { background: #555; transform: scale(1.02); box-shadow: 0 5px 10px rgba(0,0,0,0.5); }
-
-        /* 共通タブUI */
-        .tab-container { width: 90%; max-width: 800px; margin-top: 30px; background: rgba(20,20,20,0.7); padding: 20px; border-radius: 30px; backdrop-filter: blur(4px); border: 1px solid #3a3a3a; }
-        .tabs { display: flex; border-bottom: 2px solid #333; margin-bottom: 20px; flex-wrap: wrap; }
-        .tab { padding: 12px 24px; cursor: pointer; font-size: 20px; border-bottom: 3px solid transparent; transition: 0.2s; }
-        .tab.active { border-bottom-color: #00bcd4; color: #00bcd4; font-weight: bold; text-shadow: 0 0 8px #00bcd4; }
-        
-        /* ランキングタイマー */
-        #ranking-timer { font-size: 18px; color: #ff9800; margin: 10px 0; font-weight: bold; }
-        
-        /* リストUI */
-        .list-container { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding-right: 10px; }
-        .list-item { 
-            background: rgba(40, 40, 40, 0.8); 
-            backdrop-filter: blur(2px);
-            padding: 18px; 
-            border-radius: 18px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border: 1px solid #4a4a4a; 
-        }
-        .rank-item-info { font-size: 20px; }
-        .shop-item-info h3 { color: #fff; margin-bottom: 5px; font-size: 22px; }
-        .shop-item-info p { color: #ccc; font-size: 15px; }
-        .action-btn { 
-            background: linear-gradient(145deg, #4caf50, #2e7d32); 
-            color: white; 
-            border: none; 
-            padding: 12px 24px; 
-            border-radius: 30px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            font-size: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            transition: 0.2s;
-        }
-        .action-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
-        .action-btn:disabled { background: #555; cursor: not-allowed; }
-        .action-btn.equipped { background: linear-gradient(145deg, #ff9800, #b26500); }
-        .use-btn { background: linear-gradient(145deg, #2196f3, #1565c0); }
-
-        /* モーダル */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-overlay.active { display: flex; }
-        .modal-content { background: linear-gradient(145deg, #202020, #151515); padding: 35px; border-radius: 30px; width: 80%; max-width: 600px; text-align: left; border: 1px solid #555; box-shadow: 0 20px 30px black; max-height: 80vh; overflow-y: auto; }
-        .modal-content h2 { margin-bottom: 20px; color: #ff5252; text-align: center; }
-        .modal-content p { font-size: 16px; line-height: 1.8; margin-bottom: 20px; color: #ddd; }
-        .modal-btn { background: linear-gradient(145deg, #2196f3, #0d47a1); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px; transition: 0.2s; }
-        .modal-btn.danger { background: linear-gradient(145deg, #f44336, #b71c1c); }
-        .modal-input { width: 100%; padding: 12px; font-size: 18px; margin-bottom: 20px; border-radius: 30px; border: 1px solid #666; background-color: #0a0a0a; color: white; }
-
-        /* 報酬モーダル */
-        .reward-item { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 15px; margin: 10px 0; display: flex; align-items: center; gap: 15px; }
-        .reward-icon { font-size: 32px; }
-        .reward-info { flex: 1; text-align: left; }
-        .reward-name { font-size: 20px; font-weight: bold; }
-        .reward-desc { font-size: 14px; color: #aaa; }
-
-        /* スクロールバー */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: #121212; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; border: 2px solid #121212; }
-        ::-webkit-scrollbar-thumb:hover { background: #666; }
+        .read-status { cursor: pointer; }
+        .read-status:hover { opacity: 1; text-decoration: underline; }
+        .timestamp { font-size: 0.65rem; }
+        .unread-badge { background: #ed4245; color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: bold; margin-left: 8px; }
+        .message-input-area { padding: 16px; display: flex; gap: 12px; background: #1e1f22; border-top: 1px solid #3c3f45; }
+        .message-input-area input { flex: 1; background: #111214; border: none; border-radius: 28px; padding: 12px; color: white; }
+        .chat-item { cursor: pointer; padding: 10px; border-radius: 12px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        .chat-item:hover { background: #3c3f45; }
+        .chat-item.active-chat { background: #5865F2; }
+        .group-exit-btn { background: #ed4245; padding: 2px 8px; font-size: 11px; border-radius: 16px; cursor: pointer; }
+        .voice-layout { display: flex; width: 100%; height: 100%; }
+        .voice-members-panel { width: 280px; background: #1e1f22; border-right: 1px solid #2b2d31; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .voice-chat-panel { flex: 1; display: flex; flex-direction: column; background: #2b2d31; }
+        .voice-log-area { flex: 1; overflow-y: auto; padding: 20px; }
+        .voice-control-area { padding: 20px; background: #1e1f22; border-top: 1px solid #3c3f45; }
+        .voice-mic-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+        .overlay-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: white; font-size: 2rem; padding: 20px 40px; border-radius: 20px; z-index: 2000; animation: fadeOut 3s forwards; pointer-events: none; }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+        .stamp-selector { position: fixed; bottom: 80px; right: 20px; background: #1e1f22; border-radius: 20px; padding: 15px; width: 350px; max-height: 450px; overflow-y: auto; display: none; z-index: 1000; border: 1px solid #5865F2; }
+        .stamp-item { background: #2b2d31; margin: 8px; padding: 12px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: 0.1s; width: calc(33% - 16px); float: left; }
+        .stamp-item:hover { background: #5865F2; transform: scale(1.02); }
+        .stamp-emoji { font-size: 2.5rem; display: block; text-align: center; }
+        .stamp-text { font-size: 0.75rem; text-align: center; word-break: break-word; margin-top: 4px; }
+        .settings-container { padding: 24px; max-width: 700px; width: 100%; }
+        .setting-group { margin-bottom: 28px; }
+        input[type="range"] { width: 100%; margin: 8px 0; }
+        .icon-grid { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+        .icon-option { font-size: 32px; cursor: pointer; padding: 8px; border-radius: 50%; background: #111214; transition: 0.1s; }
+        .icon-option:hover { background: #5865F2; }
+        .shop-item { background: #111214; margin: 10px 0; padding: 12px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        hr { border-color: #3c3f45; margin: 16px 0; }
+        .friend-select-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2b2d31; border-radius: 24px; padding: 20px; z-index: 1000; width: 350px; max-height: 80%; overflow-y: auto; display: none; }
+        .friend-select-item { padding: 12px; margin: 5px 0; background: #1e1f22; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.1s; }
+        .friend-select-item:hover { background: #5865F2; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; display: none; }
+        .voice-message-item { padding: 8px 10px; border-bottom: 1px solid #3c3f45; font-size: 0.85rem; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .member-item { padding: 8px; background: #111214; border-radius: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .group-create-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2b2d31; border-radius: 24px; padding: 24px; z-index: 1000; width: 400px; display: none; }
+        .group-create-modal input { width: 100%; padding: 10px; margin: 8px 0; background: #1e1f22; border: 1px solid #3c3f45; border-radius: 12px; color: white; }
+        .member-checkbox { display: flex; align-items: center; gap: 8px; padding: 6px; margin: 4px 0; background: #1e1f22; border-radius: 8px; cursor: pointer; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .clearfix::after { content: ""; clear: both; display: table; }
+        .voice-indicator { display: inline-block; width: 8px; height: 8px; background: #23a559; border-radius: 50%; margin-right: 6px; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+        .new-message-notice { background: #5865F2; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .command-btn { background: #3c3f45; margin: 5px; padding: 6px 12px; font-size: 12px; }
+        .bulk-buy-buttons { display: flex; gap: 4px; margin-top: 4px; }
+        .bulk-buy-buttons button { padding: 4px 8px; font-size: 11px; background: #3c3f45; }
+        .read-receipt-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2b2d31; border-radius: 20px; padding: 20px; z-index: 1001; min-width: 250px; max-height: 400px; overflow-y: auto; display: none; }
+        .read-receipt-item { padding: 8px; border-bottom: 1px solid #3c3f45; display: flex; align-items: center; gap: 8px; }
+        .create-stamp-section { background: #1e1f22; border-radius: 16px; padding: 16px; margin-top: 20px; }
+        .create-stamp-inputs { display: flex; gap: 8px; margin: 12px 0; }
+        .create-stamp-inputs input { background: #111214; border: 1px solid #3c3f45; border-radius: 12px; padding: 8px; color: white; }
+        .custom-stamp-item { background: #111214; margin: 8px 0; padding: 10px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
-
-<div id="app-container">
-    <div id="header">
-        <div id="header-left">
-            <button id="settings-btn">⚙️</button>
-            <button id="greek-info-btn">🔍</button>
-            <div id="coin-display">🪙0</div>
-            <div id="gold-coin-display">🥇0</div>
-            <div id="raid-point-display">🎯0</div>
-        </div>
-        <div id="header-right">
-            <div id="level-display">Lv.1</div>
-            <div id="xp-bar-container">
-                <div id="xp-bar-fill"></div>
-                <div id="xp-text">0 / 100 XP</div>
-            </div>
-        </div>
+<div id="lobbyScreen" class="lobby-container"><div class="lobby-card"><h1>Forcord</h1><input type="text" id="usernameInput" placeholder="ニックネーム (最大15文字)" maxlength="15"><button id="createAccountBtn">✨ はじめる ✨</button><div id="lobbyError" class="error-msg"></div></div></div>
+<div id="mainApp" class="app-main" style="display: none;">
+    <div class="global-invite-area" id="globalInviteArea"></div>
+    <div class="sidebar">
+        <div class="sidebar-icon" data-tab="home"><i class="fas fa-home"></i></div>
+        <div class="sidebar-icon" data-tab="connect"><i class="fas fa-handshake"></i></div>
+        <div class="sidebar-icon" data-tab="messages"><i class="fas fa-comment-dots"></i></div>
+        <div class="sidebar-icon" data-tab="voice"><i class="fas fa-microphone-alt"></i></div>
+        <div class="sidebar-icon" data-tab="shop"><i class="fas fa-store"></i></div>
+        <div class="sidebar-icon" data-tab="settings"><i class="fas fa-sliders-h"></i></div>
     </div>
-
-    <div id="main-content">
-        <div id="menu-screen" class="screen active">
-            <h1>Typing RPG</h1>
-            <div class="menu-grid">
-                <button class="menu-btn" onclick="app.showScreen('play-select-screen')">プレイ</button>
-                <button class="menu-btn" onclick="app.openRanking()">ランキング</button>
-                <button class="menu-btn" onclick="app.openShop()">ショップ</button>
-                <button class="menu-btn" onclick="app.openInventory()">持ち物</button>
-                <button class="menu-btn story-mode" onclick="app.openStoryMap()">ストーリーモード</button>
-                <button class="menu-btn event-mode" onclick="app.openEvent()">イベント応援</button>
-                <div class="raid-timer-info" id="raid-menu-timer"></div>
-                <button class="menu-btn raid-mode" onclick="app.openRaidMap()" id="raid-menu-btn">レイド</button>
-            </div>
-        </div>
-
-        <div id="event-screen" class="screen">
-            <h2>🎉 イベント応援</h2>
-            <div class="event-content">
-                <div class="event-main">
-                    <button id="like-btn">👍</button>
-                    <div id="like-count">0 いいね</div>
-                </div>
-                <div class="event-ranking">
-                    <h3>いいねランキング</h3>
-                    <div id="event-ranking-list"></div>
-                </div>
-            </div>
-            <div id="event-announcement"></div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')">ホームに戻る</button>
-        </div>
-
-        <div id="play-select-screen" class="screen">
-            <h2>難易度選択</h2>
-            <div class="select-grid">
-                <button class="mode-btn" onclick="app.startGame('normal')">ノーマル<br><span style="font-size: 16px;">通常ルール</span></button>
-                <button class="mode-btn hard" onclick="app.startGame('hard')">ハード<br><span style="font-size: 16px;">未入力非表示 / コイン2倍</span></button>
-                <button class="mode-btn story" onclick="app.openStoryMap()">ストーリー<br><span style="font-size: 16px;">全100ステージ</span></button>
-            </div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')" style="margin-top: 50px;">戻る</button>
-        </div>
-
-        <div id="story-map-screen" class="screen">
-            <h2>📖 ストーリーモード</h2>
-            <div class="stage-info">現在のステージ: <span id="current-story-stage">1</span> / 100</div>
-            <div class="stage-grid" id="stage-grid"></div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')">戻る</button>
-        </div>
-
-        <div id="raid-map-screen" class="screen">
-            <h2>🔥 レイドモード</h2>
-            <div class="raid-timer" id="raid-status-timer"></div>
-            <div class="stage-info">レイドポイント: 🎯<span id="raid-point-info">0</span></div>
-            <div class="raid-stages-grid" id="raid-stages-grid"></div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')">戻る</button>
-        </div>
-
-        <div id="game-screen" class="screen">
-            <div id="game-overlay"></div>
-            <div id="game-message"></div>
-            <div id="time-reduce-animation">-10s</div>
-            <div id="time-extend-game">
-                <h3>⏱️ 時間伸ばし</h3>
-                <p>スペースキーで止めよう！</p>
-                <div id="time-extend-bar-container">
-                    <div id="time-extend-bar"></div>
-                    <div id="time-extend-marker"></div>
-                    <div id="time-extend-center"></div>
-                    <div id="time-extend-perfect"></div>
-                </div>
-                <p id="time-extend-result"></p>
-            </div>
-            <div id="game-info">
-                <div>残り時間: <span id="time-display">60</span>秒</div>
-                <div>スコア: <span id="score-display">0</span></div>
-                <div>コンボ: <span id="combo-display">0</span></div>
-            </div>
-            <div id="story-target-container">
-                <div id="story-target-info"></div>
-                <div id="story-target-bar-container">
-                    <div id="story-target-bar-fill"></div>
-                </div>
-                <div id="story-target-text"></div>
-            </div>
-            <div id="raid-target-container" style="display: none;">
-                <div id="raid-target-info"></div>
-                <div id="raid-target-bar-container">
-                    <div id="raid-target-bar-fill"></div>
-                </div>
-                <div id="raid-target-text"></div>
-            </div>
-            <div id="typing-area">
-                <div id="japanese-text"></div>
-                <div id="romaji-text"></div>
-            </div>
-            <div id="skill-button-container">
-                <button id="skill-btn" disabled>
-                    <span id="skill-btn-text">スキル無し</span>
-                    <div id="skill-cooldown-overlay"></div>
-                </button>
-                <div style="text-align: center; font-size: 12px; margin-top: 5px;">Spaceキー</div>
-            </div>
-        </div>
-
-        <div id="result-screen" class="screen">
-            <div class="result-box">
-                <h2 style="font-size: 36px; margin-bottom: 20px;" id="result-title">ゲーム終了！</h2>
-                <div class="result-item">最終スコア: <span id="result-score">0</span></div>
-                <div class="result-item">最大コンボ: <span id="result-combo">0</span></div>
-                <div class="result-item" style="color: #ffd700;">獲得コイン: 🪙<span id="result-coin">0</span></div>
-                <div class="result-item" style="color: #ffaa00;" id="gold-coin-result" style="display: none;">🥇 ゴールドコイン: <span id="result-gold">0</span></div>
-                <div class="result-item" style="color: #ff5722;" id="raid-point-result" style="display: none;">🎯 レイドポイント: <span id="result-raid">0</span></div>
-                <div class="result-item" style="color: #4caf50;">獲得XP: <span id="result-xp">0</span></div>
-                <div id="level-up-msg" style="color: #ff9800; font-weight: bold; margin-top: 10px; display: none;">レベルアップ！</div>
-                <div id="story-clear-msg" style="color: #4caf50; font-weight: bold; margin-top: 10px; display: none;">✅ ステージクリア！</div>
-                <div id="raid-clear-msg" style="color: #ff5722; font-weight: bold; margin-top: 10px; display: none;">🔥 レイドクリア！</div>
-                <button class="back-btn" onclick="app.endResult()">メニューに戻る</button>
-            </div>
-        </div>
-
-        <div id="ranking-screen" class="screen">
-            <h2 style="font-size: 32px;">🏆 ランキング</h2>
-            <p style="color: #ff9800; margin-bottom: 5px; font-size: 14px;">毎日朝7時にリセット</p>
-            <div id="ranking-timer">次のリセットまで: 計算中...</div>
-            <div class="tab-container">
-                <div class="tabs">
-                    <div class="tab active" onclick="app.switchRankingTab('score')">スコア</div>
-                    <div class="tab" onclick="app.switchRankingTab('combo')">コンボ</div>
-                    <div class="tab" onclick="app.switchRankingTab('playCount')">プレイ回数</div>
-                </div>
-                <div id="ranking-list" class="list-container"></div>
-            </div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')">戻る</button>
-        </div>
-
-        <div id="shop-screen" class="screen">
-            <h2 style="font-size: 32px;">🛒 ショップ</h2>
-            <div class="tab-container">
-                <div class="tabs">
-                    <div class="tab active" onclick="app.switchShopTab('skills')">スキル</div>
-                    <div class="tab" onclick="app.switchShopTab('items')">アイテム</div>
-                    <div class="tab" onclick="app.switchShopTab('raid')">レイド</div>
-                    <div class="tab" onclick="app.switchShopTab('passive')">パッシブ</div>
-                </div>
-                <div id="shop-list" class="list-container"></div>
-            </div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')">戻る</button>
-        </div>
-
-        <div id="inventory-screen" class="screen">
-            <h2 style="font-size: 32px;">🎒 持ち物</h2>
-            <div class="tab-container">
-                <div class="tabs">
-                    <div class="tab active" onclick="app.switchInventoryTab('skills')">スキル</div>
-                    <div class="tab" onclick="app.switchInventoryTab('items')">アイテム</div>
-                    <div class="tab" onclick="app.switchInventoryTab('passive')">パッシブ</div>
-                </div>
-                <div id="inventory-list" class="list-container"></div>
-            </div>
-            <button class="back-btn" onclick="app.showScreen('menu-screen')">戻る</button>
-        </div>
+    <div class="content-area">
+        <div id="homeView" class="tab-view"><div class="home-container"><div class="profile-card"><div class="profile-icon" id="profileIconSpan">😀</div><div class="profile-info"><h3 id="profileName">Loading...<span id="coinDisplay" class="coin-badge">💰 0コイン</span></h3><div class="friend-code" id="friendCodeDisplay">コード: ********</div><div class="info-text">✨ メッセージ1回で10コイン獲得！ ✨</div></div></div><div class="friend-add-section"><h4><i class="fas fa-user-plus"></i> フレンド追加</h4><div class="friend-add-row"><input type="text" id="addFriendInput" placeholder="8桁のフレンドコード"><button id="addFriendBtn">追加</button></div></div><div class="friend-add-section"><h4><i class="fas fa-users"></i> フレンドリスト</h4><ul id="friendListUl" class="friend-list"></ul></div><div id="newMessagesArea" style="margin-top: 20px;"></div></div></div>
+        <div id="connectView" class="tab-view"><div class="connect-container"><div class="section-card"><h3><i class="fas fa-globe"></i> オンラインユーザー</h3><div id="onlineUsersList"></div></div><div class="section-card"><h3><i class="fas fa-envelope-open-text"></i> フレンドリクエスト</h3><div id="requestsList"></div></div></div></div>
+        <div id="messagesView" class="tab-view"><div class="messages-layout"><div class="channels-list"><button id="createGroupBtn" style="margin-bottom:16px; width:100%"><i class="fas fa-plus"></i> グループ作成</button><div><strong>チャット一覧</strong> <button id="refreshChatsBtn" style="background:#3c3f45; padding:4px 8px; margin-left:8px;"><i class="fas fa-sync-alt"></i> 更新</button></div><div id="chatListContainer"></div></div><div class="chat-area"><div class="chat-header" id="chatHeader"><span id="currentChatName">チャットを選択</span><span id="groupMembersDisplay" class="group-members"></span></div><div class="messages-history" id="messagesHistory"></div><div id="replyPreviewContainer" style="padding: 0 16px;"></div><div class="message-input-area"><input type="text" id="messageInput" placeholder="メッセージを入力..."><button id="sendStampBtn"><i class="fas fa-smile"></i></button><button id="sendImageBtn"><i class="fas fa-image"></i></button><button id="sendMsgBtn">送信</button></div></div></div></div>
+        <div id="voiceView" class="tab-view"><div class="voice-layout"><div class="voice-members-panel"><h3><i class="fas fa-users"></i> 参加者</h3><div id="voiceMembersList"></div><div id="voiceAdminCommands" style="margin-top: 10px;"></div><button id="startVoiceInviteBtn" style="margin-top:20px; width:100%; background:#5865F2;">🎤 ボイスチャットを始める</button></div><div class="voice-chat-panel"><div class="voice-log-area"><div id="voiceLogList" style="display:flex; flex-direction:column; gap:6px;"></div></div><div class="voice-control-area"><div id="voiceRoomStatus" style="margin-bottom:12px; padding:8px; background:#111214; border-radius:12px;">⚪ 未接続</div><div class="voice-mic-row"><button id="toggleMicBtn" style="background:#3c3f45;"><i class="fas fa-microphone-slash"></i> マイクOFF</button><select id="voiceRecogMode" style="background:#111214; color:white; border:1px solid #3c3f45; border-radius:12px; padding:8px; outline:none; cursor:pointer;"><option value="voice">🗣️ 声のみ聞き取り</option><option value="all">⚡ 全部聞き取り (高感度)</option></select><button id="sendVoiceTextBtn"><i class="fas fa-keyboard"></i> 文字送信</button></div><div id="voiceTextInputDiv" style="display:none; margin-top:12px;"><div style="display:flex; gap:8px;"><input type="text" id="voiceManualText" placeholder="テキストを入力 (音声で読み上げ)" style="flex:1; background:#111214; border:none; border-radius:28px; padding:8px 12px; color:white;"><button id="submitVoiceTextBtn">送信</button></div></div><button id="leaveVoiceBtn" style="background:#ed4245; margin-top:12px;">退出する</button></div></div></div></div>
+        <div id="shopView" class="tab-view"><div class="settings-container"><h2><i class="fas fa-store"></i> ショップ <span id="shopCoinDisplay" class="coin-badge">💰 0コイン</span></h2><div class="info-text" style="margin-bottom:16px;">💡 メッセージを送ると10コインGET！</div><div class="setting-group"><h3>📱 スタンプ</h3><div id="stampShop"></div><h3>⚡ アップグレード</h3><div id="upgradeShop"></div><h3>🎨 スタンプ作成 (3000コイン)</h3><div id="stampCreationShop"></div></div></div></div>
+        <div id="settingsView" class="tab-view"><div class="settings-container"><div class="setting-group"><h3>プロフィール変更</h3><input type="text" id="changeNameInput" placeholder="新しい名前" maxlength="15"><button id="updateNameBtn">名前変更</button><div class="icon-grid" id="iconPicker"></div></div><hr><div class="setting-group"><h3>🎤 声の変換プリセット (相手に聞こえる声)</h3><div><button data-preset="standard">標準</button> <button data-preset="female">女性</button> <button data-preset="robot">ロボット</button> <button data-preset="alien">エイリアン</button></div><div>ピッチ: <input type="range" id="pitchSlider" min="0.5" max="2" step="0.1" value="1"></div><div>速度: <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1"></div><div>音量: <input type="range" id="volumeSlider" min="0" max="1.5" step="0.05" value="1"></div><button id="testVoiceBtn">テスト発声</button><p>現在のプリセット: <span id="currentVoicePreset">標準</span></p></div></div></div>
     </div>
 </div>
+<div id="stampSelector" class="stamp-selector"><h4>スタンプを選んでね</h4><div id="stampList" class="clearfix"></div></div>
+<div id="friendSelectModal" class="friend-select-modal"><h3>招待するフレンドを選択</h3><div id="friendSelectList"></div><button id="closeFriendModal" style="margin-top:12px; width:100%; background:#3c3f45;">キャンセル</button></div>
+<div id="groupCreateModal" class="group-create-modal"><h3>グループ作成</h3><input type="text" id="groupNameInput" placeholder="グループ名"><div id="groupMembersList" style="max-height:300px; overflow-y:auto; margin:12px 0;"></div><div style="display:flex; gap:12px; margin-top:16px;"><button id="confirmGroupBtn">作成</button><button id="cancelGroupBtn" style="background:#3c3f45;">キャンセル</button></div></div>
+<div id="readReceiptModal" class="read-receipt-modal"><h3>既読したユーザー</h3><div id="readReceiptList"></div><button id="closeReadReceiptModal" style="margin-top:12px; width:100%; background:#3c3f45;">閉じる</button></div>
+<div id="overlay" class="overlay"></div>
 
-<!-- モーダル類 -->
-<div id="agreement-modal" class="modal-overlay">
-    <div class="modal-content">
-        <h2>⚠️ 注意事項</h2>
-        <p>このゲームはバグ、チートを使った場合はBANとなります。<br>そちらが不利にしているので言い訳はしないでください。</p>
-        <button class="modal-btn" onclick="app.acceptAgreement()">読み終わった</button>
-    </div>
-</div>
+<script>
+    const firebaseConfig = { apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com", databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", projectId: "iikotowaruikoto-d5aa7", storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app", messagingSenderId: "455780219216", appId: "1:455780219216:web:225461fcf24c1a46f69455", measurementId: "G-YQD459DBSG" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const storage = firebase.storage();
+    let currentUser = null, currentChatId = null, currentChatType = null, voiceRoomId = null, recognition = null, isMicActive = false;
+    let lastMessageTime = 0, lastStampTime = 0, userCoins = 0, messageCooldown = 2500, maxMessageLength = 200;
+    let lastVoiceManualTime = 0;
+    let replyingTo = null; // { msgId, senderName, text, isStamp, stampEmoji }
 
-<div id="settings-modal" class="modal-overlay">
-    <div class="modal-content">
-        <h2 style="color: white;">設定</h2>
-        <div style="text-align: left; margin-bottom: 10px;">名前変更 (20文字以内)</div>
-        <input type="text" id="name-input" class="modal-input" maxlength="20">
-        <button class="modal-btn" onclick="app.saveName()">名前を保存</button>
-        <button class="modal-btn" onclick="app.showAgreement()">注意事項をもう一度見る</button>
-        <button class="modal-btn danger" onclick="app.resetDataConfirm()" style="margin-top: 20px;">データの初期化</button>
-        <button class="back-btn" onclick="app.closeSettings()" style="width: 100%; margin-top: 10px;">閉じる</button>
-    </div>
-</div>
+    const defaultStamps = ['やっほー！', 'おーい！', 'バイバイ！', 'ボイチャできる？'];
+    const stampEmojis = { 'やっほー！': '👋', 'おーい！': '📣', 'バイバイ！': '👋', 'ボイチャできる？': '🎤', 'Yes!!!': '✅', 'No!!!': '❌', 'そろそろやめるかも': '😴', 'よろしくぅ！': '🙌', 'わからん': '🤔', 'うんうん': '👍', 'へぇ〜〜': '😮', '話聞けやボケェ': '💢' };
+    const shopStamps = [
+        { name: 'Yes!!!', price: 1000 }, { name: 'No!!!', price: 1000 }, { name: 'そろそろやめるかも', price: 1000 },
+        { name: 'よろしくぅ！', price: 5000 }, { name: 'わからん', price: 5000 }, { name: 'うんうん', price: 7500 },
+        { name: 'へぇ〜〜', price: 7500 }, { name: '話聞けやボケェ', price: 10000 }
+    ];
+    let ownedStamps = [...defaultStamps];
+    let customStamps = []; // { name, emoji }
+    let hasStampCreation = false;
+    let unreadCounts = {};
 
-<div id="greek-info-modal" class="modal-overlay">
-    <div class="modal-content">
-        <h2 style="color: #00bcd4;">🔍 ギリシャ文字について</h2>
-        <p><strong style="color: #ffd700;">α (アルファ)</strong> ... 初期のスキル。弱いことが多い。</p>
-        <p><strong style="color: #4caf50;">β, γ, Δ, Ω</strong> ... 強化版。右に行くにつれて強くなる。</p>
-        <p><strong style="color: #ff5722;">ε, ζ</strong> ... レイドなどで獲得が可能。</p>
-        <p><strong style="color: #2196f3;">Σ, π, Ο</strong> ... 強化部分が違う時に使われる。<br>例：α→βは効果時間が長い。Σは効果が強くなる。</p>
-        <p><strong style="color: #9c27b0;">その他</strong> ... 説明に載っていないことが多い。載っていなかったら強化版の種類に入れよう。</p>
-        <button class="modal-btn" onclick="document.getElementById('greek-info-modal').classList.remove('active')">閉じる</button>
-    </div>
-</div>
-
-<div id="reset-confirm-modal" class="modal-overlay" style="z-index: 1001;">
-    <div class="modal-content">
-        <h2>⚠️ 警告</h2>
-        <p>本当に初期化しますか？<br>この操作は取り消せません。</p>
-        <button class="modal-btn danger" onclick="app.resetDataExecute()">はい、初期化します</button>
-        <button class="modal-btn" onclick="document.getElementById('reset-confirm-modal').classList.remove('active')">キャンセル</button>
-    </div>
-</div>
-
-<div id="reward-modal" class="modal-overlay">
-    <div class="modal-content">
-        <h2 style="color: #ffd700;">🎉 報酬獲得！</h2>
-        <div id="reward-content"></div>
-        <button class="modal-btn" onclick="document.getElementById('reward-modal').classList.remove('active')">受け取る</button>
-    </div>
-</div>
-
-<script type="module">
-// ==========================================
-// Firebase 設定と初期化
-// ==========================================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-analytics.js";
-import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyBXnNXQ5khcR0EvRide4C0PjshJZpSF4oM",
-    authDomain: "typing-game-28ed0.firebaseapp.com",
-    databaseURL: "https://typing-game-28ed0-default-rtdb.firebaseio.com",
-    projectId: "typing-game-28ed0",
-    storageBucket: "typing-game-28ed0.firebasestorage.app",
-    messagingSenderId: "963797267101",
-    appId: "1:963797267101:web:0d5d700458fb1991021a74",
-    measurementId: "G-CL4B6ZK0SC"
-};
-
-const appInstance = initializeApp(firebaseConfig);
-const analytics = getAnalytics(appInstance);
-const db = getDatabase(appInstance);
-
-// ==========================================
-// 出題データ
-// ==========================================
-const typingData = [
-    { ja: "早起きは三文の得", romaji: "hayaokihasannmonnnotoku" },
-    { ja: "石の上にも三年", romaji: "isinouenimosannnenn" },
-    { ja: "塵も積もれば山となる", romaji: "tirimotumorebayamatonaru" },
-    { ja: "猿も木から落ちる", romaji: "sarumokikaraotiru" },
-    { ja: "犬も歩けば棒に当たる", romaji: "inumoarukebabouniataru" },
-    { ja: "雨降って地固まる", romaji: "amehuttezikatamaru" },
-    { ja: "花より団子", romaji: "hanayoridanngo" },
-    { ja: "転ばぬ先の杖", romaji: "korobanusakinotue" },
-    { ja: "三人寄れば文殊の知恵", romaji: "sannninnyorebamonnzyunotie" },
-    { ja: "百聞は一見に如かず", romaji: "hyakubunnhaikkennnisikazu" },
-    { ja: "好きこそ物の上手なれ", romaji: "sukikosomononozyouzunare" },
-    { ja: "案ずるより産むが易し", romaji: "annzuruyoriumugayasusi" },
-    { ja: "かわいい子には旅をさせよ", romaji: "kawaiikonihatabiwosaseyo" },
-    { ja: "親しき中にも礼儀あり", romaji: "sitasikinakanimoreigiari" },
-    { ja: "笑う門には福来る", romaji: "waraukadonihahukukitaru" },
-    { ja: "朝ごはんを食べる", romaji: "asagohannwotaberu" },
-    { ja: "学校へ行く", romaji: "gakkoueiku" },
-    { ja: "図書館で本を読む", romaji: "tosyokanndehonnwoyomu" },
-    { ja: "公園で友だちと遊ぶ", romaji: "kouenndetomodatitoasobu" },
-    { ja: "電車に乗る", romaji: "dennsyaninoru" },
-    { ja: "自転車で走る", romaji: "zitennsyadehasiru" },
-    { ja: "海で泳ぐ", romaji: "umideoyogu" },
-    { ja: "山へ登る", romaji: "yamahenoboru" },
-    { ja: "星を数える", romaji: "hosiwokazoeru" },
-    { ja: "春に花がさく", romaji: "harunihanagasaku" },
-    { ja: "夏はとてもあつい", romaji: "natuhatotemoatui" },
-    { ja: "秋に葉っぱが色づく", romaji: "akinihappagairoduku" },
-    { ja: "冬に雪がふる", romaji: "huyuniyukigahuru" },
-    { ja: "おいしいラーメンを食べる", romaji: "oisiira-mennwotaberu" },
-    { ja: "大きな船が海をわたる", romaji: "ookinahunegaumiwowataru" }
-];
-
-// ==========================================
-// スキルデータ
-// ==========================================
-const skillData = {
-    "auto_input_alpha": {
-        id: "auto_input_alpha",
-        name: "自動入力α",
-        desc: "3.5秒間、約0.06秒間隔で自動タイピング。クールダウン25秒。",
-        price: 10000,
-        priceType: 'coin',
-        cooldown: 25,
-        duration: 3.5,
-        interval: 60,
-        execute: function() {
-            gameState.isAutoTyping = true;
-            gameState.autoTypeInterval = setInterval(() => {
-                if (gameState.isPlaying && !gameState.timeExtendActive) handleCorrectKey();
-            }, this.interval);
-            setTimeout(() => {
-                gameState.isAutoTyping = false;
-                clearInterval(gameState.autoTypeInterval);
-            }, this.duration * 1000);
-        }
-    },
-    "auto_input_gamma": {
-        id: "auto_input_gamma",
-        name: "自動入力γ",
-        desc: "6秒間、0.25秒間隔で自動タイピング。クールダウン40秒。",
-        price: 0,
-        priceType: 'coin',
-        cooldown: 40,
-        duration: 6,
-        interval: 250,
-        execute: function() {
-            gameState.isAutoTyping = true;
-            gameState.autoTypeInterval = setInterval(() => {
-                if (gameState.isPlaying && !gameState.timeExtendActive) handleCorrectKey();
-            }, this.interval);
-            setTimeout(() => {
-                gameState.isAutoTyping = false;
-                clearInterval(gameState.autoTypeInterval);
-            }, this.duration * 1000);
-        }
-    },
-    "auto_input_epsilon": {
-        id: "auto_input_epsilon",
-        name: "自動入力ε",
-        desc: "2.5秒間自動入力 + コンボが5秒間1.5倍。クールダウン25秒。",
-        price: 50,
-        priceType: 'raid',
-        cooldown: 25,
-        duration: 2.5,
-        interval: 60,
-        execute: function() {
-            gameState.isAutoTyping = true;
-            gameState.autoTypeInterval = setInterval(() => {
-                if (gameState.isPlaying && !gameState.timeExtendActive) handleCorrectKey();
-            }, this.interval);
-            setTimeout(() => {
-                gameState.isAutoTyping = false;
-                clearInterval(gameState.autoTypeInterval);
-            }, this.duration * 1000);
-            
-            gameState.comboMultiplier = 1.5;
-            setTimeout(() => {
-                gameState.comboMultiplier = 1.0;
-            }, 5000);
-        }
-    },
-    "time_extend_alpha": {
-        id: "time_extend_alpha",
-        name: "時間伸ばしα",
-        desc: "タイマーを止めてゲージを止めるミニゲーム。クールダウン120秒。",
-        price: 50,
-        priceType: 'raid',
-        cooldown: 120,
-        execute: function() {
-            startTimeExtendGame();
-        }
-    },
-    "combo_up_alpha": {
-        id: "combo_up_alpha",
-        name: "コンボアップα",
-        desc: "5秒間、コンボが1.5倍。クールダウン35秒。",
-        price: 10000,
-        priceType: 'coin',
-        cooldown: 35,
-        duration: 5,
-        execute: function() {
-            gameState.comboMultiplier = 1.5;
-            setTimeout(() => {
-                gameState.comboMultiplier = 1.0;
-            }, this.duration * 1000);
-        }
+    function getMyVoiceSettings() {
+        return {
+            pitch: parseFloat(document.getElementById('pitchSlider').value),
+            rate: parseFloat(document.getElementById('rateSlider').value),
+            volume: parseFloat(document.getElementById('volumeSlider').value),
+            preset: localStorage.getItem('voicePreset') || 'standard'
+        };
     }
-};
 
-// ==========================================
-// パッシブスキルデータ
-// ==========================================
-const passiveData = {
-    "combo_set_alpha": {
-        id: "combo_set_alpha",
-        name: "コンボセットα",
-        desc: "ゲーム開始時のコンボが30になります。",
-        price: 30000,
-        priceType: 'coin',
-        onGameStart: function() {
-            gameState.combo = 30;
-            if (gameState.combo > gameState.maxCombo) gameState.maxCombo = gameState.combo;
-            updateGameUI();
-        }
-    },
-    "combo_no_reset_alpha": {
-        id: "combo_no_reset_alpha",
-        name: "コンボノットリセットα",
-        desc: "一度だけミスしてもコンボが0になりません。",
-        price: 30000,
-        priceType: 'coin',
-        usedInGame: false
-    }
-};
+    function playNotificationSound() { try { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); const oscillator = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); oscillator.connect(gainNode); gainNode.connect(audioCtx.destination); oscillator.frequency.value = 880; gainNode.gain.value = 0.3; oscillator.start(); gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3); oscillator.stop(audioCtx.currentTime + 0.3); } catch(e) { } }
+    function formatTime(timestamp) { if(!timestamp) return ''; const d = new Date(timestamp); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; }
+    function generateFriendCode() { return Math.floor(10000000 + Math.random() * 90000000).toString(); }
 
-// ==========================================
-// アイテムデータ
-// ==========================================
-const itemData = {
-    "coin_boost_alpha": {
-        id: "coin_boost_alpha",
-        name: "コインブーストα",
-        desc: "10分間、獲得コインが2倍になる。",
-        price: 0,
-        priceType: 'coin',
-        duration: 600,
-        effect: (active) => { gameState.coinMultiplier = active ? 2 : 1; }
-    },
-    "mini_coin_boost_alpha": {
-        id: "mini_coin_boost_alpha",
-        name: "ミニコインブーストα",
-        desc: "5分間、獲得コインが1.5倍になる。",
-        price: 5000,
-        priceType: 'coin',
-        duration: 300,
-        effect: (active) => { gameState.coinMultiplier = active ? 1.5 : 1; }
-    },
-    "xp_boost_alpha": {
-        id: "xp_boost_alpha",
-        name: "XPブーストα",
-        desc: "10分間、獲得XPが2倍になる。",
-        price: 0,
-        priceType: 'coin',
-        duration: 600,
-        effect: (active) => { gameState.xpMultiplier = active ? 2 : 1; }
-    },
-    "gold_luck_boost_alpha": {
-        id: "gold_luck_boost_alpha",
-        name: "ゴールドコインラックブーストα",
-        desc: "10分間、ゴールドコインのドロップ率が2倍(2%)になる。",
-        price: 0,
-        priceType: 'coin',
-        duration: 600,
-        effect: (active) => { gameState.goldDropRate = active ? 0.02 : 0.01; }
-    }
-};
-
-// ==========================================
-// 状態管理
-// ==========================================
-const defaultUserData = {
-    name: "冒険者",
-    level: 1,
-    xp: 0,
-    coin: 0,
-    goldCoin: 0,
-    raidPoint: 0,
-    skills: [],
-    equippedSkill: null,
-    passives: [],
-    equippedPassive: null,
-    items: {},
-    playCount: 0,
-    bestScore: 0,
-    bestCombo: 0,
-    storyStage: 1,
-    raidClearedTime: 0
-};
-
-let userRef = null;
-let userData = { ...defaultUserData };
-let uid = localStorage.getItem('typingGameUid');
-
-const gameState = {
-    isPlaying: false,
-    mode: 'normal',
-    storyStage: null,
-    raidStage: null,
-    timeLeft: 60,
-    initialTime: 60,
-    score: 0,
-    combo: 0,
-    maxCombo: 0,
-    currentWordObj: null,
-    timer: null,
-    isAutoTyping: false,
-    autoTypeInterval: null,
-    comboMultiplier: 1.0,
-    coinMultiplier: 1,
-    xpMultiplier: 1,
-    goldDropRate: 0.01,
-    skillCooldownTimer: null,
-    skillCooldownLeft: 0,
-    isSkillReady: false,
-    activeBoosts: {},
-    obstacleTriggered: false,
-    typingDisabled: false,
-    targetScore: 0,
-    timeExtendActive: false,
-    raidObstacle: null,
-    passiveUsed: false
-};
-
-// レイド状態
-let raidState = {
-    isOpen: false,
-    currentStage: 1,
-    stages: []
-};
-
-// イベントデータ
-let eventData = {
-    totalLikes: 0,
-    userLikes: 0
-};
-
-// ==========================================
-// ユーティリティ
-// ==========================================
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
-function getNextLevelXp(level) {
-    return 100 * level;
-}
-
-function getRankingDateKey() {
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    jstNow.setHours(jstNow.getHours() - 7);
-    return `${jstNow.getFullYear()}-${(jstNow.getMonth()+1).toString().padStart(2, '0')}-${jstNow.getDate().toString().padStart(2, '0')}`;
-}
-
-function getNextResetTime() {
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    jstNow.setHours(7, 0, 0, 0);
-    if (jstNow <= new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000)) {
-        jstNow.setDate(jstNow.getDate() + 1);
-    }
-    return jstNow;
-}
-
-function formatTimeRemaining(ms) {
-    if (ms <= 0) return "まもなく";
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-    return `${hours}時間${minutes}分${seconds}秒`;
-}
-
-function getNextRaidOpenTime() {
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    const currentHour = jstNow.getHours();
-    const currentMinute = jstNow.getMinutes();
-    
-    let nextOpen = new Date(jstNow);
-    nextOpen.setMinutes(30, 0, 0);
-    nextOpen.setSeconds(0, 0);
-    
-    if (currentHour < 7 || (currentHour === 7 && currentMinute < 30)) {
-        nextOpen.setHours(7);
-    } else {
-        let found = false;
-        for (let h = 7; h <= 23; h++) {
-            const openTime = new Date(jstNow);
-            openTime.setHours(h, 30, 0, 0);
-            if (openTime > jstNow) {
-                nextOpen = openTime;
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            nextOpen.setDate(nextOpen.getDate() + 1);
-            nextOpen.setHours(7, 30, 0, 0);
-        }
-    }
-    
-    return nextOpen;
-}
-
-function isRaidOpen() {
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    const hour = jstNow.getHours();
-    const minute = jstNow.getMinutes();
-    
-    if (hour < 7) return false;
-    if (minute >= 30 && minute < 45) return true;
-    return false;
-}
-
-function getRaidCloseTime() {
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    
-    let closeTime = new Date(jstNow);
-    closeTime.setMinutes(45, 0, 0);
-    closeTime.setSeconds(0, 0);
-    
-    if (jstNow.getMinutes() >= 45) {
-        closeTime.setHours(jstNow.getHours() + 1);
-    }
-    
-    return closeTime;
-}
-
-function canPlayRaid() {
-    if (!isRaidOpen()) return false;
-    
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    const clearedTime = new Date(userData.raidClearedTime || 0);
-    const clearedJst = new Date(clearedTime.getTime() + (clearedTime.getTimezoneOffset() + 540) * 60000);
-    
-    // 同じ時間帯のレイドかをチェック
-    if (userData.raidClearedTime) {
-        const clearedHour = clearedJst.getHours();
-        const currentHour = jstNow.getHours();
-        if (clearedHour === currentHour) return false;
-    }
-    
-    return true;
-}
-
-function getStoryTargetScore(stage) {
-    return 10000 + (stage - 1) * 1000;
-}
-
-function getRaidTargetScore(stage) {
-    if (stage === 6) return 100000;
-    return 30000 + Math.floor(Math.random() * 10001);
-}
-
-function getStageObstacle(stage) {
-    if (stage >= 76) return 'freeze';
-    if (stage >= 51) return 'time_reduce';
-    if (stage >= 26) return 'darkness';
-    return null;
-}
-
-function getRandomRaidObstacle() {
-    const obstacles = ['darkness', 'time_reduce', 'freeze'];
-    return obstacles[Math.floor(Math.random() * obstacles.length)];
-}
-
-function startTimeExtendGame() {
-    if (!gameState.isPlaying) return;
-    
-    gameState.timeExtendActive = true;
-    gameState.typingDisabled = true;
-    clearInterval(gameState.timer);
-    
-    const gameEl = document.getElementById('time-extend-game');
-    const bar = document.getElementById('time-extend-bar');
-    gameEl.style.display = 'block';
-    
-    let position = 0;
-    let direction = 1;
-    const speed = 5;
-    let animationId;
-    
-    const animate = () => {
-        position += direction * speed;
-        if (position >= 100 || position <= 0) {
-            direction *= -1;
-        }
-        bar.style.left = position + '%';
-        animationId = requestAnimationFrame(animate);
+    document.getElementById('createAccountBtn').onclick = async () => {
+        const name = document.getElementById('usernameInput').value.trim();
+        if(!name) { document.getElementById('lobbyError').innerText = '名前を入力してください'; return; }
+        const friendCode = generateFriendCode();
+        const newUserRef = db.ref('users').push();
+        const uid = newUserRef.key;
+        await newUserRef.set({ uid, name, friendCode, icon: '😀', online: true, friends: {}, coins: 0, maxMessageLen: 200, messageCooldownMs: 2500, stamps: { default: true }, customStamps: [], hasStampCreation: false });
+        currentUser = { uid, name, friendCode, icon: '😀' };
+        localStorage.setItem('forcord_user', JSON.stringify(currentUser));
+        startApp();
     };
-    animate();
-    
-    const stopGame = () => {
-        cancelAnimationFrame(animationId);
-        const finalPos = parseFloat(bar.style.left) || 0;
-        let addedTime = 0;
-        
-        if (finalPos >= 48 && finalPos <= 52) {
-            addedTime = 12;
-            document.getElementById('time-extend-result').innerHTML = '🎯 パーフェクト！ +12秒！';
-        } else if (finalPos >= 40 && finalPos <= 60) {
-            addedTime = 8;
-            document.getElementById('time-extend-result').innerHTML = '🎉 グッド！ +8秒！';
-        } else {
-            addedTime = 5;
-            document.getElementById('time-extend-result').innerHTML = '👍 ナイス！ +5秒！';
-        }
-        
-        gameState.timeLeft += addedTime;
-        document.getElementById('time-display').innerText = gameState.timeLeft;
-        
-        setTimeout(() => {
-            gameEl.style.display = 'none';
-            gameState.timeExtendActive = false;
-            gameState.typingDisabled = false;
-            
-            gameState.timer = setInterval(() => {
-                gameState.timeLeft--;
-                document.getElementById('time-display').innerText = gameState.timeLeft;
-                if (gameState.timeLeft <= 0) {
-                    endGame();
+
+    async function startApp() {
+        document.getElementById('lobbyScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'flex';
+        await loadUserFull();
+        db.ref(`users/${currentUser.uid}/online`).set(true);
+        window.addEventListener('beforeunload', () => { if(currentUser) db.ref(`users/${currentUser.uid}/online`).set(false); });
+        initTabs();
+        loadIconPicker();
+        setupVoiceSettings();
+        listenVoiceInvites();
+        renderShop();
+        setupGroupModal();
+        startVoiceMessagePoller();
+        startNewMessageListener();
+        setupVoiceAdminCommands();
+        setInterval(() => { renderChatListWithUnread(); }, 2000);
+        setupReplySystem();
+        setupReadReceiptModal();
+    }
+
+    function setupReadReceiptModal() {
+        document.getElementById('closeReadReceiptModal').onclick = () => {
+            document.getElementById('readReceiptModal').style.display = 'none';
+            overlay.style.display = 'none';
+        };
+    }
+
+    function setupReplySystem() {
+        // 返信プレビューのキャンセル処理は動的に生成される要素に対してイベント委譲で対応
+    }
+
+    let lastVoiceMessageTime = 0;
+    function startVoiceMessagePoller() {
+        setInterval(async () => {
+            if(!currentUser) return;
+            const snap = await db.ref(`voiceSpeak/${currentUser.uid}`).limitToLast(10).once('value');
+            const msgs = snap.val() || {};
+            Object.entries(msgs).forEach(([key, data]) => {
+                if(data && data.text && data.timestamp > lastVoiceMessageTime) {
+                    console.log("🎤 音声読み上げ:", data.fromName, ":", data.text);
+                    speakText(data.text, data.voiceSettings);
+                    lastVoiceMessageTime = data.timestamp;
+                    db.ref(`voiceSpeak/${currentUser.uid}/${key}`).remove();
                 }
-            }, 1000);
-            
-            document.removeEventListener('keydown', spaceHandler);
-        }, 1500);
-    };
-    
-    const spaceHandler = (e) => {
-        if (e.code === 'Space') {
-            e.preventDefault();
-            stopGame();
-        }
-    };
-    document.addEventListener('keydown', spaceHandler);
-}
-
-// ==========================================
-// 初期化・データロード
-// ==========================================
-async function initApp() {
-    if (!uid) {
-        uid = generateUUID();
-        localStorage.setItem('typingGameUid', uid);
+            });
+        }, 1000); 
     }
-    userRef = ref(db, `users/${uid}`);
-    const eventRef = ref(db, 'eventData');
 
-    try {
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-            userData = { ...defaultUserData, ...snapshot.val() };
-            if (!userData.items) userData.items = {};
-            if (!userData.goldCoin) userData.goldCoin = 0;
-            if (!userData.raidPoint) userData.raidPoint = 0;
-            if (!userData.storyStage) userData.storyStage = 1;
-            if (!userData.passives) userData.passives = [];
-            if (!userData.equippedPassive) userData.equippedPassive = null;
-            if (!userData.raidClearedTime) userData.raidClearedTime = 0;
-        } else {
-            await set(userRef, userData);
-        }
-        
-        const eventSnapshot = await get(eventRef);
-        if (eventSnapshot.exists()) {
-            eventData = eventSnapshot.val();
-        } else {
-            await set(eventRef, eventData);
-        }
-        
-        // イベントデータのリアルタイム監視
-        onValue(eventRef, (snap) => {
-            if (snap.exists()) {
-                eventData = snap.val();
-                updateEventUI();
+    function startNewMessageListener() {
+        const updateChatList = () => renderChatListWithUnread();
+        db.ref('globalMessages').limitToLast(10).on('child_added', (snap) => {
+            const msg = snap.val();
+            if(msg && msg.senderId !== currentUser.uid && currentChatId !== 'global') {
+                unreadCounts['global'] = (unreadCounts['global'] || 0) + 1;
+                updateChatList();
+                playNotificationSound();
             }
         });
-    } catch (e) {
-        console.error("Firebase load error", e);
-    }
-
-    updateHeaderUI();
-    
-    if (!localStorage.getItem('agreementAccepted')) {
-        document.getElementById('agreement-modal').classList.add('active');
-    }
-    
-    startRankingTimer();
-    startRaidTimer();
-}
-
-async function saveUserData() {
-    try {
-        await update(userRef, userData);
-        updateHeaderUI();
-    } catch (e) {
-        console.error("Firebase save error", e);
-    }
-}
-
-async function saveEventData() {
-    try {
-        await set(ref(db, 'eventData'), eventData);
-    } catch (e) {
-        console.error("Event data save error", e);
-    }
-}
-
-// ==========================================
-// UI更新系
-// ==========================================
-function updateHeaderUI() {
-    document.getElementById('coin-display').innerText = `🪙${Math.floor(userData.coin || 0)}`;
-    document.getElementById('gold-coin-display').innerText = `🥇${userData.goldCoin || 0}`;
-    document.getElementById('raid-point-display').innerText = `🎯${userData.raidPoint || 0}`;
-    document.getElementById('level-display').innerText = `Lv.${userData.level || 1}`;
-    
-    const nextXp = getNextLevelXp(userData.level || 1);
-    const xpPercent = Math.min(100, ((userData.xp || 0) / nextXp) * 100);
-    document.getElementById('xp-bar-fill').style.width = `${xpPercent}%`;
-    document.getElementById('xp-text').innerText = `${Math.floor(userData.xp || 0)} / ${nextXp} XP`;
-}
-
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
-}
-
-function updateEventUI() {
-    document.getElementById('like-count').innerText = `${eventData.totalLikes || 0} いいね`;
-    const announcement = document.getElementById('event-announcement');
-    if ((eventData.totalLikes || 0) >= 5000) {
-        announcement.innerText = '✅ いいねが5000に達しました！アプデの準備をします。';
-        announcement.style.color = '#4caf50';
-    } else {
-        const remaining = 5000 - (eventData.totalLikes || 0);
-        announcement.innerText = `あと ${remaining.toLocaleString()} いいねでアプデの準備をします。`;
-        announcement.style.color = '#ff9800';
-    }
-}
-
-function startRankingTimer() {
-    const updateTimer = () => {
-        const resetTime = getNextResetTime();
-        const now = new Date();
-        const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-        const diff = resetTime - jstNow;
-        document.getElementById('ranking-timer').innerText = `次のリセットまで: ${formatTimeRemaining(diff)}`;
-    };
-    updateTimer();
-    setInterval(updateTimer, 1000);
-}
-
-function startRaidTimer() {
-    const updateRaidTimer = () => {
-        const now = new Date();
-        const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-        const isOpen = isRaidOpen();
-        const canPlay = canPlayRaid();
-        
-        let timerText = '';
-        
-        if (isOpen && canPlay) {
-            const closeTime = getRaidCloseTime();
-            const diff = closeTime - jstNow;
-            timerText = `🔥 レイド開催中！ 残り ${formatTimeRemaining(diff)}`;
-        } else {
-            const nextOpen = getNextRaidOpenTime();
-            const diff = nextOpen - jstNow;
-            timerText = `⏳ 次のレイドまで: ${formatTimeRemaining(diff)}`;
-        }
-        
-        document.getElementById('raid-menu-timer').innerText = timerText;
-        const raidBtn = document.getElementById('raid-menu-btn');
-        
-        if (!isOpen || !canPlay) {
-            raidBtn.classList.add('disabled');
-        } else {
-            raidBtn.classList.remove('disabled');
-        }
-    };
-    updateRaidTimer();
-    setInterval(updateRaidTimer, 1000);
-}
-
-// ==========================================
-// イベント機能
-// ==========================================
-function renderEvent() {
-    updateEventUI();
-    fetchEventRanking();
-}
-
-async function handleLike() {
-    eventData.totalLikes = (eventData.totalLikes || 0) + 1;
-    
-    const userLikesRef = ref(db, `eventLikes/${uid}`);
-    try {
-        const snap = await get(userLikesRef);
-        const currentLikes = snap.exists() ? (snap.val().likes || 0) : 0;
-        await set(userLikesRef, { name: userData.name, likes: currentLikes + 1 });
-    } catch(e) {
-        console.error("Like save error", e);
-    }
-    
-    await saveEventData();
-    updateEventUI();
-    fetchEventRanking();
-    
-    // アニメーション
-    const anim = document.createElement('div');
-    anim.className = 'like-animation';
-    anim.innerText = '+1';
-    anim.style.left = '50%';
-    anim.style.top = '50%';
-    document.body.appendChild(anim);
-    setTimeout(() => anim.remove(), 1500);
-}
-
-async function fetchEventRanking() {
-    const list = document.getElementById('event-ranking-list');
-    list.innerHTML = '<div style="text-align:center;">読み込み中...</div>';
-    
-    try {
-        const snapshot = await get(ref(db, 'eventLikes'));
-        const results = [];
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                results.push({ uid: child.key, ...child.val() });
-            });
-        }
-        
-        results.sort((a, b) => (b.likes || 0) - (a.likes || 0));
-        
-        list.innerHTML = '';
-        if (results.length === 0) {
-            list.innerHTML = '<div style="text-align:center;">まだデータがありません</div>';
-            return;
-        }
-        
-        results.slice(0, 20).forEach((data, index) => {
-            const div = document.createElement('div');
-            div.className = 'event-ranking-item';
-            div.innerHTML = `
-                <span>${index + 1}位：${escapeHTML(data.name || '名無し')}</span>
-                <span>${data.likes || 0} 回</span>
-            `;
-            list.appendChild(div);
+        db.ref(`users/${currentUser.uid}/friends`).once('value', (friendsSnap) => {
+            for(let friendId of Object.keys(friendsSnap.val() || {})) {
+                const path = `privateChats/${[currentUser.uid, friendId].sort().join('_')}/messages`;
+                db.ref(path).limitToLast(10).on('child_added', (snap) => {
+                    const msg = snap.val();
+                    if(msg && msg.senderId !== currentUser.uid && currentChatId !== `friend_${friendId}`) {
+                        unreadCounts[`friend_${friendId}`] = (unreadCounts[`friend_${friendId}`] || 0) + 1;
+                        updateChatList();
+                        playNotificationSound();
+                        addNewMessageNotice(friendId, msg.senderName, msg.text);
+                    }
+                });
+            }
         });
-    } catch(e) {
-        console.error("Event ranking error", e);
-        list.innerHTML = '<div style="color:red;">読み込み失敗</div>';
-    }
-}
-
-// ==========================================
-// レイドマップ
-// ==========================================
-function renderRaidMap() {
-    const grid = document.getElementById('raid-stages-grid');
-    grid.innerHTML = '';
-    const isOpen = isRaidOpen();
-    const canPlay = canPlayRaid();
-    
-    document.getElementById('raid-point-info').innerText = userData.raidPoint || 0;
-    
-    if (!isOpen) {
-        const nextOpen = getNextRaidOpenTime();
-        const now = new Date();
-        const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-        const diff = nextOpen - jstNow;
-        document.getElementById('raid-status-timer').innerHTML = `
-            ⏳ 次のレイド開始まで: ${formatTimeRemaining(diff)}
-        `;
-        grid.innerHTML = '<div style="text-align:center; padding: 40px; color: #888;">レイドは開催時間外です</div>';
-        return;
-    }
-    
-    if (!canPlay) {
-        const nextOpen = getNextRaidOpenTime();
-        const now = new Date();
-        const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-        const diff = nextOpen - jstNow;
-        document.getElementById('raid-status-timer').innerHTML = `
-            ⏳ 次のレイドまで: ${formatTimeRemaining(diff)}
-        `;
-        grid.innerHTML = '<div style="text-align:center; padding: 40px; color: #888;">この回のレイドはクリア済みです。次の開催時間をお待ちください。</div>';
-        return;
-    }
-    
-    const closeTime = getRaidCloseTime();
-    const now = new Date();
-    const jstNow = new Date(now.getTime() + (now.getTimezoneOffset() + 540) * 60000);
-    const diff = closeTime - jstNow;
-    document.getElementById('raid-status-timer').innerHTML = `
-        🔥 レイド開催中！ 残り ${formatTimeRemaining(diff)}
-    `;
-    
-    if (!raidState.stages.length) {
-        raidState.stages = [];
-        for (let i = 1; i <= 6; i++) {
-            raidState.stages.push({
-                stage: i,
-                cleared: false,
-                targetScore: getRaidTargetScore(i),
-                obstacle: i === 6 ? null : getRandomRaidObstacle()
-            });
-        }
-        raidState.currentStage = 1;
-    }
-    
-    for (let i = 0; i < 6; i++) {
-        const stage = raidState.stages[i];
-        const btn = document.createElement('button');
-        btn.className = 'raid-stage-btn';
-        
-        if (stage.cleared) {
-            btn.classList.add('completed');
-            btn.innerText = `ステージ ${i+1} - クリア済み ✅`;
-        } else if (i + 1 === raidState.currentStage) {
-            btn.classList.add('current');
-            btn.innerText = `ステージ ${i+1} - 目標: ${stage.targetScore.toLocaleString()}`;
-            btn.onclick = () => startRaidStage(i + 1);
-        } else {
-            btn.classList.add('locked');
-            btn.innerText = `ステージ ${i+1} - ロック 🔒`;
-        }
-        
-        grid.appendChild(btn);
-    }
-}
-
-function startRaidStage(stage) {
-    if (!isRaidOpen() || !canPlayRaid()) return;
-    if (stage !== raidState.currentStage) return;
-    
-    const stageData = raidState.stages[stage - 1];
-    
-    gameState.mode = 'raid';
-    gameState.raidStage = stage;
-    gameState.isPlaying = true;
-    gameState.raidObstacle = stageData.obstacle;
-    gameState.passiveUsed = false;
-    
-    let initialTime = 60;
-    if (stageData.obstacle === 'time_reduce') initialTime = 50;
-    gameState.timeLeft = initialTime;
-    gameState.initialTime = initialTime;
-    gameState.score = 0;
-    gameState.combo = 0;
-    gameState.maxCombo = 0;
-    gameState.comboMultiplier = 1.0;
-    gameState.coinMultiplier = 1;
-    gameState.xpMultiplier = 1;
-    gameState.goldDropRate = 0.01;
-    gameState.obstacleTriggered = false;
-    gameState.typingDisabled = false;
-    gameState.targetScore = stageData.targetScore;
-    
-    applyPassiveOnStart();
-    resetSkillUI();
-    
-    showScreen('game-screen');
-    document.getElementById('story-target-container').style.display = 'none';
-    document.getElementById('raid-target-container').style.display = 'block';
-    
-    updateRaidTargetUI();
-    updateGameUI();
-    setNextWord();
-    
-    gameState.timer = setInterval(() => {
-        gameState.timeLeft--;
-        document.getElementById('time-display').innerText = gameState.timeLeft;
-        
-        if (gameState.raidObstacle === 'darkness' && !gameState.obstacleTriggered && gameState.timeLeft <= 30) {
-            triggerDarkness();
-        } else if (gameState.raidObstacle === 'freeze' && !gameState.obstacleTriggered && gameState.timeLeft <= 40) {
-            triggerFreeze();
-        }
-        
-        if (gameState.timeLeft <= 0) {
-            endGame();
-        }
-    }, 1000);
-    
-    if (stageData.obstacle === 'time_reduce') {
-        const animEl = document.getElementById('time-reduce-animation');
-        animEl.style.opacity = '1';
-        setTimeout(() => animEl.style.opacity = '0', 1500);
-    }
-}
-
-function updateRaidTargetUI() {
-    if (gameState.mode !== 'raid') return;
-    
-    const target = gameState.targetScore;
-    const current = gameState.score;
-    const percent = Math.min(100, (current / target) * 100);
-    const remaining = Math.max(0, target - current);
-    
-    document.getElementById('raid-target-info').innerHTML = `
-        🔥 レイド ステージ${gameState.raidStage}/6 目標スコア
-    `;
-    document.getElementById('raid-target-bar-fill').style.width = `${percent}%`;
-    document.getElementById('raid-target-text').innerHTML = `
-        ${current.toLocaleString()} / ${target.toLocaleString()} (残り ${remaining.toLocaleString()})
-    `;
-}
-
-// ==========================================
-// ストーリーマップ
-// ==========================================
-function renderStoryMap() {
-    const grid = document.getElementById('stage-grid');
-    grid.innerHTML = '';
-    const currentStage = userData.storyStage || 1;
-    document.getElementById('current-story-stage').innerText = currentStage;
-    
-    for (let i = 1; i <= 100; i++) {
-        const btn = document.createElement('button');
-        btn.className = 'stage-btn';
-        if (i < currentStage) btn.classList.add('completed');
-        else if (i === currentStage) btn.classList.add('current');
-        else btn.classList.add('locked');
-        
-        let label = `${i}`;
-        if (i === 25) label += '\n🎁';
-        if (i === 50) label += '\n🎁';
-        if (i === 75) label += '\n🎁';
-        if (i === 100) label += '\n👑';
-        
-        btn.innerText = label;
-        
-        if (i === currentStage) {
-            btn.onclick = () => startStoryStage(i);
-        } else {
-            btn.style.cursor = 'not-allowed';
-        }
-        grid.appendChild(btn);
-    }
-}
-
-function startStoryStage(stage) {
-    if (stage !== userData.storyStage) return;
-    
-    gameState.mode = 'story';
-    gameState.storyStage = stage;
-    gameState.isPlaying = true;
-    gameState.raidObstacle = null;
-    gameState.passiveUsed = false;
-    
-    let initialTime = 60;
-    if (stage >= 51) initialTime = 50;
-    gameState.timeLeft = initialTime;
-    gameState.initialTime = initialTime;
-    gameState.score = 0;
-    gameState.combo = 0;
-    gameState.maxCombo = 0;
-    gameState.comboMultiplier = 1.0;
-    gameState.coinMultiplier = 1;
-    gameState.xpMultiplier = 1;
-    gameState.goldDropRate = 0.01;
-    gameState.obstacleTriggered = false;
-    gameState.typingDisabled = false;
-    gameState.targetScore = getStoryTargetScore(stage);
-    
-    applyPassiveOnStart();
-    resetSkillUI();
-    
-    showScreen('game-screen');
-    document.getElementById('story-target-container').style.display = 'block';
-    document.getElementById('raid-target-container').style.display = 'none';
-    
-    updateStoryTargetUI();
-    updateGameUI();
-    setNextWord();
-    
-    gameState.timer = setInterval(() => {
-        gameState.timeLeft--;
-        document.getElementById('time-display').innerText = gameState.timeLeft;
-        
-        if (!gameState.obstacleTriggered) {
-            const obstacle = getStageObstacle(stage);
-            if (obstacle === 'darkness' && gameState.timeLeft <= 30) {
-                triggerDarkness();
-            } else if (obstacle === 'freeze' && gameState.timeLeft <= 40) {
-                triggerFreeze();
-            }
-        }
-        
-        if (gameState.timeLeft <= 0) {
-            endGame();
-        }
-    }, 1000);
-    
-    if (stage >= 51) {
-        const animEl = document.getElementById('time-reduce-animation');
-        animEl.style.opacity = '1';
-        setTimeout(() => animEl.style.opacity = '0', 1500);
-    }
-}
-
-function updateStoryTargetUI() {
-    if (gameState.mode !== 'story') return;
-    
-    const target = gameState.targetScore;
-    const current = gameState.score;
-    const percent = Math.min(100, (current / target) * 100);
-    const remaining = Math.max(0, target - current);
-    
-    document.getElementById('story-target-info').innerHTML = `
-        🎯 ステージ${gameState.storyStage} 目標スコア
-    `;
-    document.getElementById('story-target-bar-fill').style.width = `${percent}%`;
-    document.getElementById('story-target-text').innerHTML = `
-        ${current.toLocaleString()} / ${target.toLocaleString()} (残り ${remaining.toLocaleString()})
-    `;
-}
-
-function triggerDarkness() {
-    gameState.obstacleTriggered = true;
-    const overlay = document.getElementById('game-overlay');
-    overlay.style.backgroundColor = 'rgba(0,0,0,0)';
-    overlay.style.transition = 'background-color 1s';
-    setTimeout(() => {
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.95)';
-        setTimeout(() => {
-            overlay.style.backgroundColor = 'rgba(0,0,0,0)';
-        }, 2500);
-    }, 10);
-}
-
-function triggerFreeze() {
-    gameState.obstacleTriggered = true;
-    gameState.typingDisabled = true;
-    
-    const overlay = document.getElementById('game-overlay');
-    const message = document.getElementById('game-message');
-    
-    overlay.style.backgroundColor = 'rgba(0,100,255,0.3)';
-    overlay.style.transition = 'background-color 0.5s';
-    message.innerText = '❄️ BrrBrrフローズン！ ❄️';
-    message.style.opacity = '1';
-    
-    setTimeout(() => {
-        overlay.style.backgroundColor = 'rgba(0,0,0,0)';
-        message.style.opacity = '0';
-        gameState.typingDisabled = false;
-    }, 5000);
-}
-
-// ==========================================
-// パッシブシステム
-// ==========================================
-function applyPassiveOnStart() {
-    if (!userData.equippedPassive || !passiveData[userData.equippedPassive]) return;
-    
-    const passive = passiveData[userData.equippedPassive];
-    if (passive.onGameStart) {
-        passive.onGameStart();
-    }
-    gameState.passiveUsed = false;
-}
-
-// ==========================================
-// ゲームロジック
-// ==========================================
-function startGame(mode) {
-    gameState.mode = mode;
-    gameState.storyStage = null;
-    gameState.raidStage = null;
-    gameState.raidObstacle = null;
-    gameState.isPlaying = true;
-    gameState.timeLeft = 60;
-    gameState.initialTime = 60;
-    gameState.score = 0;
-    gameState.combo = 0;
-    gameState.maxCombo = 0;
-    gameState.comboMultiplier = 1.0;
-    gameState.coinMultiplier = 1;
-    gameState.xpMultiplier = 1;
-    gameState.goldDropRate = 0.01;
-    gameState.targetScore = 0;
-    gameState.timeExtendActive = false;
-    gameState.passiveUsed = false;
-    
-    applyPassiveOnStart();
-    resetSkillUI();
-    
-    showScreen('game-screen');
-    document.getElementById('story-target-container').style.display = 'none';
-    document.getElementById('raid-target-container').style.display = 'none';
-    updateGameUI();
-    setNextWord();
-    
-    gameState.timer = setInterval(() => {
-        gameState.timeLeft--;
-        document.getElementById('time-display').innerText = gameState.timeLeft;
-        if (gameState.timeLeft <= 0) {
-            endGame();
-        }
-    }, 1000);
-}
-
-function setNextWord() {
-    const randomObj = typingData[Math.floor(Math.random() * typingData.length)];
-    gameState.currentWordObj = { ...randomObj, typedLength: 0 };
-    renderWord();
-}
-
-function renderWord() {
-    const obj = gameState.currentWordObj;
-    document.getElementById('japanese-text').innerText = obj.ja;
-    
-    const romajiContainer = document.getElementById('romaji-text');
-    romajiContainer.innerHTML = '';
-    
-    for (let i = 0; i < obj.romaji.length; i++) {
-        const span = document.createElement('span');
-        span.innerText = obj.romaji[i];
-        if (i < obj.typedLength) {
-            span.className = 'typed';
-        } else {
-            span.className = gameState.mode === 'hard' ? 'untyped-hidden' : 'untyped';
-        }
-        romajiContainer.appendChild(span);
-    }
-}
-
-function handleCorrectKey() {
-    const obj = gameState.currentWordObj;
-    obj.typedLength++;
-    
-    gameState.combo += 1 * gameState.comboMultiplier;
-    if (gameState.combo > gameState.maxCombo) gameState.maxCombo = gameState.combo;
-    
-    gameState.score += Math.floor(gameState.combo * 5);
-    
-    updateGameUI();
-    renderWord();
-    
-    if (obj.typedLength >= obj.romaji.length) {
-        setNextWord();
-    }
-}
-
-function handleWrongKey() {
-    // パッシブ: コンボノットリセットα
-    if (!gameState.passiveUsed && userData.equippedPassive === 'combo_no_reset_alpha' && gameState.combo > 0) {
-        gameState.passiveUsed = true;
-        // エフェクト
-        const effect = document.createElement('div');
-        effect.className = 'passive-effect';
-        effect.innerText = '🛡️ コンボ保護！';
-        document.body.appendChild(effect);
-        setTimeout(() => effect.remove(), 2000);
-        updateGameUI();
-        return;
-    }
-    
-    gameState.combo = 0;
-    updateGameUI();
-}
-
-function updateGameUI() {
-    document.getElementById('score-display').innerText = gameState.score;
-    document.getElementById('combo-display').innerText = Math.floor(gameState.combo);
-    
-    if (gameState.mode === 'story') {
-        updateStoryTargetUI();
-        if (gameState.score >= gameState.targetScore) {
-            endGame(true);
-        }
-    } else if (gameState.mode === 'raid') {
-        updateRaidTargetUI();
-        if (gameState.score >= gameState.targetScore) {
-            endGame(true);
-        }
-    }
-}
-
-document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && gameState.isPlaying && gameState.isSkillReady && !gameState.timeExtendActive) {
-        e.preventDefault();
-        activateSkill();
-        return;
-    }
-    
-    if (!gameState.isPlaying || gameState.isAutoTyping || gameState.typingDisabled || gameState.timeExtendActive) return;
-    
-    const obj = gameState.currentWordObj;
-    if (!obj) return;
-    
-    const expectedChar = obj.romaji[obj.typedLength];
-    if (/^[a-zA-Z\-]$/.test(e.key)) {
-        if (e.key.toLowerCase() === expectedChar.toLowerCase()) {
-            handleCorrectKey();
-        } else {
-            handleWrongKey();
-        }
-    }
-});
-
-function endGame(isCleared = false) {
-    gameState.isPlaying = false;
-    clearInterval(gameState.timer);
-    if (gameState.autoTypeInterval) clearInterval(gameState.autoTypeInterval);
-    if (gameState.skillCooldownTimer) clearInterval(gameState.skillCooldownTimer);
-    
-    document.getElementById('game-overlay').style.backgroundColor = 'rgba(0,0,0,0)';
-    document.getElementById('game-message').style.opacity = '0';
-    
-    let earnedCoin = Math.floor(gameState.score / 10) * gameState.coinMultiplier;
-    if (gameState.mode === 'hard') earnedCoin *= 2;
-    const earnedXp = Math.floor(gameState.score / 100) * gameState.xpMultiplier;
-    
-    userData.coin = (userData.coin || 0) + earnedCoin;
-    userData.xp = (userData.xp || 0) + earnedXp;
-    userData.playCount = (userData.playCount || 0) + 1;
-    
-    let earnedGold = 0;
-    if (Math.random() < gameState.goldDropRate) {
-        earnedGold = 1;
-        userData.goldCoin = (userData.goldCoin || 0) + 1;
-    }
-    
-    let storyCleared = false;
-    let raidCleared = false;
-    let earnedRaidPoint = 0;
-    let rewards = [];
-    
-    if (gameState.mode === 'story' && isCleared) {
-        const stage = gameState.storyStage;
-        if (stage === userData.storyStage) {
-            userData.storyStage = Math.min(100, stage + 1);
-            storyCleared = true;
-            
-            if (stage === 25) {
-                addItemToInventory('coin_boost_alpha', 5);
-                rewards.push({ type: 'item', id: 'coin_boost_alpha', name: 'コインブーストα', count: 5 });
-            } else if (stage === 50) {
-                addItemToInventory('coin_boost_alpha', 3);
-                addItemToInventory('xp_boost_alpha', 2);
-                rewards.push({ type: 'item', id: 'coin_boost_alpha', name: 'コインブーストα', count: 3 });
-                rewards.push({ type: 'item', id: 'xp_boost_alpha', name: 'XPブーストα', count: 2 });
-            } else if (stage === 75) {
-                userData.goldCoin = (userData.goldCoin || 0) + 5;
-                addItemToInventory('gold_luck_boost_alpha', 1);
-                rewards.push({ type: 'gold', count: 5 });
-                rewards.push({ type: 'item', id: 'gold_luck_boost_alpha', name: 'ゴールドコインラックブーストα', count: 1 });
-            } else if (stage === 100) {
-                if (!userData.skills.includes('auto_input_gamma')) {
-                    userData.skills.push('auto_input_gamma');
+        db.ref('groups').on('value', (groupsSnap) => {
+            groupsSnap.forEach(groupSnap => {
+                const group = groupSnap.val();
+                if(group && group.members && group.members[currentUser.uid]) {
+                    db.ref(`groups/${groupSnap.key}/messages`).limitToLast(10).on('child_added', (snap) => {
+                        const msg = snap.val();
+                        if(msg && msg.senderId !== currentUser.uid && currentChatId !== groupSnap.key) {
+                            unreadCounts[groupSnap.key] = (unreadCounts[groupSnap.key] || 0) + 1;
+                            updateChatList();
+                            playNotificationSound();
+                        }
+                    });
                 }
-                rewards.push({ type: 'skill', id: 'auto_input_gamma', name: '自動入力γ' });
-            }
-        }
-    } else if (gameState.mode === 'raid' && isCleared) {
-        const stage = gameState.raidStage;
-        if (stage === raidState.currentStage) {
-            raidState.stages[stage - 1].cleared = true;
-            
-            if (stage === 6) {
-                raidCleared = true;
-                earnedRaidPoint = 5 + Math.floor(Math.random() * 6);
-                userData.raidPoint = (userData.raidPoint || 0) + earnedRaidPoint;
-                
-                const now = new Date();
-                userData.raidClearedTime = now.getTime();
-                
-                rewards.push({ type: 'raid', count: earnedRaidPoint });
-                raidState = { isOpen: false, currentStage: 1, stages: [] };
-            } else {
-                raidState.currentStage = stage + 1;
-            }
-        }
+            });
+        });
     }
-    
-    if (gameState.mode === 'normal') {
-        if (gameState.score > (userData.bestScore || 0)) userData.bestScore = gameState.score;
-        if (gameState.maxCombo > (userData.bestCombo || 0)) userData.bestCombo = Math.floor(gameState.maxCombo);
-        submitRanking();
-    }
-    
-    let leveledUp = false;
-    while ((userData.xp || 0) >= getNextLevelXp(userData.level)) {
-        userData.xp -= getNextLevelXp(userData.level);
-        userData.level++;
-        leveledUp = true;
-    }
-    
-    saveUserData();
-    
-    document.getElementById('result-title').innerText = isCleared ? (raidCleared ? '🔥 レイド制覇！' : '🎉 ステージクリア！') : 'ゲーム終了！';
-    document.getElementById('result-score').innerText = gameState.score;
-    document.getElementById('result-combo').innerText = Math.floor(gameState.maxCombo);
-    document.getElementById('result-coin').innerText = earnedCoin;
-    document.getElementById('result-xp').innerText = earnedXp;
-    document.getElementById('level-up-msg').style.display = leveledUp ? 'block' : 'none';
-    document.getElementById('story-clear-msg').style.display = storyCleared ? 'block' : 'none';
-    document.getElementById('raid-clear-msg').style.display = raidCleared ? 'block' : 'none';
-    
-    const goldResultEl = document.getElementById('gold-coin-result');
-    if (earnedGold > 0) {
-        goldResultEl.style.display = 'block';
-        document.getElementById('result-gold').innerText = earnedGold;
-    } else {
-        goldResultEl.style.display = 'none';
-    }
-    
-    const raidResultEl = document.getElementById('raid-point-result');
-    if (earnedRaidPoint > 0) {
-        raidResultEl.style.display = 'block';
-        document.getElementById('result-raid').innerText = earnedRaidPoint;
-    } else {
-        raidResultEl.style.display = 'none';
-    }
-    
-    showScreen('result-screen');
-    
-    if (rewards.length > 0) {
-        showRewardModal(rewards);
-    }
-}
 
-function addItemToInventory(itemId, count) {
-    if (!userData.items) userData.items = {};
-    userData.items[itemId] = (userData.items[itemId] || 0) + count;
-}
-
-function showRewardModal(rewards) {
-    const content = document.getElementById('reward-content');
-    content.innerHTML = '';
-    rewards.forEach(r => {
+    function addNewMessageNotice(friendId, senderName, text) {
+        const area = document.getElementById('newMessagesArea');
+        if(document.querySelector(`.new-message-notice[data-friend="${friendId}"]`)) return;
         const div = document.createElement('div');
-        div.className = 'reward-item';
-        if (r.type === 'gold') {
-            div.innerHTML = `<div class="reward-icon">🥇</div><div class="reward-info"><div class="reward-name">ゴールドコイン x${r.count}</div></div>`;
-        } else if (r.type === 'raid') {
-            div.innerHTML = `<div class="reward-icon">🎯</div><div class="reward-info"><div class="reward-name">レイドポイント x${r.count}</div></div>`;
-        } else if (r.type === 'item') {
-            const item = itemData[r.id];
-            div.innerHTML = `<div class="reward-icon">🎁</div><div class="reward-info"><div class="reward-name">${item.name} x${r.count}</div><div class="reward-desc">${item.desc}</div></div>`;
-        } else if (r.type === 'skill') {
-            const skill = skillData[r.id];
-            div.innerHTML = `<div class="reward-icon">⚡</div><div class="reward-info"><div class="reward-name">${skill.name}</div><div class="reward-desc">${skill.desc}</div></div>`;
-        }
-        content.appendChild(div);
-    });
-    document.getElementById('reward-modal').classList.add('active');
-}
+        div.className = 'new-message-notice';
+        div.setAttribute('data-friend', friendId);
+        div.innerHTML = `<span><strong>${senderName || '不明'}</strong>さんからメッセージが来ています！<br><small>${text ? text.substring(0,30) : ''}${text && text.length>30?'...':''}</small></span><button class="goto-chat-btn" data-friend="${friendId}">見に行く</button>`;
 
-// ==========================================
-// スキルシステム
-// ==========================================
-function resetSkillUI() {
-    const btn = document.getElementById('skill-btn');
-    const overlay = document.getElementById('skill-cooldown-overlay');
-    const text = document.getElementById('skill-btn-text');
-    
-    if (!userData.equippedSkill || !skillData[userData.equippedSkill]) {
-        text.innerText = "スキル\n無し";
-        btn.disabled = true;
-        overlay.style.height = '0%';
-        gameState.isSkillReady = false;
-        return;
+
+        const btn = div.querySelector('.goto-chat-btn');
+        btn.onclick = () => {
+            openChat(`friend_${friendId}`, 'friend');
+            document.querySelector('.sidebar-icon[data-tab="messages"]').click();
+            div.remove();
+        };
+
+        area.prepend(div);
+        setTimeout(() => { if(div.parentNode) div.remove(); }, 15000);
     }
-    
-    const skill = skillData[userData.equippedSkill];
-    text.innerText = skill.name.replace('α', '\nα').replace('γ', '\nγ').replace('ε', '\nε');
-    btn.disabled = false;
-    btn.onclick = activateSkill;
-    overlay.style.height = '0%';
-    gameState.isSkillReady = true;
-}
 
-function activateSkill() {
-    if (!gameState.isPlaying || !gameState.isSkillReady || gameState.timeExtendActive) return;
-    
-    const skill = skillData[userData.equippedSkill];
-    skill.execute();
-    
-    gameState.isSkillReady = false;
-    gameState.skillCooldownLeft = skill.cooldown;
-    document.getElementById('skill-btn').disabled = true;
-    
-    const overlay = document.getElementById('skill-cooldown-overlay');
-    overlay.style.transition = 'none';
-    overlay.style.height = '100%';
-    
-    let tick = 100;
-    gameState.skillCooldownTimer = setInterval(() => {
-        if(!gameState.isPlaying) {
-            clearInterval(gameState.skillCooldownTimer);
+    async function loadUserFull() {
+        const snap = await db.ref(`users/${currentUser.uid}`).once('value');
+        const data = snap.val();
+        if(data) {
+            currentUser.name = data.name; currentUser.friendCode = data.friendCode; currentUser.icon = data.icon || '😀';
+            userCoins = data.coins || 0; maxMessageLength = data.maxMessageLen || 200; messageCooldown = data.messageCooldownMs || 2500;
+            hasStampCreation = data.hasStampCreation || false;
+            if(data.stamps) Object.keys(data.stamps).forEach(s => { if(s !== 'default' && !ownedStamps.includes(s)) ownedStamps.push(s); });
+            if(data.customStamps) customStamps = data.customStamps;
+            document.getElementById('profileName').innerHTML = `${currentUser.name} <span id="coinDisplay" class="coin-badge">💰 ${userCoins}コイン</span>`;
+            document.getElementById('friendCodeDisplay').innerText = `コード: ${currentUser.friendCode}`;
+            document.getElementById('profileIconSpan').innerText = currentUser.icon;
+            updateCoinDisplay();
+        }
+        await renderFriends(); renderOnlineUsers(); renderRequests(); renderChatListWithUnread();
+    }
+
+    function updateCoinDisplay() {
+        const coinSpan = document.getElementById('coinDisplay');
+        if(coinSpan) coinSpan.innerHTML = `💰 ${userCoins}コイン`;
+        const shopCoin = document.getElementById('shopCoinDisplay');
+        if(shopCoin) shopCoin.innerHTML = `💰 ${userCoins}コイン`;
+    }
+    async function addCoins(amount) { userCoins += amount; await db.ref(`users/${currentUser.uid}/coins`).set(userCoins); updateCoinDisplay(); }
+    async function renderFriends() {
+        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+        const friends = friendsSnap.val() || {};
+        const list = document.getElementById('friendListUl'); list.innerHTML = '';
+        for(let [friendId] of Object.entries(friends)) {
+            const fdata = (await db.ref(`users/${friendId}`).once('value')).val();
+            if(fdata) list.innerHTML += `<li class="friend-item"><span>${fdata.icon} ${fdata.name}</span><button data-uid="${friendId}" class="removeFriendBtn">削除</button></li>`;
+        }
+        document.querySelectorAll('.removeFriendBtn').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`users/${currentUser.uid}/friends/${fid}`).remove(); await db.ref(`users/${fid}/friends/${currentUser.uid}`).remove(); renderFriends(); });
+    }
+    document.getElementById('addFriendBtn').onclick = async () => {
+        const code = document.getElementById('addFriendInput').value.trim();
+        if(code.length !== 8) return;
+        const usersSnap = await db.ref('users').orderByChild('friendCode').equalTo(code).once('value');
+        let targetUid = null; usersSnap.forEach(snap => { targetUid = snap.key; });
+        if(targetUid && targetUid !== currentUser.uid) { await db.ref(`users/${currentUser.uid}/friends/${targetUid}`).set(true); await db.ref(`users/${targetUid}/friends/${currentUser.uid}`).set(true); renderFriends(); }
+        else alert("ユーザーが見つかりません");
+    };
+    function renderOnlineUsers() { db.ref('users').on('value', (snap) => { const container = document.getElementById('onlineUsersList'); container.innerHTML = ''; snap.forEach(userSnap => { const u = userSnap.val(); if(u && u.uid !== currentUser.uid && u.online && (!currentUser.friends || !currentUser.friends[u.uid])) container.innerHTML += `<div class="user-row"><span>${u.icon || '😀'} ${u.name || 'ユーザー'}</span><button data-uid="${u.uid}" data-name="${u.name}" class="connectReqBtn">つながる</button></div>`; }); document.querySelectorAll('.connectReqBtn').forEach(btn => btn.onclick = async () => { const target = btn.getAttribute('data-uid'); const targetName = btn.getAttribute('data-name'); await db.ref(`requests/${target}/${currentUser.uid}`).set({ fromName: currentUser.name, fromIcon: currentUser.icon, fromUid: currentUser.uid, timestamp: Date.now() }); playNotificationSound(); alert(`${targetName}さんにフレンドリクエストを送信しました！`); }); }); }
+    function renderRequests() { db.ref(`requests/${currentUser.uid}`).on('value', (snap) => { const reqs = snap.val() || {}; const container = document.getElementById('requestsList'); container.innerHTML = ''; if(Object.keys(reqs).length === 0) { container.innerHTML = '<div class="info-text">フレンドリクエストはありません</div>'; } else { for(let [fromId, req] of Object.entries(reqs)) { if(req && req.fromName) container.innerHTML += `<div class="user-row"><span><i class="fas fa-user-plus"></i> ${req.fromIcon || '😀'} ${req.fromName}</span><div><button data-uid="${fromId}" class="acceptReq" style="background:#23a559; margin-right:8px;">✅ 許可</button><button data-uid="${fromId}" class="rejectReq" style="background:#ed4245;">❌ 拒否</button></div></div>`; } } document.querySelectorAll('.acceptReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`users/${currentUser.uid}/friends/${fid}`).set(true); await db.ref(`users/${fid}/friends/${currentUser.uid}`).set(true); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); renderFriends(); renderRequests(); alert("フレンドになりました！"); }); document.querySelectorAll('.rejectReq').forEach(btn => btn.onclick = async () => { const fid = btn.getAttribute('data-uid'); await db.ref(`requests/${currentUser.uid}/${fid}`).remove(); renderRequests(); alert("リクエストを拒否しました"); }); }); }
+
+    async function renderChatListWithUnread() {
+        const container = document.getElementById('chatListContainer');
+        if(!container) return;
+        const existingChats = new Set();
+        const newContainer = document.createElement('div');
+        newContainer.id = 'chatListContainer';
+
+        const globalDiv = document.createElement('div'); globalDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`; globalDiv.innerHTML = '<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>' + (unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''); globalDiv.onclick = () => { openChat('global', 'global'); unreadCounts['global'] = 0; renderChatListWithUnread(); }; newContainer.appendChild(globalDiv);
+        existingChats.add('global');
+
+        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
+        for(let friendId of Object.keys(friendsSnap.val() || {})) { 
+            const fdata = (await db.ref(`users/${friendId}`).once('value')).val(); 
+            if(fdata && !existingChats.has(`friend_${friendId}`)) { 
+                existingChats.add(`friend_${friendId}`);
+                const unread = unreadCounts[`friend_${friendId}`] || 0;
+                const fd = document.createElement('div'); 
+                fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`; 
+                fd.innerHTML = `<div><i class="fas fa-user-friends"></i> 💬 ${fdata.icon} ${fdata.name}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
+                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); }; 
+                newContainer.appendChild(fd); 
+            } 
+        }
+
+        const groupsSnap = await db.ref('groups').once('value'); 
+        groupsSnap.forEach(snap => { 
+            const group = snap.val(); 
+            if(group && group.members && group.members[currentUser.uid] && !existingChats.has(snap.key)) { 
+                existingChats.add(snap.key);
+                const unread = unreadCounts[snap.key] || 0;
+                const gd = document.createElement('div'); 
+                gd.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`; 
+                gd.innerHTML = `<div><i class="fas fa-users"></i> 👥 ${group.name || 'グループ'}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`; 
+                gd.onclick = (e) => { if(e.target.className !== 'group-exit-btn') { openChat(snap.key, 'group'); unreadCounts[snap.key] = 0; renderChatListWithUnread(); } }; 
+                newContainer.appendChild(gd); 
+            } 
+        });
+
+        container.parentNode.replaceChild(newContainer, container);
+        document.getElementById('chatListContainer')?.querySelectorAll('.group-exit-btn').forEach(btn => btn.onclick = async (e) => { e.stopPropagation(); const groupId = btn.getAttribute('data-group'); await db.ref(`groups/${groupId}/members/${currentUser.uid}`).remove(); if(currentChatId === groupId) currentChatId = null; renderChatListWithUnread(); });
+    }
+
+    function openChat(chatId, type) { 
+        currentChatId = chatId; 
+        currentChatType = type; 
+        document.getElementById('currentChatName').innerText = type === 'global' ? '全体チャット' : (type === 'friend' ? '個人チャット' : 'グループ'); 
+        loadGroupMembersDisplay(); 
+        loadMessagesWithRead(); 
+        renderChatListWithUnread(); 
+        replyingTo = null;
+        updateReplyPreview();
+        if(type === 'friend') { 
+
+            const notice = document.querySelector(`.new-message-notice[data-friend="${chatId.replace('friend_', '')}"]`); 
+            if(notice) notice.remove(); 
+        } 
+    }
+
+    function updateReplyPreview() {
+        const container = document.getElementById('replyPreviewContainer');
+        if (!replyingTo) {
+            container.innerHTML = '';
             return;
         }
-        if (gameState.timeExtendActive) return;
-        
-        gameState.skillCooldownLeft -= tick / 1000;
-        const percent = Math.max(0, (gameState.skillCooldownLeft / skill.cooldown) * 100);
-        overlay.style.height = `${percent}%`;
-        
-        if (gameState.skillCooldownLeft <= 0) {
-            clearInterval(gameState.skillCooldownTimer);
-            gameState.isSkillReady = true;
-            document.getElementById('skill-btn').disabled = false;
-            overlay.style.height = '0%';
-        }
-    }, tick);
-}
+        const previewText = replyingTo.isStamp ? `[スタンプ] ${replyingTo.text}` : replyingTo.text;
+        container.innerHTML = `<div class="reply-preview"><span><i class="fas fa-reply"></i> ${replyingTo.senderName} に返信中: "${previewText.substring(0, 30)}${previewText.length > 30 ? '...' : ''}"</span><span class="cancel-reply" onclick="cancelReply()"><i class="fas fa-times"></i></span></div>`;
+    }
+    window.cancelReply = function() {
+        replyingTo = null;
+        updateReplyPreview();
+    };
 
-// ==========================================
-// ランキング機能
-// ==========================================
-async function submitRanking() {
-    if (gameState.mode !== 'normal') return;
-    const dateKey = getRankingDateKey();
+    async function loadGroupMembersDisplay() { const displaySpan = document.getElementById('groupMembersDisplay'); if(currentChatType === 'group' && currentChatId) { const membersSnap = await db.ref(`groups/${currentChatId}/members`).once('value'); const members = membersSnap.val() || {}; const names = []; for(let uid of Object.keys(members)) { if(uid !== currentUser.uid) { const userData = (await db.ref(`users/${uid}`).once('value')).val(); if(userData && userData.name) names.push(userData.name); } } displaySpan.innerText = names.length ? `メンバー: ${names.join(', ')}` : ''; } else { displaySpan.innerText = ''; } }
+    async function loadMessagesWithRead() { if(!currentChatId) return; let path = ''; if(currentChatType === 'global') path = 'globalMessages'; else if(currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`; else path = `groups/${currentChatId}/messages`; db.ref(path).limitToLast(50).off(); db.ref(path).limitToLast(50).on('value', async (snap) => { const msgs = snap.val() || {}; const history = document.getElementById('messagesHistory'); history.innerHTML = ''; let groupMembers = null; if(currentChatType === 'group') groupMembers = (await db.ref(`groups/${currentChatId}/members`).once('value')).val() || {}; const memberCount = groupMembers ? Object.keys(groupMembers).length : 0; const sortedMsgs = Object.entries(msgs).sort((a,b)=>a[1].timestamp-b[1].timestamp); for(let [msgId, msg] of sortedMsgs) { if(!msg || !msg.senderName) continue; const div = document.createElement('div'); div.className = `message-bubble ${msg.senderId === currentUser.uid ? 'my-message' : 'other-message'}`; let readHtml = ''; if(msg.senderId === currentUser.uid) { const readBy = msg.readBy || {}; const readCount = Object.keys(readBy).length; if(currentChatType === 'friend') readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="${currentChatId}" data-type="friend">${readCount > 0 ? '既読' : '未読'}</span>`; else if(currentChatType === 'group' && memberCount > 0) readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="${currentChatId}" data-type="group">${readCount >= memberCount ? '既読：全' : `既読：${readCount}`}</span>`; else if(currentChatType === 'global') readHtml = `<span class="read-status" data-msg-id="${msgId}" data-chat="global" data-type="global">既読：${readCount}</span>`; } 
+        let replyHtml = '';
+        if (msg.replyTo) {
+            const replyRef = msg.replyTo;
+            replyHtml = `<div class="reply-reference"><i class="fas fa-reply reply-icon"></i> ${replyRef.senderName}: ${replyRef.isStamp ? `[${replyRef.stampEmoji || '💬'}] ` : ''}${escapeHtml((replyRef.text || '').substring(0, 50))}${replyRef.text && replyRef.text.length > 50 ? '...' : ''}</div>`;
+        }
+        const replyBtn = `<button class="reply-btn" data-msg-id="${msgId}" data-sender="${msg.senderName}" data-text="${escapeHtml(msg.text || '').replace(/"/g, '&quot;')}" data-isstamp="${msg.isStamp || false}" data-stampemoji="${msg.stampEmoji || ''}"><i class="fas fa-reply"></i> 返信</button>`;
+        if (msg.isStamp) {
+            div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div>${replyHtml}
+                             <div class="message-stamp-container">
+                                 <div class="message-stamp-emoji">${msg.stampEmoji || '💬'}</div>
+                                 <div class="message-stamp-text">${escapeHtml(msg.text || '')}</div>
+                             </div>
+                             <div class="message-footer">${replyBtn}<span class="timestamp">${formatTime(msg.timestamp)}</span>${readHtml}</div>`;
+            div.style.background = 'transparent';
+        } else {
+            div.innerHTML = `<div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${msg.senderName}</strong></div>${replyHtml}<div class="message-text">${escapeHtml(msg.text || '')}</div>${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}<div class="message-footer">${replyBtn}<span class="timestamp">${formatTime(msg.timestamp)}</span>${readHtml}</div>`; 
+        }
+        history.appendChild(div); 
+        if(msg.senderId !== currentUser.uid && !msg.readBy?.[currentUser.uid]) { 
+            const readPath = currentChatType === 'global' ? `globalMessages/${msgId}/readBy/${currentUser.uid}` : (currentChatType === 'friend' ? `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages/${msgId}/readBy/${currentUser.uid}` : `groups/${currentChatId}/messages/${msgId}/readBy/${currentUser.uid}`); 
+            await db.ref(readPath).set(true); 
+            const chatKey = currentChatId === 'global' ? 'global' : (currentChatType === 'friend' ? `friend_${currentChatId.replace('friend_', '')}` : currentChatId); 
+            if(unreadCounts[chatKey]) delete unreadCounts[chatKey]; 
+            renderChatListWithUnread(); 
+        } 
+        } 
+        history.scrollTop = history.scrollHeight; 
+        attachReplyButtonListeners();
+        attachReadStatusListeners();
+    }); }
+
+    function attachReplyButtonListeners() {
+        document.querySelectorAll('.reply-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const msgId = btn.getAttribute('data-msg-id');
+                const senderName = btn.getAttribute('data-sender');
+                const text = btn.getAttribute('data-text').replace(/&quot;/g, '"');
+                const isStamp = btn.getAttribute('data-isstamp') === 'true';
+                const stampEmoji = btn.getAttribute('data-stampemoji');
+                replyingTo = { msgId, senderName, text, isStamp, stampEmoji };
+                updateReplyPreview();
+                document.getElementById('messageInput').focus();
+            };
+        });
+    }
+
+    function attachReadStatusListeners() {
+        setTimeout(() => {
+            document.querySelectorAll('.read-status').forEach(el => {
+                el.onclick = async (e) => {
+                    e.stopPropagation();
+                    const msgId = el.getAttribute('data-msg-id');
+                    const chat = el.getAttribute('data-chat');
+                    const type = el.getAttribute('data-type');
+                    let readBy = {};
+                    if(type === 'global') readBy = (await db.ref(`globalMessages/${msgId}/readBy`).once('value')).val() || {};
+                    else if(type === 'friend') readBy = (await db.ref(`privateChats/${[currentUser.uid, chat.replace('friend_', '')].sort().join('_')}/messages/${msgId}/readBy`).once('value')).val() || {};
+                    else readBy = (await db.ref(`groups/${chat}/messages/${msgId}/readBy`).once('value')).val() || {};
+                    
+                    const modal = document.getElementById('readReceiptModal');
+                    const listDiv = document.getElementById('readReceiptList');
+                    listDiv.innerHTML = '';
+                    
+                    for(let uid of Object.keys(readBy)) {
+                        const userData = (await db.ref(`users/${uid}`).once('value')).val();
+                        if(userData) {
+                            listDiv.innerHTML += `<div class="read-receipt-item"><span>${userData.icon || '😀'}</span> <strong>${userData.name}</strong></div>`;
+                        }
+                    }
+                    if (listDiv.children.length === 0) {
+                        listDiv.innerHTML = '<div class="info-text">まだ誰も既読していません</div>';
+                    }
+                    modal.style.display = 'block';
+                    overlay.style.display = 'block';
+                };
+            });
+        }, 100);
+    }
+
+    async function sendMessageWithCooldownAndRead(text, isStamp = false) { const now = Date.now(); if(!isStamp && now - lastMessageTime < messageCooldown) { alert(`メッセージ送信は${(messageCooldown/1000).toFixed(1)}秒待ってください`); return false; } if(isStamp && now - lastStampTime < 10000) { alert("スタンプは10秒に1回のみ送信できます"); return false; } if(text.length > maxMessageLength) { alert(`メッセージは${maxMessageLength}文字までです`); return false; } if(!isStamp) lastMessageTime = now; else lastStampTime = now; await addCoins(10); return true; }
     
-    const rankData = {
-        name: userData.name,
-        score: userData.bestScore || 0,
-        combo: userData.bestCombo || 0,
-        playCount: userData.playCount || 0,
-        timestamp: Date.now()
+    document.getElementById('sendMsgBtn').onclick = async () => { 
+        if(!currentChatId) return; 
+        const text = document.getElementById('messageInput').value.trim(); 
+        if(!text) return; 
+        if(!await sendMessageWithCooldownAndRead(text)) return; 
+        const msgData = { 
+            senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text, timestamp: Date.now(), readBy: {} 
+        };
+        if (replyingTo) {
+            msgData.replyTo = replyingTo;
+        }
+        if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); 
+        else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); 
+        else await db.ref(`groups/${currentChatId}/messages`).push(msgData); 
+        document.getElementById('messageInput').value = ''; 
+        replyingTo = null;
+        updateReplyPreview();
+        const chatKey = currentChatId === 'global' ? 'global' : (currentChatType === 'friend' ? `friend_${currentChatId.replace('friend_', '')}` : currentChatId); 
+        unreadCounts[chatKey] = 0; 
+        renderChatListWithUnread(); 
     };
     
-    try {
-        await update(ref(db, `rankings/${dateKey}/${uid}`), rankData);
-    } catch (e) {
-        console.error("Ranking submit error", e);
+    document.getElementById('sendImageBtn').onclick = () => { const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.onchange = async (e) => { const file = e.target.files[0]; if(!file) return; const storageRef = storage.ref(`images/${Date.now()}_${file.name}`); await storageRef.put(file); const url = await storageRef.getDownloadURL(); const msgData = { senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, imageUrl: url, timestamp: Date.now(), readBy: {} }; if(replyingTo) msgData.replyTo = replyingTo; if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); else await db.ref(`groups/${currentChatId}/messages`).push(msgData); replyingTo = null; updateReplyPreview(); }; fileInput.click(); };
+    document.getElementById('refreshChatsBtn').onclick = () => renderChatListWithUnread();
+    function setupGroupModal() { const modal = document.getElementById('groupCreateModal'); document.getElementById('createGroupBtn').onclick = async () => { const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value'); const friends = friendsSnap.val() || {}; const memberList = document.getElementById('groupMembersList'); memberList.innerHTML = ''; for(let [fid] of Object.entries(friends)) { const fdata = (await db.ref(`users/${fid}`).once('value')).val(); if(fdata && fdata.name) memberList.innerHTML += `<label class="member-checkbox"><input type="checkbox" value="${fid}"> ${fdata.icon} ${fdata.name}</label>`; } modal.style.display = 'block'; overlay.style.display = 'block'; }; document.getElementById('confirmGroupBtn').onclick = async () => { const groupName = document.getElementById('groupNameInput').value.trim(); if(!groupName) { alert("グループ名を入力してください"); return; } const members = { [currentUser.uid]: true }; document.querySelectorAll('#groupMembersList input:checked').forEach(cb => { members[cb.value] = true; }); const groupRef = db.ref('groups').push(); await groupRef.set({ name: groupName, members, createdAt: Date.now() }); modal.style.display = 'none'; overlay.style.display = 'none'; document.getElementById('groupNameInput').value = ''; renderChatListWithUnread(); }; document.getElementById('cancelGroupBtn').onclick = () => { modal.style.display = 'none'; overlay.style.display = 'none'; }; }
+    const stampSelector = document.getElementById('stampSelector'); document.getElementById('sendStampBtn').onclick = () => { renderStampList(); stampSelector.style.display = stampSelector.style.display === 'none' ? 'block' : 'none'; };
+    
+    function getAllStamps() {
+        return [...ownedStamps, ...customStamps.map(s => s.name)];
     }
-}
-
-async function fetchRanking(type) {
-    const listContainer = document.getElementById('ranking-list');
-    listContainer.innerHTML = '<div style="text-align:center; padding: 20px;">読み込み中...</div>';
-    
-    const dateKey = getRankingDateKey();
-    
-    try {
-        const snapshot = await get(ref(db, `rankings/${dateKey}`));
-        const results = [];
-        if (snapshot.exists()) {
-            snapshot.forEach(child => {
-                results.push({ uid: child.key, ...child.val() });
-            });
-        }
-        
-        results.sort((a, b) => (b[type] || 0) - (a[type] || 0));
-        
-        listContainer.innerHTML = '';
-        if (results.length === 0) {
-            listContainer.innerHTML = '<div style="text-align:center; padding: 20px;">まだデータがありません</div>';
-            return;
-        }
-        
-        results.slice(0, 50).forEach((data, index) => {
-            const div = document.createElement('div');
-            div.className = 'list-item';
-            let icon = '';
-            if(index === 0) icon = '🥇 ';
-            else if(index === 1) icon = '🥈 ';
-            else if(index === 2) icon = '🥉 ';
-            
-            div.innerHTML = `
-                <div class="rank-item-info">${icon}${index + 1}位：${escapeHTML(data.name || '名無し')}</div>
-                <div style="font-weight:bold; font-size: 20px;">${Math.floor(data[type] || 0).toLocaleString()}</div>
-            `;
-            listContainer.appendChild(div);
-        });
-    } catch (e) {
-        console.error("Ranking fetch error", e);
-        listContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">読み込みに失敗しました。再読み込みしてください。</div>';
+    function getStampEmoji(stampName) {
+        const custom = customStamps.find(s => s.name === stampName);
+        if (custom) return custom.emoji;
+        return stampEmojis[stampName] || '💬';
     }
-}
 
-// ==========================================
-// UI イベント
-// ==========================================
-const uiControllers = {
-    showScreen,
-    startGame,
-    endResult: () => showScreen('menu-screen'),
-    
-    openEvent: () => {
-        renderEvent();
-        showScreen('event-screen');
-    },
-    
-    openStoryMap: () => {
-        renderStoryMap();
-        showScreen('story-map-screen');
-    },
-    
-    openRaidMap: () => {
-        if (!isRaidOpen()) {
-            alert("レイドは開催時間外です。");
-            return;
-        }
-        if (!canPlayRaid()) {
-            alert("この回のレイドはクリア済みです。次の開催時間をお待ちください。");
-            return;
-        }
-        renderRaidMap();
-        showScreen('raid-map-screen');
-    },
-    
-    acceptAgreement: () => {
-        localStorage.setItem('agreementAccepted', 'true');
-        document.getElementById('agreement-modal').classList.remove('active');
-    },
-    showAgreement: () => {
-        document.getElementById('settings-modal').classList.remove('active');
-        document.getElementById('agreement-modal').classList.add('active');
-    },
-    closeSettings: () => document.getElementById('settings-modal').classList.remove('active'),
-    saveName: () => {
-        const input = document.getElementById('name-input').value.trim();
-        if (input && input.length <= 20) {
-            userData.name = input;
-            saveUserData();
-            alert("名前を保存しました！");
-        } else {
-            alert("1文字以上、20文字以内で入力してください。");
-        }
-    },
-    resetDataConfirm: () => {
-        document.getElementById('reset-confirm-modal').classList.add('active');
-    },
-    resetDataExecute: async () => {
-        userData = { ...defaultUserData };
-        raidState = { isOpen: false, currentStage: 1, stages: [] };
-        await saveUserData();
-        document.getElementById('reset-confirm-modal').classList.remove('active');
-        document.getElementById('settings-modal').classList.remove('active');
-        alert("データを初期化しました。");
-        location.reload();
-    },
+    function renderStampList() { 
+        const container = document.getElementById('stampList'); 
+        container.innerHTML = ''; 
+        getAllStamps().forEach(st => { 
+            const btn = document.createElement('div'); 
+            btn.className = 'stamp-item'; 
+            const emoji = getStampEmoji(st); 
+            btn.innerHTML = `<div class="stamp-emoji">${emoji}</div><div class="stamp-text">${st}</div>`; 
+            btn.onclick = async () => { 
+                if(!currentChatId) return; 
+                if(await sendMessageWithCooldownAndRead(st, true)) { 
+                    const msgData = { 
+                        senderId: currentUser.uid, senderName: currentUser.name, senderIcon: currentUser.icon, text: st, isStamp: true, stampEmoji: emoji, timestamp: Date.now(), readBy: {} 
+                    }; 
+                    if(replyingTo) msgData.replyTo = replyingTo;
+                    if(currentChatType === 'global') await db.ref('globalMessages').push(msgData); 
+                    else if(currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData); 
+                    else await db.ref(`groups/${currentChatId}/messages`).push(msgData); 
+                    stampSelector.style.display = 'none'; 
+                    replyingTo = null;
+                    updateReplyPreview();
+                } 
+            }; 
+            container.appendChild(btn); 
+        }); 
+    }
 
-    openRanking: () => {
-        showScreen('ranking-screen');
-        uiControllers.switchRankingTab('score');
-    },
-    switchRankingTab: (type) => {
-        const tabs = document.querySelectorAll('#ranking-screen .tab');
-        tabs.forEach(t => t.classList.remove('active'));
-        if(type === 'score') tabs[0].classList.add('active');
-        if(type === 'combo') tabs[1].classList.add('active');
-        if(type === 'playCount') tabs[2].classList.add('active');
-        fetchRanking(type);
-    },
+    function setupVoiceAdminCommands() {
+        const adminDiv = document.getElementById('voiceAdminCommands');
+        if(!adminDiv) return;
+        adminDiv.innerHTML = `<div style="background:#111214; border-radius:12px; padding:10px;"><strong>👑 管理者コマンド</strong><div><button id="showTextBtn" class="command-btn">📝 文字表示</button></div><div id="showTextInput" style="display:none; margin-top:8px;"><input type="text" id="displayTextInput" maxlength="20" placeholder="20文字以内のメッセージ" style="width:100%; padding:6px; border-radius:12px;"><button id="sendDisplayTextBtn">送信</button></div></div>`;
+        document.getElementById('showTextBtn')?.addEventListener('click', () => { const div = document.getElementById('showTextInput'); if(div) div.style.display = div.style.display === 'none' ? 'block' : 'none'; });
+        document.getElementById('sendDisplayTextBtn')?.addEventListener('click', () => { const text = document.getElementById('displayTextInput')?.value.trim(); if(text && voiceRoomId) { db.ref(`voiceRooms/${voiceRoomId}/displayText`).push({ text, fromName: currentUser.name, timestamp: Date.now() }); const input = document.getElementById('displayTextInput'); if(input) input.value = ''; const div = document.getElementById('showTextInput'); if(div) div.style.display = 'none'; } });
+        if(voiceRoomId) db.ref(`voiceRooms/${voiceRoomId}/displayText`).on('child_added', (snap) => { const data = snap.val(); if(data && data.text) { showOverlayText(data.text); snap.ref.remove(); } });
+    }
+    function showOverlayText(text) { const div = document.createElement('div'); div.className = 'overlay-text'; div.innerText = text; document.body.appendChild(div); setTimeout(() => div.remove(), 3000); }
 
-    switchShopTab: (tab) => {
-        const tabs = document.querySelectorAll('#shop-screen .tab');
-        tabs.forEach(t => t.classList.remove('active'));
-        if (tab === 'skills') tabs[0].classList.add('active');
-        else if (tab === 'items') tabs[1].classList.add('active');
-        else if (tab === 'raid') tabs[2].classList.add('active');
-        else if (tab === 'passive') tabs[3].classList.add('active');
-        uiControllers.openShop();
-    },
-    
-    openShop: () => {
-        showScreen('shop-screen');
-        const list = document.getElementById('shop-list');
-        const activeTab = document.querySelector('#shop-screen .tab.active');
-        const tabText = activeTab.innerText;
-        
-        list.innerHTML = '';
-        
-        if (tabText.includes('パッシブ')) {
-            Object.values(passiveData).forEach(passive => {
-                const hasPassive = (userData.passives || []).includes(passive.id);
-                const canAfford = (userData.coin || 0) >= passive.price;
-                
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${passive.name}</h3>
-                        <p>${passive.desc}</p>
-                        <div style="color: #ffd700; margin-top: 5px; font-weight: bold;">🪙${passive.price.toLocaleString()}</div>
-                    </div>
-                    <button class="action-btn" ${hasPassive || !canAfford ? 'disabled' : ''}>
-                        ${hasPassive ? '購入済み' : '購入'}
-                    </button>
-                `;
-                list.appendChild(div);
-                
-                if(!hasPassive && canAfford) {
-                    div.querySelector('button').onclick = () => {
-                        if ((userData.coin || 0) >= passive.price) {
-                            userData.coin -= passive.price;
-                            if (!userData.passives) userData.passives = [];
-                            userData.passives.push(passive.id);
-                            saveUserData();
-                            alert(`${passive.name}を購入しました！`);
-                            uiControllers.openShop();
-                        }
-                    };
-                }
-            });
-        } else if (tabText.includes('スキル')) {
-            Object.values(skillData).forEach(skill => {
-                if (skill.priceType !== 'coin' || skill.price === 0) return;
-                const hasSkill = (userData.skills || []).includes(skill.id);
-                const canAfford = (userData.coin || 0) >= skill.price;
-                
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${skill.name}</h3>
-                        <p>${skill.desc}</p>
-                        <div style="color: #ffd700; margin-top: 5px; font-weight: bold;">🪙${skill.price.toLocaleString()}</div>
-                    </div>
-                    <button class="action-btn" ${hasSkill || !canAfford ? 'disabled' : ''}>
-                        ${hasSkill ? '購入済み' : '購入'}
-                    </button>
-                `;
-                list.appendChild(div);
-                
-                if(!hasSkill && canAfford) {
-                    div.querySelector('button').onclick = () => {
-                        if ((userData.coin || 0) >= skill.price) {
-                            userData.coin -= skill.price;
-                            if (!userData.skills) userData.skills = [];
-                            userData.skills.push(skill.id);
-                            saveUserData();
-                            alert(`${skill.name}を購入しました！`);
-                            uiControllers.openShop();
-                        }
-                    };
-                }
-            });
-        } else if (tabText.includes('アイテム')) {
-            Object.values(itemData).forEach(item => {
-                if (item.price === 0) return;
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${item.name}</h3>
-                        <p>${item.desc}</p>
-                        <div style="color: #ffd700; margin-top: 5px; font-weight: bold;">🪙${item.price.toLocaleString()}</div>
-                    </div>
-                    <button class="action-btn" ${(userData.coin || 0) < item.price ? 'disabled' : ''}>
-                        購入
-                    </button>
-                `;
-                list.appendChild(div);
-                
-                div.querySelector('button').onclick = () => {
-                    if ((userData.coin || 0) >= item.price) {
-                        userData.coin -= item.price;
-                        addItemToInventory(item.id, 1);
-                        saveUserData();
-                        alert(`${item.name}を購入しました！`);
-                        uiControllers.openShop();
-                    } else {
-                        alert("コインが足りません。");
+    function listenVoiceInvites() { db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => { const invite = snap.val(); const inviteArea = document.getElementById('globalInviteArea'); const div = document.createElement('div'); div.className = 'invite-notification'; div.innerHTML = `<span>🎤 <strong>${invite.fromName || '不明'}</strong> さんからボイチャの招待が来ています！</span><div><button data-room="${invite.roomId}" data-key="${snap.key}" class="acceptVoiceInvite" style="background:#23a559; margin-right:8px;">✅ 許可</button><button data-key="${snap.key}" class="rejectVoiceInvite" style="background:#ed4245;">❌ 拒否</button></div>`; inviteArea.prepend(div); setTimeout(() => { if(div.parentNode) div.remove(); }, 30000); document.querySelectorAll('.acceptVoiceInvite').forEach(btn => btn.onclick = async () => { const roomId = btn.getAttribute('data-room'); const key = btn.getAttribute('data-key'); await db.ref(`voiceRooms/${roomId}/members/${currentUser.uid}`).set(true); await db.ref(`users/${currentUser.uid}/voiceRoom`).set(roomId); await db.ref(`voiceInvites/${currentUser.uid}/${key}`).remove(); joinVoiceRoom(roomId); div.remove(); }); document.querySelectorAll('.rejectVoiceInvite').forEach(btn => btn.onclick = async () => { const key = btn.getAttribute('data-key'); await db.ref(`voiceInvites/${currentUser.uid}/${key}`).remove(); div.remove(); }); }); }
+    document.getElementById('startVoiceInviteBtn').onclick = async () => { const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value'); const friendIds = Object.keys(friendsSnap.val() || {}); if(friendIds.length === 0) { alert("フレンドがいません"); return; } const friendList = []; for(let fid of friendIds) { const fdata = (await db.ref(`users/${fid}`).once('value')).val(); if(fdata && fdata.name) friendList.push({ uid: fid, name: fdata.name, icon: fdata.icon }); } const modal = document.getElementById('friendSelectModal'); const listDiv = document.getElementById('friendSelectList'); listDiv.innerHTML = ''; friendList.forEach(f => { const item = document.createElement('div'); item.className = 'friend-select-item'; item.innerHTML = `${f.icon || '😀'} ${f.name}`; item.onclick = async () => { const newRoomId = `room_${Date.now()}`; await db.ref(`voiceRooms/${newRoomId}`).set({ host: currentUser.uid, members: { [currentUser.uid]: true }, active: true, createdAt: Date.now() }); await db.ref(`voiceInvites/${f.uid}`).push({ fromName: currentUser.name, fromUid: currentUser.uid, roomId: newRoomId }); await db.ref(`users/${currentUser.uid}/voiceRoom`).set(newRoomId); joinVoiceRoom(newRoomId); modal.style.display = 'none'; overlay.style.display = 'none'; alert(`${f.name} に招待を送信しました`); }; listDiv.appendChild(item); }); modal.style.display = 'block'; overlay.style.display = 'block'; };
+    document.getElementById('closeFriendModal').onclick = () => { document.getElementById('friendSelectModal').style.display = 'none'; overlay.style.display = 'none'; };
+    overlay.onclick = () => { 
+        document.getElementById('friendSelectModal').style.display = 'none'; 
+        document.getElementById('groupCreateModal').style.display = 'none'; 
+        document.getElementById('readReceiptModal').style.display = 'none';
+        overlay.style.display = 'none'; 
+    };
+
+    document.getElementById('voiceRecogMode').addEventListener('change', () => { if(isMicActive) { startVoiceRecognition(); } });
+
+
+
+
+
+
+    function joinVoiceRoom(roomId) { 
+        if(voiceRoomId) leaveVoiceRoom(); 
+        voiceRoomId = roomId; 
+        document.getElementById('voiceRoomStatus').innerHTML = '🎙️ ボイスチャット接続中 <span class="voice-indicator"></span>'; 
+        setupVoiceAdminCommands(); 
+        db.ref(`voiceRooms/${roomId}/members`).on('value', (snap) => { const members = snap.val() || {}; const membersDiv = document.getElementById('voiceMembersList'); membersDiv.innerHTML = ''; Object.keys(members).forEach(m => { membersDiv.innerHTML += `<div class="member-item"><i class="fas fa-user-circle"></i> ${m === currentUser.uid ? currentUser.name + ' (あなた)' : 'ユーザー'}</div>`; }); }); 
+        db.ref(`voiceRooms/${roomId}/voiceLog`).limitToLast(100).on('value', (snap) => { const logs = snap.val() || {}; const logDiv = document.getElementById('voiceLogList'); logDiv.innerHTML = ''; Object.values(logs).sort((a,b)=>a.timestamp-b.timestamp).forEach(log => { if(log && log.senderName) logDiv.innerHTML += `<div class="voice-message-item"><strong>${log.senderName}:</strong> ${log.text}</div>`; }); logDiv.scrollTop = logDiv.scrollHeight; }); 
+        startVoiceRecognition(); 
+    }
+
+    function startVoiceRecognition() { 
+        if(!('webkitSpeechRecognition' in window)) return; 
+        if(recognition) recognition.stop(); 
+        recognition = new webkitSpeechRecognition(); 
+        recognition.lang = 'ja-JP'; 
+
+        const mode = document.getElementById('voiceRecogMode').value;
+
+        recognition.interimResults = (mode === 'all'); 
+        recognition.continuous = true; 
+
+        recognition.onresult = async (event) => { 
+            for(let i = event.resultIndex; i < event.results.length; i++) { 
+                const text = event.results[i][0].transcript; 
+                const isFinal = event.results[i].isFinal;
+
+                if(text && text.trim() && voiceRoomId) { 
+
+                    if(mode === 'voice' && !isFinal) continue;
+
+                    console.log("🎤 音声認識:", text); 
+                    const timestamp = Date.now(); 
+                    const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp }; 
+                    await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
+                    const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
+                    const vSettings = getMyVoiceSettings(); 
+                    membersSnap.forEach(memberSnap => { 
+                        if(memberSnap.key !== currentUser.uid) { 
+                            db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp, voiceSettings: vSettings }); 
+                        } 
+                    }); 
+
+
+                    if(mode === 'all' && !isFinal) {
+                        recognition.stop();
+                        break;
                     }
-                };
-            });
-        } else if (tabText.includes('レイド')) {
-            const raidSkills = Object.values(skillData).filter(s => s.priceType === 'raid');
-            if (raidSkills.length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding: 20px;">レイド商品はありません</div>';
-                return;
-            }
-            raidSkills.forEach(skill => {
-                const hasSkill = (userData.skills || []).includes(skill.id);
-                const canAfford = (userData.raidPoint || 0) >= skill.price;
-                
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${skill.name}</h3>
-                        <p>${skill.desc}</p>
-                        <div style="color: #ff5722; margin-top: 5px; font-weight: bold;">🎯${skill.price.toLocaleString()}</div>
-                    </div>
-                    <button class="action-btn" ${hasSkill || !canAfford ? 'disabled' : ''}>
-                        ${hasSkill ? '購入済み' : '購入'}
-                    </button>
-                `;
-                list.appendChild(div);
-                
-                if(!hasSkill && canAfford) {
-                    div.querySelector('button').onclick = () => {
-                        if ((userData.raidPoint || 0) >= skill.price) {
-                            userData.raidPoint -= skill.price;
-                            if (!userData.skills) userData.skills = [];
-                            userData.skills.push(skill.id);
-                            saveUserData();
-                            alert(`${skill.name}を購入しました！`);
-                            uiControllers.openShop();
-                        }
-                    };
-                }
-            });
-        }
-    },
+                } 
+            } 
+        }; 
+        recognition.onerror = (e) => { console.error('音声認識エラー:', e); }; 
+        recognition.onend = () => { if(isMicActive && voiceRoomId) recognition.start(); }; 
+        if(isMicActive) recognition.start(); 
+    }
 
-    switchInventoryTab: (tab) => {
-        const tabs = document.querySelectorAll('#inventory-screen .tab');
-        tabs.forEach(t => t.classList.remove('active'));
-        if (tab === 'skills') tabs[0].classList.add('active');
-        else if (tab === 'items') tabs[1].classList.add('active');
-        else if (tab === 'passive') tabs[2].classList.add('active');
-        uiControllers.openInventory();
-    },
+    document.getElementById('toggleMicBtn').onclick = () => { isMicActive = !isMicActive; const btn = document.getElementById('toggleMicBtn'); if(isMicActive) { if(recognition) recognition.start(); btn.innerHTML = '<i class="fas fa-microphone"></i> マイクON <span class="voice-indicator"></span>'; btn.style.background = '#23a559'; } else { if(recognition) recognition.stop(); btn.innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; btn.style.background = '#3c3f45'; } };
+    document.getElementById('sendVoiceTextBtn').onclick = () => { const div = document.getElementById('voiceTextInputDiv'); div.style.display = div.style.display === 'none' ? 'block' : 'none'; };
+
+    document.getElementById('submitVoiceTextBtn').onclick = async () => { 
+        const text = document.getElementById('voiceManualText').value.trim(); 
+        if(!text) return; 
+        if(text.length > 200) { alert("ボイチャのテキスト送信は200文字までです！"); return; }
+
+
+
+
+
+        const now = Date.now();
+        if(now - lastVoiceManualTime < 5000) { alert("ボイチャのテキスト送信は5秒間のクールダウンがあります！"); return; }
+
+
+
+        lastVoiceManualTime = now;
+
+        if(voiceRoomId) { 
+            const timestamp = Date.now(); 
+            const logData = { text, sender: currentUser.uid, senderName: currentUser.name, timestamp }; 
+            await db.ref(`voiceRooms/${voiceRoomId}/voiceLog`).push(logData); 
+            const membersSnap = await db.ref(`voiceRooms/${voiceRoomId}/members`).once('value'); 
+            const vSettings = getMyVoiceSettings(); 
+            membersSnap.forEach(memberSnap => { 
+                if(memberSnap.key !== currentUser.uid) db.ref(`voiceSpeak/${memberSnap.key}`).push({ text, fromName: currentUser.name, timestamp, voiceSettings: vSettings }); 
+            }); 
+            document.getElementById('voiceManualText').value = ''; 
+        } 
+    };
+
+    document.getElementById('leaveVoiceBtn').onclick = () => leaveVoiceRoom();
+
+    function leaveVoiceRoom() { 
+        if(voiceRoomId) { 
+            db.ref(`voiceRooms/${voiceRoomId}/members/${currentUser.uid}`).remove(); 
+            db.ref(`users/${currentUser.uid}/voiceRoom`).remove(); 
+        } 
+        if(recognition) recognition.stop(); 
+        isMicActive = false; 
+        voiceRoomId = null; 
+
+
+        document.getElementById('voiceRoomStatus').innerHTML = '⚪ 未接続'; 
+        document.getElementById('voiceMembersList').innerHTML = ''; 
+        document.getElementById('voiceLogList').innerHTML = ''; 
+
+        document.getElementById('toggleMicBtn').innerHTML = '<i class="fas fa-microphone-slash"></i> マイクOFF'; 
+        document.getElementById('toggleMicBtn').style.background = '#3c3f45'; 
+    }
+
+    let speechSynthesis = window.speechSynthesis; let currentUtterance = null;
+    function speakText(text, settings = null) { 
+        if(!text) return; 
+        if(currentUtterance) speechSynthesis.cancel(); 
+        const utterance = new SpeechSynthesisUtterance(text); 
+
+        const pitch = settings && settings.pitch !== undefined ? parseFloat(settings.pitch) : parseFloat(document.getElementById('pitchSlider').value);
+        const rate = settings && settings.rate !== undefined ? parseFloat(settings.rate) : parseFloat(document.getElementById('rateSlider').value);
+        let volume = settings && settings.volume !== undefined ? parseFloat(settings.volume) : parseFloat(document.getElementById('volumeSlider').value);
+        const preset = settings && settings.preset ? settings.preset : (localStorage.getItem('voicePreset') || 'standard');
+        utterance.pitch = pitch; utterance.rate = rate; utterance.volume = volume * 1.2; 
+
+
+
+
+        const voices = speechSynthesis.getVoices(); 
+        if(preset === 'female') { const femaleVoice = voices.find(v => v.lang === 'ja-JP' && (v.name.includes('女性') || v.name.includes('Kyoko') || v.name.includes('Mei'))); if(femaleVoice) utterance.voice = femaleVoice; } 
+        else if(preset === 'robot') { utterance.pitch = pitch * 0.6; utterance.rate = rate * 0.8; } 
+        else if(preset === 'alien') { utterance.pitch = pitch * 1.6; } 
+
+
+
+
+
+
+        currentUtterance = utterance; 
+        utterance.onend = () => { currentUtterance = null; }; 
+        speechSynthesis.speak(utterance); 
+        console.log("🔊 読み上げ実行:", text); 
+    }
+
+    function setupVoiceSettings() { document.querySelectorAll('[data-preset]').forEach(btn => btn.onclick = () => { localStorage.setItem('voicePreset', btn.getAttribute('data-preset')); document.getElementById('currentVoicePreset').innerText = btn.getAttribute('data-preset'); }); document.getElementById('testVoiceBtn').onclick = () => speakText("これはテストボイスです。この声が相手に聞こえます。"); }
     
-    openInventory: () => {
-        showScreen('inventory-screen');
-        const list = document.getElementById('inventory-list');
-        const activeTab = document.querySelector('#inventory-screen .tab.active');
-        const tabText = activeTab.innerText;
+    function renderShop() { 
+        const stampDiv = document.getElementById('stampShop'); 
+        stampDiv.innerHTML = ''; 
+        shopStamps.forEach(s => { 
+            if(!ownedStamps.includes(s.name)) 
+                stampDiv.innerHTML += `<div class="shop-item"><span>${stampEmojis[s.name] || '📱'} ${s.name}</span><button data-stamp="${s.name}" data-price="${s.price}" class="buyStampBtn">${s.price}コイン</button></div>`; 
+        }); 
+        document.querySelectorAll('.buyStampBtn').forEach(btn => btn.onclick = async () => { 
+            const stampName = btn.getAttribute('data-stamp'); 
+            const price = parseInt(btn.getAttribute('data-price')); 
+            if(userCoins >= price && !ownedStamps.includes(stampName)) { 
+                userCoins -= price; ownedStamps.push(stampName); 
+                await db.ref(`users/${currentUser.uid}/coins`).set(userCoins); 
+                await db.ref(`users/${currentUser.uid}/stamps/${stampName}`).set(true); 
+                updateCoinDisplay(); renderShop(); alert(`${stampName}を購入しました！`); 
+            } else alert("コイン不足か既に所持しています"); 
+        }); 
         
-        list.innerHTML = '';
+        const upgradeDiv = document.getElementById('upgradeShop'); 
+        upgradeDiv.innerHTML = `
+            <div class="shop-item">
+                <span>⚡ メッセージクールダウン -0.01秒 (現在: ${(messageCooldown/1000).toFixed(2)}秒)</span>
+                <div>
+                    <button class="buyCooldownBtn" data-amount="1" ${messageCooldown <= 1000 ? 'disabled' : ''}>1回 (500)</button>
+                    <button class="buyCooldownBtn" data-amount="10" ${messageCooldown <= 1000 ? 'disabled' : ''}>10回 (4500)</button>
+                    <button class="buyCooldownBtn" data-amount="100" ${messageCooldown <= 1000 ? 'disabled' : ''}>100回 (40000)</button>
+                </div>
+            </div>
+            <div class="shop-item">
+                <span>📝 最大文字数 +5文字 (現在: ${maxMessageLength}文字)</span>
+                <div>
+                    <button class="buyMaxLenBtn" data-amount="1" ${maxMessageLength >= 3000 ? 'disabled' : ''}>1回 (500)</button>
+                    <button class="buyMaxLenBtn" data-amount="10" ${maxMessageLength >= 3000 ? 'disabled' : ''}>10回 (4500)</button>
+                    <button class="buyMaxLenBtn" data-amount="100" ${maxMessageLength >= 3000 ? 'disabled' : ''}>100回 (40000)</button>
+                </div>
+            </div>
+        `;
         
-        if (tabText.includes('パッシブ')) {
-            if (!userData.passives || userData.passives.length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding: 20px;">パッシブを所持していません</div>';
-                return;
-            }
+        document.querySelectorAll('.buyCooldownBtn').forEach(btn => btn.addEventListener('click', async (e) => {
+            const amount = parseInt(btn.getAttribute('data-amount'));
+            const cost = amount === 1 ? 500 : (amount === 10 ? 4500 : 40000);
+            if(userCoins >= cost && messageCooldown > 1000) {
+                userCoins -= cost;
+                messageCooldown = Math.max(1000, messageCooldown - (10 * amount));
+                await db.ref(`users/${currentUser.uid}/coins`).set(userCoins);
+                await db.ref(`users/${currentUser.uid}/messageCooldownMs`).set(messageCooldown);
+                updateCoinDisplay(); renderShop();
+            } else alert("コイン不足または最小値(1秒)です");
+        }));
+        
+        document.querySelectorAll('.buyMaxLenBtn').forEach(btn => btn.addEventListener('click', async (e) => {
+            const amount = parseInt(btn.getAttribute('data-amount'));
+            const cost = amount === 1 ? 500 : (amount === 10 ? 4500 : 40000);
+            if(userCoins >= cost && maxMessageLength < 3000) {
+                userCoins -= cost;
+                maxMessageLength = Math.min(3000, maxMessageLength + (5 * amount));
+                await db.ref(`users/${currentUser.uid}/coins`).set(userCoins);
+                await db.ref(`users/${currentUser.uid}/maxMessageLen`).set(maxMessageLength);
+                updateCoinDisplay(); renderShop();
+            } else alert("コイン不足または上限(3000文字)です");
+        }));
 
-            userData.passives.forEach(passiveId => {
-                const passive = passiveData[passiveId];
-                if (!passive) return;
-                const isEquipped = userData.equippedPassive === passiveId;
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${passive.name}</h3>
-                        <p>${passive.desc}</p>
-                    </div>
-                    <button class="action-btn ${isEquipped ? 'equipped' : ''}">
-                        ${isEquipped ? '装備中' : '装備する'}
-                    </button>
-                `;
-                list.appendChild(div);
-                
-                div.querySelector('button').onclick = () => {
-                    userData.equippedPassive = isEquipped ? null : passiveId;
-                    saveUserData();
-                    uiControllers.openInventory();
-                };
-            });
-        } else if (tabText.includes('スキル')) {
-            if (!userData.skills || userData.skills.length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding: 20px;">スキルを所持していません</div>';
-                return;
-            }
+        renderStampCreationShop();
+    }
 
-            userData.skills.forEach(skillId => {
-                const skill = skillData[skillId];
-                if (!skill) return;
-                const isEquipped = userData.equippedSkill === skillId;
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${skill.name}</h3>
-                        <p>${skill.desc}</p>
-                    </div>
-                    <button class="action-btn ${isEquipped ? 'equipped' : ''}">
-                        ${isEquipped ? '装備中' : '装備する'}
-                    </button>
-                `;
-                list.appendChild(div);
-                
-                div.querySelector('button').onclick = () => {
-                    userData.equippedSkill = isEquipped ? null : skillId;
-                    saveUserData();
-                    uiControllers.openInventory();
-                };
+    function renderStampCreationShop() {
+        const container = document.getElementById('stampCreationShop');
+        if (!hasStampCreation) {
+            container.innerHTML = `<div class="shop-item"><span>🎨 スタンプ作成機能を解放 (最大12個作成可能)</span><button id="buyStampCreationBtn">3000コイン</button></div>`;
+            document.getElementById('buyStampCreationBtn')?.addEventListener('click', async () => {
+                if (userCoins >= 3000) {
+                    userCoins -= 3000;
+                    hasStampCreation = true;
+                    await db.ref(`users/${currentUser.uid}/coins`).set(userCoins);
+                    await db.ref(`users/${currentUser.uid}/hasStampCreation`).set(true);
+                    updateCoinDisplay();
+                    renderShop();
+                    alert("スタンプ作成機能を解放しました！");
+                } else alert("コインが不足しています");
             });
         } else {
-            if (!userData.items || Object.keys(userData.items).length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding: 20px;">アイテムを所持していません</div>';
-                return;
+            let html = `<div class="create-stamp-section">
+                <h4>✨ オリジナルスタンプ作成 (${customStamps.length}/12)</h4>`;
+            if (customStamps.length < 12) {
+                html += `<div class="create-stamp-inputs">
+                    <input type="text" id="newStampEmoji" placeholder="絵文字1文字" maxlength="2" style="width:80px;">
+                    <input type="text" id="newStampText" placeholder="スタンプ名 (10文字)" maxlength="10" style="flex:1;">
+                    <button id="createStampBtn">作成</button>
+                </div>`;
+            } else {
+                html += `<p class="info-text">作成上限(12個)に達しました</p>`;
             }
-            
-            Object.entries(userData.items).forEach(([itemId, count]) => {
-                if (count <= 0) return;
-                const item = itemData[itemId];
-                if (!item) return;
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `
-                    <div class="shop-item-info">
-                        <h3>${item.name}</h3>
-                        <p>${item.desc}</p>
-                        <div style="color: #4caf50; margin-top: 5px;">所持数: ${count}</div>
-                    </div>
-                    <button class="action-btn use-btn">使う</button>
-                `;
-                list.appendChild(div);
-                
-                div.querySelector('button').onclick = () => {
-                    if (gameState.activeBoosts[itemId]) {
-                        alert("すでに効果が発動中です！");
-                        return;
-                    }
-                    userData.items[itemId]--;
-                    gameState.activeBoosts[itemId] = true;
-                    item.effect(true);
-                    
-                    setTimeout(() => {
-                        gameState.activeBoosts[itemId] = false;
-                        item.effect(false);
-                    }, item.duration * 1000);
-                    
-                    saveUserData();
-                    alert(`${item.name}を使用しました！(${item.duration/60}分間)`);
-                    uiControllers.openInventory();
-                };
+            html += `<div id="customStampsList">`;
+            customStamps.forEach((stamp, idx) => {
+                html += `<div class="custom-stamp-item">
+                    <span><span style="font-size:1.5rem;">${stamp.emoji}</span> ${stamp.name}</span>
+                    <button data-index="${idx}" class="deleteCustomStampBtn" style="background:#ed4245; padding:4px 8px;">削除</button>
+                </div>`;
             });
+            html += `</div></div>`;
+            container.innerHTML = html;
+            
+            document.getElementById('createStampBtn')?.addEventListener('click', async () => {
+                const emoji = document.getElementById('newStampEmoji')?.value.trim();
+                const text = document.getElementById('newStampText')?.value.trim();
+                if (!emoji || !text) { alert("絵文字とスタンプ名を入力してください"); return; }
+                if (customStamps.length >= 12) { alert("作成上限に達しています"); return; }
+                if (customStamps.some(s => s.name === text)) { alert("同じ名前のスタンプが既に存在します"); return; }
+                customStamps.push({ name: text, emoji: emoji });
+                await db.ref(`users/${currentUser.uid}/customStamps`).set(customStamps);
+                renderShop();
+            });
+            
+            document.querySelectorAll('.deleteCustomStampBtn').forEach(btn => btn.addEventListener('click', async () => {
+                const idx = parseInt(btn.getAttribute('data-index'));
+                customStamps.splice(idx, 1);
+                await db.ref(`users/${currentUser.uid}/customStamps`).set(customStamps);
+                renderShop();
+            }));
         }
     }
-};
 
-function escapeHTML(str) {
-    if (!str) return '';
-    return str.replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-    }[tag] || tag));
-}
-
-window.app = uiControllers;
-
-document.getElementById('settings-btn').addEventListener('click', () => {
-    document.getElementById('name-input').value = userData.name || '';
-    document.getElementById('settings-modal').classList.add('active');
-});
-
-document.getElementById('greek-info-btn').addEventListener('click', () => {
-    document.getElementById('greek-info-modal').classList.add('active');
-});
-
-document.getElementById('like-btn').addEventListener('click', () => {
-    handleLike();
-});
-
-initApp();
+    function initTabs() { const tabs = document.querySelectorAll('.sidebar-icon'); const views = ['home', 'connect', 'messages', 'voice', 'shop', 'settings']; tabs.forEach((tab, idx) => { tab.onclick = () => { views.forEach(v => document.getElementById(v+'View').classList.remove('active-view')); document.getElementById(views[idx]+'View').classList.add('active-view'); tabs.forEach(t => t.classList.remove('active')); tab.classList.add('active'); if(views[idx]==='home') loadUserFull(); if(views[idx]==='messages') renderChatListWithUnread(); if(views[idx]==='shop') renderShop(); }; }); document.getElementById('homeView').classList.add('active-view'); document.querySelector('.sidebar-icon').classList.add('active'); }
+    function loadIconPicker() { const icons = ['😀','😎','🥳','😺','🐶','🌸','🌟','🎮','⚡','💎']; icons.forEach(ic => { const span = document.createElement('span'); span.innerText = ic; span.className = 'icon-option'; span.onclick = async () => { await db.ref(`users/${currentUser.uid}/icon`).set(ic); currentUser.icon = ic; loadUserFull(); }; document.getElementById('iconPicker').appendChild(span); }); }
+    document.getElementById('updateNameBtn').onclick = async () => { const newName = document.getElementById('changeNameInput').value.trim(); if(newName) { await db.ref(`users/${currentUser.uid}/name`).set(newName); currentUser.name = newName; loadUserFull(); } };
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
+    const stored = localStorage.getItem('forcord_user'); if(stored) { currentUser = JSON.parse(stored); startApp(); }
 </script>
 </body>
 </html>
