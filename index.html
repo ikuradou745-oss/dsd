@@ -55,12 +55,40 @@
         .tab-view { display: none; width: 100%; height: 100%; overflow-y: auto; }
         .tab-view.active-view { display: flex; }
         
-        /* Floating Notifications */
+        /* Voice Volume Presets */
+        .volume-preset-group { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+        .vol-preset-btn { background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.7rem; padding: 3px 6px; border-radius: 8px; cursor: pointer; transition: 0.15s; font-weight: 600; }
+        .vol-preset-btn:hover { background: var(--bg-hover); color: var(--text-main); }
+        .vol-preset-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        /* Screen Sharing Video Stage */
+        .screenshare-stage { width: 100%; background: #0c0d0e; border-radius: 16px; margin-bottom: 16px; overflow: hidden; position: relative; display: none; flex-direction: column; border: 1px solid var(--border-color); box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+        .screenshare-stage.active { display: flex; }
+        .screenshare-header { background: rgba(17,18,20,0.85); backdrop-filter: blur(6px); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 5; }
+        .screenshare-title { font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #58a6ff; }
+        .screenshare-video-wrap { width: 100%; max-height: 480px; min-height: 280px; background: black; display: flex; align-items: center; justify-content: center; position: relative; }
+        .screenshare-video { width: 100%; height: 100%; max-height: 480px; object-fit: contain; }
+        .screenshare-controls { position: absolute; bottom: 12px; right: 12px; display: flex; gap: 8px; z-index: 10; }
+        .screenshare-btn { background: rgba(30, 31, 34, 0.85); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 10px; font-size: 0.8rem; cursor: pointer; backdrop-filter: blur(4px); transition: 0.15s; }
+        .screenshare-btn:hover { background: var(--accent); }
+
+        /* Image Viewer Modal */
+        .image-viewer-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); z-index: 1500; display: none; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
+        .image-viewer-content { max-width: 90vw; max-height: 90vh; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.8); object-fit: contain; }
+        .image-viewer-close { position: absolute; top: 24px; right: 24px; font-size: 2rem; color: white; cursor: pointer; background: rgba(0,0,0,0.5); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); }
+        .image-viewer-close:hover { background: var(--danger); }
+
+        /* Image Upload Drag & Drop Preview */
+        .chat-image-preview-bar { background: var(--bg-darker); border-top: 1px solid var(--border-color); padding: 10px 16px; display: none; align-items: center; gap: 12px; }
+        .chat-image-preview-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border-color); }
+
+        /* Floating Notifications with Dismiss Button */
         .global-invite-area { position: fixed; top: 16px; right: 20px; z-index: 1000; width: 340px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .global-invite-area > * { pointer-events: auto; }
-        .invite-notification { background: var(--bg-card); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; animation: slideInRight 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4); border: 1px solid var(--border-color); }
+        .invite-notification { background: var(--bg-card); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; animation: slideInRight 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4); border: 1px solid var(--border-color); position: relative; }
         .invite-notification.call-invite { border-left-color: var(--success); }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        .invite-close-btn { position: absolute; top: 8px; right: 10px; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 4px; }
+        .invite-close-btn:hover { color: var(--danger); }
         
         /* Common Buttons & UI */
         button { background: var(--accent); border: none; border-radius: 20px; padding: 8px 18px; color: white; font-weight: 600; cursor: pointer; transition: 0.15s; font-family: inherit; font-size: 0.9rem; }
@@ -326,6 +354,22 @@
                         </div>
                     </div>
 
+                    <!-- Screen Sharing Stage -->
+                    <div class="screenshare-stage" id="screenShareStage">
+                        <div class="screenshare-header">
+                            <div class="screenshare-title" id="screenShareTitle">
+                                <i class="fas fa-desktop"></i> <span id="screenSharePresenterName">画面共有中</span>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button id="fullscreenScreenShareBtn" class="screenshare-btn"><i class="fas fa-expand"></i> 全画面</button>
+                                <button id="stopMyScreenShareBtn" class="screenshare-btn" style="background:var(--danger); display:none;"><i class="fas fa-stop-circle"></i> 共有停止</button>
+                            </div>
+                        </div>
+                        <div class="screenshare-video-wrap">
+                            <video id="screenShareVideo" class="screenshare-video" autoplay playsinline></video>
+                        </div>
+                    </div>
+
                     <!-- Participant Cards Grid -->
                     <div class="voice-grid-area" id="voiceParticipantsGrid">
                         <!-- Dynamic Participant Cards will be inserted here -->
@@ -362,6 +406,9 @@
                             </button>
                             <button id="toggleDeafenBtn" class="voice-action-btn" title="スピーカーミュート (Deafen)">
                                 <i class="fas fa-headphones"></i>
+                            </button>
+                            <button id="toggleScreenShareBtn" class="voice-action-btn" title="🖥️ 画面共有 (Screen Share)">
+                                <i class="fas fa-desktop"></i>
                             </button>
                             <button id="noiseSuppressionToggleBtn" class="voice-action-btn active-toggle" title="AIノイズ抑制 & エコーキャンセラー (ON/OFF)">
                                 <i class="fas fa-shield-alt"></i>
@@ -402,10 +449,20 @@
                     <div class="messages-history" id="messagesHistory"></div>
                     <div id="replyPreviewContainer" style="padding: 0 16px;"></div>
                     <div class="message-input-area">
-                        <input type="text" id="messageInput" placeholder="メッセージを入力...">
+                        <input type="text" id="messageInput" placeholder="メッセージを入力... (画像貼り付け Ctrl+V やドラッグ＆ドロップ対応)">
                         <button id="sendStampBtn" class="btn-secondary" title="スタンプ"><i class="fas fa-smile"></i></button>
-                        <button id="sendImageBtn" class="btn-secondary" title="画像送信"><i class="fas fa-image"></i></button>
+                        <button id="sendImageBtn" class="btn-secondary" title="写真を送信"><i class="fas fa-image"></i> 写真</button>
+                        <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
                         <button id="sendMsgBtn">送信</button>
+                    </div>
+                    <!-- Image Attachment Preview Bar -->
+                    <div id="chatImagePreviewBar" class="chat-image-preview-bar">
+                        <img id="chatImagePreviewThumb" class="chat-image-preview-thumb" src="" alt="preview">
+                        <div style="flex:1; font-size:0.85rem;">
+                            <strong id="chatImageFileName">画像ファイル</strong>
+                            <div class="info-text">添付されました (メッセージ送信時に送信されます)</div>
+                        </div>
+                        <button id="cancelImageAttachmentBtn" class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;"><i class="fas fa-times"></i> 取消</button>
                     </div>
                 </div>
             </div>
@@ -488,6 +545,20 @@
                     <h3><i class="fas fa-microphone-alt"></i> 高性能マイク・音響設定 (WebRTC)</h3>
                     
                     <div style="margin-bottom:16px;">
+                        <label style="font-size:0.9rem; font-weight:600;">電話・ボイス通話の受信音量 (ブースト対応): <span id="masterVoiceVolDisplay">100%</span></label>
+                        <div class="volume-preset-group" id="masterVolPresetGroup" style="margin-top:8px;">
+                            <button class="vol-preset-btn" data-vol="50">50%</button>
+                            <button class="vol-preset-btn active" data-vol="100">100% (標準)</button>
+                            <button class="vol-preset-btn" data-vol="200">200% (2倍)</button>
+                            <button class="vol-preset-btn" data-vol="300">300% (3倍)</button>
+                            <button class="vol-preset-btn" data-vol="400">400% (4倍)</button>
+                            <button class="vol-preset-btn" data-vol="500">500% (5倍超大音量)</button>
+                        </div>
+                        <input type="range" id="masterVoiceVolSlider" min="0" max="500" step="5" value="100" style="margin-top:10px;">
+                        <div class="info-text">相手の声が小さいときでも、最大500%（5倍ゲイン）まで超強力に増幅して聞き取れます。</div>
+                    </div>
+
+                    <div style="margin-bottom:16px;">
                         <label style="font-size:0.9rem; font-weight:600;">マイク入力感度 (ノイズゲートしきい値): <span id="noiseGateDisplay">10%</span></label>
                         <input type="range" id="noiseGateSlider" min="1" max="50" step="1" value="10">
                         <div class="info-text">周囲の雑音やキーボード音を自動でカットする入力感度を設定します。</div>
@@ -566,6 +637,12 @@
     <div id="stampList" class="clearfix"></div>
 </div>
 
+<!-- Fullscreen Image Viewer Modal -->
+<div id="imageViewerModal" class="image-viewer-modal">
+    <span class="image-viewer-close" id="closeImageViewerBtn">&times;</span>
+    <img id="imageViewerImg" class="image-viewer-content" src="" alt="拡大画像">
+</div>
+
 <div id="overlay" class="overlay"></div>
 
 <!-- Hidden audio element container for remote peer tracks -->
@@ -598,6 +675,11 @@
     let lastStampTime = 0;
     let replyingTo = null;
     let unreadCounts = {};
+    let pendingImageAttachment = null; // base64 dataUrl or null
+
+    // Cache state to eliminate chat list flickering
+    let cachedFriends = {};
+    let cachedGroups = {};
 
     const defaultStamps = ['やっほー！', 'おーい！', 'バイバイ！', 'ボイチャできる？'];
     const stampEmojis = { 'やっほー！': '👋', 'おーい！': '📣', 'バイバイ！': '👋', 'ボイチャできる？': '🎤', 'Yes!!!': '✅', 'No!!!': '❌', 'そろそろやめるかも': '😴', 'よろしくぅ！': '🙌', 'わからん': '🤔', 'うんうん': '👍', 'へぇ〜〜': '😮', '話聞けやボケェ': '💢' };
@@ -623,6 +705,8 @@
     };
 
     let localAudioStream = null;
+    let localScreenStream = null;
+    let isScreenSharing = false;
     let audioContext = null;
     let micAnalyser = null;
     let micSourceNode = null;
@@ -637,7 +721,9 @@
     let currentVoiceRoomName = "";
     let peerConnections = {}; // targetUid -> RTCPeerConnection
     let remoteAudioElements = {}; // targetUid -> HTMLAudioElement
-    let userVolumes = {}; // targetUid -> volume factor (0 to 2.0)
+    let peerGainNodes = {}; // targetUid -> GainNode (for 0% - 500% amplification)
+    let userVolumes = {}; // targetUid -> volume factor (e.g. 0.5 = 50%, 1.0 = 100%, 5.0 = 500%)
+    let masterVoiceVolume = 1.0; // 0.0 to 5.0
     let meterAnimationId = null;
     let signalingRef = null;
 
@@ -679,7 +765,6 @@
         if (localAudioStream) return localAudioStream;
 
         const useNoiseSuppression = document.getElementById('noiseSuppressionToggleBtn')?.classList.contains('active-toggle');
-        const bitrate = parseInt(document.getElementById('audioBitrateSelect')?.value || "96");
 
         const constraints = {
             audio: {
@@ -764,6 +849,21 @@
         updateMeter();
     }
 
+    // Update peer volume with Web Audio GainNode (supports up to 500% boost!)
+    function applyPeerVolume(targetUid) {
+        const userVol = userVolumes[targetUid] !== undefined ? userVolumes[targetUid] : 1.0;
+        const totalGain = userVol * masterVoiceVolume;
+        
+        if (peerGainNodes[targetUid] && audioContext) {
+            try {
+                peerGainNodes[targetUid].gain.setValueAtTime(isDeafened ? 0 : totalGain, audioContext.currentTime);
+            } catch(e) { console.warn("GainNode volume update failed", e); }
+        }
+        if (remoteAudioElements[targetUid]) {
+            remoteAudioElements[targetUid].volume = Math.min(1.0, Math.max(0, isDeafened ? 0 : totalGain));
+        }
+    }
+
     // --- WebRTC Multi-Peer Mesh Connection Logic ---
     async function joinRtcVoiceRoom(roomId, roomName = "ボイスルーム") {
         if (currentVoiceRoomId === roomId) return;
@@ -838,7 +938,30 @@
             });
         });
 
-        // Setup Signaling Listeners (Offers, Answers, ICE Candidates)
+        // Listen for active screen share in this room
+        db.ref(`voiceRooms/${roomId}/screenshare`).on('value', (snap) => {
+            const ssData = snap.val();
+            const stage = document.getElementById('screenShareStage');
+            const title = document.getElementById('screenSharePresenterName');
+            const stopBtn = document.getElementById('stopMyScreenShareBtn');
+
+            if (ssData && ssData.active) {
+                stage.classList.add('active');
+                title.innerText = `${ssData.name} さんの画面共有`;
+                if (ssData.uid === currentUser.uid) {
+                    stopBtn.style.display = 'inline-block';
+                } else {
+                    stopBtn.style.display = 'none';
+                }
+            } else if (!isScreenSharing) {
+                stage.classList.remove('active');
+                const videoEl = document.getElementById('screenShareVideo');
+                if (videoEl) videoEl.srcObject = null;
+                stopBtn.style.display = 'none';
+            }
+        });
+
+        // Setup Signaling Listeners (Offers, Answers, ICE Candidates, Renegotiation)
         setupSignalingListeners(roomId);
 
         // Setup Live Subtitles & Soundboard listeners for this room
@@ -863,7 +986,6 @@
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await pc.createAnswer();
-                // Optimize Opus SDP for highest quality
                 answer.sdp = tuneSdpAudio(answer.sdp);
                 await pc.setLocalDescription(answer);
 
@@ -919,27 +1041,63 @@
         const pc = new RTCPeerConnection(rtcConfig);
         peerConnections[targetUid] = pc;
 
-        // Add local tracks
+        // Add local audio tracks
         if (localAudioStream) {
             localAudioStream.getAudioTracks().forEach(track => {
                 pc.addTrack(track, localAudioStream);
             });
         }
 
-        // Handle remote stream
+        // Add local screen share track if currently sharing
+        if (localScreenStream) {
+            localScreenStream.getVideoTracks().forEach(track => {
+                pc.addTrack(track, localScreenStream);
+            });
+        }
+
+        // Handle remote stream tracks (Audio & Screen Share Video)
         pc.ontrack = (event) => {
-            const remoteStream = event.streams[0];
-            let audioEl = remoteAudioElements[targetUid];
-            if (!audioEl) {
-                audioEl = document.createElement('audio');
-                audioEl.autoplay = true;
-                audioEl.id = `remote_audio_${targetUid}`;
-                document.getElementById('remoteAudioContainer').appendChild(audioEl);
-                remoteAudioElements[targetUid] = audioEl;
+            if (event.track.kind === 'audio') {
+                const remoteStream = event.streams[0];
+                let audioEl = remoteAudioElements[targetUid];
+                if (!audioEl) {
+                    audioEl = document.createElement('audio');
+                    audioEl.autoplay = true;
+                    audioEl.id = `remote_audio_${targetUid}`;
+                    document.getElementById('remoteAudioContainer').appendChild(audioEl);
+                    remoteAudioElements[targetUid] = audioEl;
+                }
+                audioEl.srcObject = remoteStream;
+                audioEl.muted = isDeafened;
+
+                // Web Audio API GainNode routing for 50% - 500% Volume Boost
+                try {
+                    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    if (audioContext.state === 'suspended') audioContext.resume();
+                    
+                    const src = audioContext.createMediaStreamSource(remoteStream);
+                    const gain = audioContext.createGain();
+                    src.connect(gain);
+                    gain.connect(audioContext.destination);
+                    peerGainNodes[targetUid] = gain;
+
+                    // Mute the raw audio element to prevent echo/duplicate sound when GainNode is active
+                    audioEl.muted = true;
+                    applyPeerVolume(targetUid);
+                } catch (e) {
+                    console.warn("Could not connect GainNode for remote stream, falling back to element volume:", e);
+                    audioEl.muted = isDeafened;
+                    applyPeerVolume(targetUid);
+                }
+            } else if (event.track.kind === 'video') {
+                // Screen Sharing video track from remote peer
+                const screenVideo = document.getElementById('screenShareVideo');
+                const screenStage = document.getElementById('screenShareStage');
+                if (screenVideo && screenStage) {
+                    screenVideo.srcObject = event.streams[0];
+                    screenStage.classList.add('active');
+                }
             }
-            audioEl.srcObject = remoteStream;
-            audioEl.muted = isDeafened;
-            audioEl.volume = userVolumes[targetUid] !== undefined ? userVolumes[targetUid] : 1.0;
         };
 
         // Handle ICE candidates
@@ -952,8 +1110,18 @@
             }
         };
 
-        pc.onconnectionstatechange = () => {
-            console.log(`WebRTC Peer [${targetUid}] state:`, pc.connectionState);
+        pc.onnegotiationneeded = async () => {
+            if (currentVoiceRoomId) {
+                try {
+                    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+                    offer.sdp = tuneSdpAudio(offer.sdp);
+                    await pc.setLocalDescription(offer);
+                    db.ref(`voiceSignals/${currentVoiceRoomId}/${targetUid}/offers`).push({
+                        fromUid: currentUser.uid,
+                        offer: { type: offer.type, sdp: offer.sdp }
+                    });
+                } catch(e) { console.warn("Negotiation error:", e); }
+            }
         };
 
         return pc;
@@ -963,7 +1131,7 @@
         const pc = createPeerConnection(targetUid);
         if (isOfferer) {
             try {
-                const offer = await pc.createOffer({ offerToReceiveAudio: true });
+                const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
                 offer.sdp = tuneSdpAudio(offer.sdp);
                 await pc.setLocalDescription(offer);
 
@@ -978,7 +1146,6 @@
     }
 
     function tuneSdpAudio(sdp) {
-        // High Bitrate Opus SDP Munging for Studio Quality
         const bitrate = parseInt(document.getElementById('audioBitrateSelect')?.value || "96") * 1000;
         let modified = sdp;
         if (modified.includes('opus/48000')) {
@@ -998,10 +1165,17 @@
             remoteAudioElements[targetUid].remove();
             delete remoteAudioElements[targetUid];
         }
+        if (peerGainNodes[targetUid]) {
+            delete peerGainNodes[targetUid];
+        }
     }
 
     async function leaveRtcVoiceRoom() {
         if (!currentVoiceRoomId) return;
+
+        if (isScreenSharing) {
+            await stopScreenShare();
+        }
 
         playRtcSound('leave');
 
@@ -1032,7 +1206,92 @@
         renderVoiceParticipants({});
     }
 
-    // --- Render Voice Participant Grid Cards ---
+    // --- Screen Sharing Implementation ---
+    async function startScreenShare() {
+        if (!currentVoiceRoomId) {
+            alert("画面共有を開始するには、まずボイスチャンネルに接続してください。");
+            return;
+        }
+        try {
+            localScreenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always", frameRate: { max: 30 } },
+                audio: false
+            });
+
+            isScreenSharing = true;
+            const videoTrack = localScreenStream.getVideoTracks()[0];
+
+            // Local Preview in Screen Share Stage
+            const screenStage = document.getElementById('screenShareStage');
+            const screenVideo = document.getElementById('screenShareVideo');
+            const screenTitle = document.getElementById('screenSharePresenterName');
+            const stopBtn = document.getElementById('stopMyScreenShareBtn');
+
+            screenStage.classList.add('active');
+            screenVideo.srcObject = localScreenStream;
+            screenTitle.innerText = `${currentUser.name} さんの画面共有 (配信中)`;
+            stopBtn.style.display = 'inline-block';
+
+            // Add video track to all active peer connections
+            Object.values(peerConnections).forEach(pc => {
+                pc.addTrack(videoTrack, localScreenStream);
+            });
+
+            // Update database state
+            await db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).set({
+                uid: currentUser.uid,
+                name: currentUser.name,
+                active: true,
+                timestamp: Date.now()
+            });
+
+            // If user stops sharing via browser bar UI
+            videoTrack.onended = () => {
+                stopScreenShare();
+            };
+
+            const toggleBtn = document.getElementById('toggleScreenShareBtn');
+            if (toggleBtn) toggleBtn.classList.add('active-toggle');
+            playTone(700, 0.15, 'sine', 0.2);
+        } catch(err) {
+            console.warn("Screen share cancelled or failed:", err);
+        }
+    }
+
+    async function stopScreenShare() {
+        if (localScreenStream) {
+            localScreenStream.getTracks().forEach(t => t.stop());
+            localScreenStream = null;
+        }
+        isScreenSharing = false;
+
+        const screenStage = document.getElementById('screenShareStage');
+        const screenVideo = document.getElementById('screenShareVideo');
+        const stopBtn = document.getElementById('stopMyScreenShareBtn');
+
+        screenStage.classList.remove('active');
+        if (screenVideo) screenVideo.srcObject = null;
+        if (stopBtn) stopBtn.style.display = 'none';
+
+        // Remove video track senders from peer connections
+        Object.values(peerConnections).forEach(pc => {
+            const senders = pc.getSenders();
+            const vSender = senders.find(s => s.track && s.track.kind === 'video');
+            if (vSender) {
+                try { pc.removeTrack(vSender); } catch(e) {}
+            }
+        });
+
+        if (currentVoiceRoomId) {
+            await db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).remove();
+        }
+
+        const toggleBtn = document.getElementById('toggleScreenShareBtn');
+        if (toggleBtn) toggleBtn.classList.remove('active-toggle');
+        playTone(350, 0.12, 'sine', 0.2);
+    }
+
+    // --- Render Voice Participant Grid Cards with 50% - 500% Volume Controls ---
     function renderVoiceParticipants(members) {
         const grid = document.getElementById('voiceParticipantsGrid');
         grid.innerHTML = '';
@@ -1062,7 +1321,7 @@
                     <div class="voice-avatar">${data.icon || '😀'}</div>
                 </div>
                 <div class="voice-user-name">
-                    ${data.name || 'ユーザー'}
+                    ${escapeHtml(data.name || 'ユーザー')}
                     ${isMe ? '<span class="voice-user-badge">あなた</span>' : ''}
                 </div>
                 <div class="voice-card-status">
@@ -1072,26 +1331,63 @@
                 <div class="voice-user-controls">
                     <div class="voice-slider-row">
                         <span><i class="fas fa-volume-up"></i> 音量</span>
-                        <span id="vol_val_${uid}">${volValue}%</span>
+                        <span id="vol_val_${uid}" style="font-weight:700; color:var(--accent);">${volValue}%</span>
                     </div>
-                    <input type="range" class="voice-volume-slider" min="0" max="200" value="${volValue}" data-uid="${uid}">
+                    <div class="volume-preset-group" data-uid="${uid}">
+                        <button class="vol-preset-btn ${volValue === 50 ? 'active' : ''}" data-vol="50">50%</button>
+                        <button class="vol-preset-btn ${volValue === 100 ? 'active' : ''}" data-vol="100">100%</button>
+                        <button class="vol-preset-btn ${volValue === 200 ? 'active' : ''}" data-vol="200">200%</button>
+                        <button class="vol-preset-btn ${volValue === 300 ? 'active' : ''}" data-vol="300">300%</button>
+                        <button class="vol-preset-btn ${volValue === 400 ? 'active' : ''}" data-vol="400">400%</button>
+                        <button class="vol-preset-btn ${volValue === 500 ? 'active' : ''}" data-vol="500">500%</button>
+                    </div>
+                    <input type="range" class="voice-volume-slider" min="0" max="500" step="5" value="${volValue}" data-uid="${uid}" style="margin-top:8px;">
                 </div>` : ''}
             `;
 
             grid.appendChild(card);
         });
 
-        // Attach per-user volume slider listeners
+        // Attach per-user volume slider & preset button listeners
         document.querySelectorAll('.voice-volume-slider').forEach(slider => {
             slider.oninput = (e) => {
                 const targetUid = slider.getAttribute('data-uid');
-                const val = parseFloat(slider.value) / 100;
-                userVolumes[targetUid] = val;
+                const val = parseInt(slider.value);
+                userVolumes[targetUid] = val / 100;
+                
                 const valLabel = document.getElementById(`vol_val_${targetUid}`);
-                if (valLabel) valLabel.innerText = `${slider.value}%`;
-                if (remoteAudioElements[targetUid]) {
-                    remoteAudioElements[targetUid].volume = Math.min(1.0, val);
+                if (valLabel) valLabel.innerText = `${val}%`;
+                
+                // Update preset active classes
+                const presetGroup = document.querySelector(`.volume-preset-group[data-uid="${targetUid}"]`);
+                if (presetGroup) {
+                    presetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                        btn.classList.toggle('active', parseInt(btn.getAttribute('data-vol')) === val);
+                    });
                 }
+                applyPeerVolume(targetUid);
+            };
+        });
+
+        document.querySelectorAll('.volume-preset-group[data-uid] .vol-preset-btn').forEach(btn => {
+            btn.onclick = () => {
+                const presetGroup = btn.parentElement;
+                const targetUid = presetGroup.getAttribute('data-uid');
+                const val = parseInt(btn.getAttribute('data-vol'));
+                
+                userVolumes[targetUid] = val / 100;
+                
+                const valLabel = document.getElementById(`vol_val_${targetUid}`);
+                if (valLabel) valLabel.innerText = `${val}%`;
+                
+                const slider = document.querySelector(`.voice-volume-slider[data-uid="${targetUid}"]`);
+                if (slider) slider.value = val;
+                
+                presetGroup.querySelectorAll('.vol-preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                applyPeerVolume(targetUid);
+                playTone(600, 0.05, 'sine', 0.1);
             };
         });
     }
@@ -1236,13 +1532,15 @@
         initTabs();
         loadIconPicker();
         setupVoiceControls();
+        setupMasterVolumeControls();
+        setupImageViewerModal();
+        setupChatDataListeners();
         listenVoiceInvites();
         renderShop();
         setupGroupModal();
         startNewMessageListener();
         setupSpeechRecognition();
         startChannelCounters();
-        setInterval(() => { renderChatListWithUnread(); }, 2500);
 
         // Keyboard Shortcut: Press M to mute/unmute
         window.addEventListener('keydown', (e) => {
@@ -1439,23 +1737,68 @@
         });
     }
 
-    // --- Voice Invite Listener ---
+    // --- Master Volume Setting & Presets ---
+    function setupMasterVolumeControls() {
+        const slider = document.getElementById('masterVoiceVolSlider');
+        const display = document.getElementById('masterVoiceVolDisplay');
+        const presetGroup = document.getElementById('masterVolPresetGroup');
+
+        if (slider) {
+            slider.oninput = (e) => {
+                const val = parseInt(e.target.value);
+                masterVoiceVolume = val / 100;
+                if (display) display.innerText = `${val}%`;
+
+                if (presetGroup) {
+                    presetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                        btn.classList.toggle('active', parseInt(btn.getAttribute('data-vol')) === val);
+                    });
+                }
+                // Apply to all active peer connections
+                Object.keys(peerConnections).forEach(uid => applyPeerVolume(uid));
+            };
+        }
+
+        if (presetGroup) {
+            presetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const val = parseInt(btn.getAttribute('data-vol'));
+                    masterVoiceVolume = val / 100;
+                    if (slider) slider.value = val;
+                    if (display) display.innerText = `${val}%`;
+
+                    presetGroup.querySelectorAll('.vol-preset-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    Object.keys(peerConnections).forEach(uid => applyPeerVolume(uid));
+                    playTone(600, 0.05, 'sine', 0.1);
+                };
+            });
+        }
+    }
+
+    // --- Voice Invite Notifications (Auto-dismiss and Manual close) ---
     function listenVoiceInvites() {
         db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => {
             const invite = snap.val();
             if (!invite) return;
+            const inviteKey = snap.key;
             const inviteArea = document.getElementById('globalInviteArea');
             const div = document.createElement('div');
             div.className = 'invite-notification call-invite';
+            div.id = `invite_${inviteKey}`;
             div.innerHTML = `
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="font-size:24px; color:var(--success);"><i class="fas fa-phone-volume"></i></div>
-                    <div>
-                        <strong>${escapeHtml(invite.fromName || 'フレンド')}</strong> さんから通話招待！
-                        <div style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(invite.roomName || 'ボイスチャット')}</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="font-size:24px; color:var(--success);"><i class="fas fa-phone-volume"></i></div>
+                        <div>
+                            <strong>${escapeHtml(invite.fromName || 'フレンド')}</strong> さんから通話招待！
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(invite.roomName || 'ボイスチャット')}</div>
+                        </div>
                     </div>
+                    <button class="invite-dismiss-btn" title="通知を閉じる"><i class="fas fa-times"></i></button>
                 </div>
-                <div style="display:flex; gap:8px;">
+                <div style="display:flex; gap:8px; margin-top:8px;">
                     <button class="btn-success acceptVoiceBtn" style="flex:1;"><i class="fas fa-phone"></i> 参加</button>
                     <button class="btn-danger rejectVoiceBtn" style="flex:1;"><i class="fas fa-times"></i> 拒否</button>
                 </div>
@@ -1463,19 +1806,43 @@
             inviteArea.prepend(div);
             playTone(800, 0.2, 'sine', 0.3);
 
+            const dismissNotification = () => {
+                div.style.opacity = '0';
+                div.style.transform = 'translateY(-10px)';
+                div.style.transition = 'all 0.25s ease';
+                setTimeout(() => { if (div.parentNode) div.remove(); }, 250);
+            };
+
+            div.querySelector('.invite-dismiss-btn').onclick = async () => {
+                await snap.ref.remove();
+                dismissNotification();
+            };
+
             div.querySelector('.acceptVoiceBtn').onclick = async () => {
-                snap.ref.remove();
-                div.remove();
+                await snap.ref.remove();
+                dismissNotification();
                 document.querySelector('.sidebar-icon[data-tab="voice"]').click();
                 joinRtcVoiceRoom(invite.roomId, invite.roomName || 'ボイスチャット');
             };
 
-            div.querySelector('.rejectVoiceBtn').onclick = () => {
-                snap.ref.remove();
-                div.remove();
+            div.querySelector('.rejectVoiceBtn').onclick = async () => {
+                await snap.ref.remove();
+                dismissNotification();
             };
 
-            setTimeout(() => { if (div.parentNode) div.remove(); }, 30000);
+            // Auto dismiss after 45s
+            setTimeout(async () => {
+                if (div.parentNode) {
+                    await snap.ref.remove();
+                    dismissNotification();
+                }
+            }, 45000);
+        });
+
+        // Also clean up removed invites from other tabs
+        db.ref(`voiceInvites/${currentUser.uid}`).on('child_removed', (snap) => {
+            const el = document.getElementById(`invite_${snap.key}`);
+            if (el) el.remove();
         });
     }
 
@@ -1538,6 +1905,7 @@
         for (let friendId of friendKeys) {
             const fdata = (await db.ref(`users/${friendId}`).once('value')).val();
             if (fdata) {
+                cachedFriends[friendId] = fdata;
                 // Home tab friend row
                 const li = document.createElement('li');
                 li.className = 'friend-item';
@@ -1600,7 +1968,9 @@
                 if (confirm("フレンドを解除しますか？")) {
                     await db.ref(`users/${currentUser.uid}/friends/${fid}`).remove();
                     await db.ref(`users/${fid}/friends/${currentUser.uid}`).remove();
+                    delete cachedFriends[fid];
                     renderFriends();
+                    renderChatListWithUnread();
                 }
             };
         });
@@ -1703,7 +2073,40 @@
         });
     }
 
-    // --- Messages & Chat ---
+    // --- Messages & Chat List (Stable Cache-Based Rendering) ---
+    function setupChatDataListeners() {
+        // Friends Cache Listener
+        db.ref(`users/${currentUser.uid}/friends`).on('value', async (snap) => {
+            const friends = snap.val() || {};
+            const newCache = {};
+            for (let fid of Object.keys(friends)) {
+                const fdata = (await db.ref(`users/${fid}`).once('value')).val();
+                if (fdata) newCache[fid] = fdata;
+            }
+            cachedFriends = newCache;
+            renderChatListWithUnread();
+        });
+
+        // Groups Cache Listener
+        db.ref('groups').on('value', (snap) => {
+            const groups = snap.val() || {};
+            const newGroupCache = {};
+            Object.entries(groups).forEach(([gid, group]) => {
+                if (group && group.members && group.members[currentUser.uid]) {
+                    newGroupCache[gid] = group;
+                }
+            });
+            cachedGroups = newGroupCache;
+            renderChatListWithUnread();
+        });
+
+        // Manual refresh button
+        document.getElementById('refreshChatsBtn')?.addEventListener('click', () => {
+            renderChatListWithUnread();
+            playTone(700, 0.05, 'sine', 0.1);
+        });
+    }
+
     function startNewMessageListener() {
         db.ref('globalMessages').limitToLast(10).on('child_added', (snap) => {
             const msg = snap.val();
@@ -1715,50 +2118,42 @@
         });
     }
 
-    async function renderChatListWithUnread() {
+    function renderChatListWithUnread() {
         const container = document.getElementById('chatListContainer');
         if (!container) return;
         container.innerHTML = '';
 
-        // Global Chat item
+        // 1. Global Chat item
         const gDiv = document.createElement('div');
         gDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`;
         gDiv.innerHTML = `<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>${unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''}`;
         gDiv.onclick = () => { openChat('global', 'global'); unreadCounts['global'] = 0; renderChatListWithUnread(); };
         container.appendChild(gDiv);
 
-        // Friends Direct chats
-        const friendsSnap = await db.ref(`users/${currentUser.uid}/friends`).once('value');
-        for (let friendId of Object.keys(friendsSnap.val() || {})) {
-            const fdata = (await db.ref(`users/${friendId}`).once('value')).val();
-            if (fdata) {
-                const unread = unreadCounts[`friend_${friendId}`] || 0;
-                const fd = document.createElement('div');
-                fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`;
-                fd.innerHTML = `<div>${fdata.icon || '😀'} ${escapeHtml(fdata.name)}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
-                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); };
-                container.appendChild(fd);
-            }
-        }
+        // 2. Friends Direct chats (Rendered smoothly from cache)
+        Object.entries(cachedFriends).forEach(([friendId, fdata]) => {
+            const unread = unreadCounts[`friend_${friendId}`] || 0;
+            const fd = document.createElement('div');
+            fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`;
+            fd.innerHTML = `<div>${fdata.icon || '😀'} ${escapeHtml(fdata.name)}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
+            fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); };
+            container.appendChild(fd);
+        });
 
-        // Groups
-        const groupsSnap = await db.ref('groups').once('value');
-        groupsSnap.forEach(snap => {
-            const group = snap.val();
-            if (group && group.members && group.members[currentUser.uid]) {
-                const unread = unreadCounts[snap.key] || 0;
-                const gd = document.createElement('div');
-                gd.className = `chat-item ${currentChatId === snap.key ? 'active-chat' : ''}`;
-                gd.innerHTML = `<div><i class="fas fa-users"></i> ${escapeHtml(group.name || 'グループ')}</div><button class="group-exit-btn" data-group="${snap.key}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
-                gd.onclick = (e) => {
-                    if (e.target.className !== 'group-exit-btn') {
-                        openChat(snap.key, 'group');
-                        unreadCounts[snap.key] = 0;
-                        renderChatListWithUnread();
-                    }
-                };
-                container.appendChild(gd);
-            }
+        // 3. Groups (Rendered smoothly from cache)
+        Object.entries(cachedGroups).forEach(([gid, group]) => {
+            const unread = unreadCounts[gid] || 0;
+            const gd = document.createElement('div');
+            gd.className = `chat-item ${currentChatId === gid ? 'active-chat' : ''}`;
+            gd.innerHTML = `<div><i class="fas fa-users"></i> ${escapeHtml(group.name || 'グループ')}</div><button class="group-exit-btn" data-group="${gid}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
+            gd.onclick = (e) => {
+                if (e.target.className !== 'group-exit-btn') {
+                    openChat(gid, 'group');
+                    unreadCounts[gid] = 0;
+                    renderChatListWithUnread();
+                }
+            };
+            container.appendChild(gd);
         });
 
         document.querySelectorAll('.group-exit-btn').forEach(btn => {
@@ -1767,6 +2162,7 @@
                 const gid = btn.getAttribute('data-group');
                 if (confirm("グループから退出しますか？")) {
                     await db.ref(`groups/${gid}/members/${currentUser.uid}`).remove();
+                    delete cachedGroups[gid];
                     if (currentChatId === gid) currentChatId = null;
                     renderChatListWithUnread();
                 }
@@ -1799,6 +2195,139 @@
     }
     window.cancelReply = () => { replyingTo = null; updateReplyPreview(); };
 
+    // --- Image Preview & Modal Viewer ---
+    function setPendingImage(dataUrl, fileName = "画像ファイル") {
+        pendingImageAttachment = dataUrl;
+        const previewBar = document.getElementById('chatImagePreviewBar');
+        const thumb = document.getElementById('chatImagePreviewThumb');
+        const nameEl = document.getElementById('chatImageFileName');
+
+        if (previewBar && thumb) {
+            thumb.src = dataUrl;
+            if (nameEl) nameEl.innerText = fileName;
+            previewBar.classList.add('active');
+        }
+    }
+
+    function clearPendingImage() {
+        pendingImageAttachment = null;
+        const previewBar = document.getElementById('chatImagePreviewBar');
+        const fileInput = document.getElementById('imageFileInput');
+        if (previewBar) previewBar.classList.remove('active');
+        if (fileInput) fileInput.value = '';
+    }
+
+    // High quality client-side image compression to base64 DataURL (Ultra fast & offline-ready)
+    function processImageFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+            alert('画像ファイルを選択してください');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 1200; // max dimension for ultra crisp messaging
+
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                setPendingImage(dataUrl, file.name);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    window.openImageViewer = (imageUrl) => {
+        const modal = document.getElementById('imageViewerModal');
+        const img = document.getElementById('imageViewerImg');
+        if (modal && img) {
+            img.src = imageUrl;
+            modal.classList.add('active');
+        }
+    };
+
+    function setupImageViewerModal() {
+        const modal = document.getElementById('imageViewerModal');
+        const closeBtn = document.getElementById('closeImageViewerBtn');
+
+        const closeModal = () => {
+            if (modal) modal.classList.remove('active');
+        };
+
+        if (closeBtn) closeBtn.onclick = closeModal;
+        if (modal) {
+            modal.onclick = (e) => {
+                if (e.target === modal || e.target.tagName === 'DIV') closeModal();
+            };
+        }
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Cancel attachment button
+        document.getElementById('cancelImageAttachmentBtn')?.addEventListener('click', clearPendingImage);
+
+        // Photo button trigger
+        const fileInput = document.getElementById('imageFileInput');
+        document.getElementById('sendImageBtn')?.addEventListener('click', () => {
+            if (fileInput) fileInput.click();
+        });
+        if (fileInput) {
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) processImageFile(file);
+            };
+        }
+
+        // Paste event listener for images (Ctrl + V)
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    processImageFile(file);
+                    break;
+                }
+            }
+        });
+
+        // Drag & Drop for images onto chat area
+        const chatArea = document.querySelector('.chat-area');
+        if (chatArea) {
+            chatArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                chatArea.style.borderColor = 'var(--accent)';
+            });
+            chatArea.addEventListener('dragleave', () => {
+                chatArea.style.borderColor = '';
+            });
+            chatArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                chatArea.style.borderColor = '';
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    processImageFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+    }
+
     async function loadMessagesWithRead() {
         if (!currentChatId) return;
         let path = '';
@@ -1806,8 +2335,8 @@
         else if (currentChatType === 'friend') path = `privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`;
         else path = `groups/${currentChatId}/messages`;
 
-        db.ref(path).limitToLast(50).off();
-        db.ref(path).limitToLast(50).on('value', (snap) => {
+        db.ref(path).limitToLast(60).off();
+        db.ref(path).limitToLast(60).on('value', (snap) => {
             const msgs = snap.val() || {};
             const history = document.getElementById('messagesHistory');
             history.innerHTML = '';
@@ -1837,11 +2366,15 @@
                     div.style.background = 'transparent';
                     div.style.border = 'none';
                 } else {
+                    let imageHtml = '';
+                    if (msg.imageUrl) {
+                        imageHtml = `<img src="${msg.imageUrl}" class="message-image" alt="添付写真" onclick="window.openImageViewer('${msg.imageUrl}')" title="クリックして全画面表示">`;
+                    }
                     div.innerHTML = `
                         <div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${escapeHtml(msg.senderName)}</strong></div>
                         ${replyHtml}
-                        <div class="message-text">${escapeHtml(msg.text || '')}</div>
-                        ${msg.imageUrl ? `<img src="${msg.imageUrl}" class="message-image" onclick="window.open('${msg.imageUrl}')">` : ''}
+                        ${msg.text ? `<div class="message-text">${escapeHtml(msg.text || '')}</div>` : ''}
+                        ${imageHtml}
                         <div class="message-footer">${replyBtn}<span class="timestamp">${formatTime(msg.timestamp)}</span></div>
                     `;
                 }
@@ -1864,9 +2397,13 @@
     }
 
     document.getElementById('sendMsgBtn').onclick = async () => {
-        if (!currentChatId) return;
+        if (!currentChatId) {
+            alert("チャットを選択してください");
+            return;
+        }
         const text = document.getElementById('messageInput').value.trim();
-        if (!text) return;
+        if (!text && !pendingImageAttachment) return;
+        
         const now = Date.now();
         if (now - lastMessageTime < messageCooldown) {
             alert(`送信間隔は ${(messageCooldown/1000).toFixed(1)} 秒待ってください`);
@@ -1883,10 +2420,13 @@
             senderId: currentUser.uid,
             senderName: currentUser.name,
             senderIcon: currentUser.icon,
-            text,
+            text: text || '',
             timestamp: Date.now(),
             readBy: { [currentUser.uid]: true }
         };
+        if (pendingImageAttachment) {
+            msgData.imageUrl = pendingImageAttachment;
+        }
         if (replyingTo) msgData.replyTo = replyingTo;
 
         if (currentChatType === 'global') await db.ref('globalMessages').push(msgData);
@@ -1894,6 +2434,7 @@
         else await db.ref(`groups/${currentChatId}/messages`).push(msgData);
 
         document.getElementById('messageInput').value = '';
+        clearPendingImage();
         replyingTo = null;
         updateReplyPreview();
     };
@@ -1904,30 +2445,6 @@
             document.getElementById('sendMsgBtn').click();
         }
     });
-
-    document.getElementById('sendImageBtn').onclick = () => {
-        const fi = document.createElement('input');
-        fi.type = 'file';
-        fi.accept = 'image/*';
-        fi.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const ref = storage.ref(`images/${Date.now()}_${file.name}`);
-            await ref.put(file);
-            const url = await ref.getDownloadURL();
-            const msgData = {
-                senderId: currentUser.uid,
-                senderName: currentUser.name,
-                senderIcon: currentUser.icon,
-                imageUrl: url,
-                timestamp: Date.now()
-            };
-            if (currentChatType === 'global') await db.ref('globalMessages').push(msgData);
-            else if (currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData);
-            else await db.ref(`groups/${currentChatId}/messages`).push(msgData);
-        };
-        fi.click();
-    };
 
     // Stamps
     document.getElementById('sendStampBtn').onclick = () => {
@@ -2123,6 +2640,27 @@
         const d = new Date(timestamp);
         return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
     }
+
+    // Screen Share Stage Control Buttons
+    document.getElementById('toggleScreenShareBtn')?.addEventListener('click', () => {
+        if (isScreenSharing) stopScreenShare();
+        else startScreenShare();
+    });
+
+    document.getElementById('stopMyScreenShareBtn')?.addEventListener('click', () => {
+        stopScreenShare();
+    });
+
+    document.getElementById('fullscreenScreenShareBtn')?.addEventListener('click', () => {
+        const stage = document.getElementById('screenShareStage');
+        if (stage) {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                stage.requestFullscreen().catch(err => console.warn(err));
+            }
+        }
+    });
 
     // Auto-login from LocalStorage
     const stored = localStorage.getItem('forcord_user');
