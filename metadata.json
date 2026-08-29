@@ -1,6 +1,6 @@
 {
   "name": "Forcord",
-  "description": "WebRTC対応の超高音質リアルタイムボイスチャット＆メッセージングアプリ",
-  "requestFramePermissions": ["microphone"],
+  "description": "WebRTC対応の超高音質リアルタイムボイスチャット、ボイスチェンジャー、画面共有＆メッセージングアプリ",
+  "requestFramePermissions": ["microphone", "camera", "display-capture"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

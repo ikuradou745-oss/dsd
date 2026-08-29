@@ -184,6 +184,10 @@
         .voice-slider-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); }
         .voice-volume-slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
         
+        .voice-fx-btn { padding: 14px 16px; border-radius: 16px; border: 1px solid var(--border-color); background: var(--bg-darker); color: white; cursor: pointer; text-align: left; transition: all 0.15s; }
+        .voice-fx-btn:hover { background: var(--bg-hover); border-color: var(--accent); transform: translateY(-1px); }
+        .voice-fx-btn.active { border-color: var(--accent); background: rgba(88, 101, 242, 0.22); box-shadow: 0 0 16px rgba(88, 101, 242, 0.35); }
+
         /* Voice Live Subtitle / Activity Feed */
         .voice-subtitles-drawer { background: rgba(17, 18, 20, 0.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-color); padding: 12px 20px; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
         .subtitle-line { font-size: 0.85rem; color: #e1e3e8; display: flex; gap: 8px; align-items: flex-start; }
@@ -418,11 +422,20 @@
                             </button>
                         </div>
 
-                        <div class="voice-controls-right">
+                        <div class="voice-controls-right" style="display:flex; align-items:center; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:6px; background:var(--bg-darker); padding:4px 8px; border-radius:12px; border:1px solid var(--border-color);" title="声の加工エフェクト">
+                                <span style="font-size:0.8rem; color:var(--text-muted);"><i class="fas fa-magic"></i> 声の加工:</span>
+                                <select id="voiceFxQuickSelect" class="voice-quality-select" style="font-size:0.8rem; padding:4px 8px;">
+                                    <option value="normal" selected>ノーマル (原音)</option>
+                                    <option value="reverb">✨ 響き (エコー残響)</option>
+                                    <option value="breath">💓 喘ぎ (息遣い・スタッター)</option>
+                                    <option value="alien">👽 宇宙人 (高音ピッチ)</option>
+                                </select>
+                            </div>
                             <select id="audioBitrateSelect" class="voice-quality-select" title="WebRTC 音質レート">
-                                <option value="128">💎 128 kbps (Ultra Studio HD)</option>
-                                <option value="96" selected>⚡ 96 kbps (高精度 High Quality)</option>
-                                <option value="48">標準 48 kbps (低帯域)</option>
+                                <option value="128">💎 128 kbps (Studio HD)</option>
+                                <option value="96" selected>⚡ 96 kbps (標準)</option>
+                                <option value="48">48 kbps (低帯域)</option>
                             </select>
                         </div>
                     </div>
@@ -576,12 +589,25 @@
 
                     <hr>
 
-                    <h3><i class="fas fa-magic"></i> 声のエフェクト / イコライザー</h3>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                        <button class="voice-fx-btn btn-secondary active" data-fx="none">原音忠実 (Studio Clean)</button>
-                        <button class="voice-fx-btn btn-secondary" data-fx="crisp">クリア高精細 (Crisp HD)</button>
-                        <button class="voice-fx-btn btn-secondary" data-fx="bass">重低音ボイス (Bass Boost)</button>
-                        <button class="voice-fx-btn btn-secondary" data-fx="radio">無線通話風 (Walkie-Talkie)</button>
+                    <h3><i class="fas fa-magic"></i> 声の加工 (ボイスエフェクト)</h3>
+                    <p class="info-text" style="margin-bottom:12px;">Web Audio リアルタイムDSPにより、あなたの声を加工して相手に通話音声を送信します。</p>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:12px;">
+                        <button class="voice-fx-btn btn-secondary active" data-fx="normal">
+                            <div style="font-weight:700; font-size:0.95rem;">🎙️ ノーマル</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">エフェクトなしの原音忠実ボイス</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="reverb">
+                            <div style="font-weight:700; font-size:0.95rem;">✨ 響き</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">声が美しく残響・エコーします</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="breath">
+                            <div style="font-weight:700; font-size:0.95rem;">💓 喘ぎ</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">言葉の間に「っ」が入り喘ぐ声になります</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="alien">
+                            <div style="font-weight:700; font-size:0.95rem;">👽 宇宙人</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">声のピッチが高くなります</div>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -705,14 +731,19 @@
     };
 
     let localAudioStream = null;
+    let processedAudioStream = null;
     let localScreenStream = null;
     let isScreenSharing = false;
     let audioContext = null;
     let micAnalyser = null;
     let micSourceNode = null;
     let micGainNode = null;
+    let fxDestinationNode = null;
+    let currentFxNodes = []; // holds active Web Audio effect nodes to disconnect on switch
     let noiseGateThreshold = 0.05; // 0 to 1
-    let selectedVoiceFx = 'none';
+    let selectedVoiceFx = 'normal'; // 'normal', 'reverb', 'breath', 'alien'
+    let isMicTesting = false;
+    let micTestMonitorNode = null;
     let isRtcMicMuted = false;
     let isDeafened = false;
     let isSubtitlesEnabled = false;
@@ -762,9 +793,9 @@
         }
     }
 
-    // Audio Constraints with Resilient Fallback
+    // Audio Constraints with Resilient Fallback & Web Audio FX Destination
     async function setupLocalAudioStream() {
-        if (localAudioStream) return localAudioStream;
+        if (localAudioStream && processedAudioStream) return localAudioStream;
 
         const useNoiseSuppression = document.getElementById('noiseSuppressionToggleBtn')?.classList.contains('active-toggle');
 
@@ -785,7 +816,7 @@
                 localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             }
             
-            // Setup Web Audio Context for visualizer & filters
+            // Setup Web Audio Context for visualizer & live voice FX filters
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
@@ -799,8 +830,15 @@
             micAnalyser.fftSize = 256;
             micAnalyser.smoothingTimeConstant = 0.3;
 
+            // MediaStream Destination for sending FX-processed audio over WebRTC
+            fxDestinationNode = audioContext.createMediaStreamDestination();
+            processedAudioStream = fxDestinationNode.stream;
+
             micSourceNode.connect(micGainNode);
             micGainNode.connect(micAnalyser);
+
+            // Connect initial voice FX pipeline
+            applyVoiceFxGraph(selectedVoiceFx);
 
             startAudioMeterLoop();
             return localAudioStream;
@@ -809,6 +847,173 @@
             alert("マイクへのアクセスに失敗しました。ブラウザのマイク権限を許可してください。");
             throw err;
         }
+    }
+
+    // Real-time Voice Effect Processor (Normal / Reverb 響き / Breath 喘ぎ / Alien 宇宙人)
+    function applyVoiceFxGraph(fxType) {
+        if (!audioContext || !micGainNode || !fxDestinationNode) return;
+
+        // Disconnect previous FX nodes
+        currentFxNodes.forEach(node => {
+            try {
+                if (node.stop) node.stop();
+                node.disconnect();
+            } catch(e) {}
+        });
+        currentFxNodes = [];
+
+        try {
+            micGainNode.disconnect(fxDestinationNode);
+        } catch(e) {}
+
+        selectedVoiceFx = fxType;
+
+        if (fxType === 'reverb') {
+            // --- 「響き」 (Reverb / Rich Echo) ---
+            const dryGain = audioContext.createGain();
+            dryGain.gain.setValueAtTime(0.75, audioContext.currentTime);
+
+            const delay1 = audioContext.createDelay();
+            delay1.delayTime.setValueAtTime(0.20, audioContext.currentTime);
+
+            const delay2 = audioContext.createDelay();
+            delay2.delayTime.setValueAtTime(0.35, audioContext.currentTime);
+
+            const feedbackGain = audioContext.createGain();
+            feedbackGain.gain.setValueAtTime(0.40, audioContext.currentTime);
+
+            const wetFilter = audioContext.createBiquadFilter();
+            wetFilter.type = 'lowpass';
+            wetFilter.frequency.setValueAtTime(3200, audioContext.currentTime);
+
+            const wetGain = audioContext.createGain();
+            wetGain.gain.setValueAtTime(0.65, audioContext.currentTime);
+
+            // Routing
+            micGainNode.connect(dryGain);
+            dryGain.connect(fxDestinationNode);
+
+            micGainNode.connect(delay1);
+            delay1.connect(wetFilter);
+            wetFilter.connect(feedbackGain);
+            feedbackGain.connect(delay1);
+
+            wetFilter.connect(delay2);
+            delay2.connect(wetGain);
+            wetFilter.connect(wetGain);
+            wetGain.connect(fxDestinationNode);
+
+            currentFxNodes.push(dryGain, delay1, delay2, feedbackGain, wetFilter, wetGain);
+
+        } else if (fxType === 'breath') {
+            // --- 「喘ぎ」 (Breath / Panting & Stutter: 言葉の間に「っ」が入るスタッター＆息遣い) ---
+            // 1. Chopper / Stutter Tremolo (言葉の間に「っ」という息継ぎ・切れ目を生成)
+            const chopGain = audioContext.createGain();
+            const chopOsc = audioContext.createOscillator();
+            chopOsc.type = 'sawtooth';
+            chopOsc.frequency.setValueAtTime(5.2, audioContext.currentTime); // ~5Hz stutter chop
+
+            const chopDepth = audioContext.createGain();
+            chopDepth.gain.setValueAtTime(0.65, audioContext.currentTime);
+
+            chopGain.gain.setValueAtTime(0.35, audioContext.currentTime);
+            chopOsc.connect(chopDepth);
+            chopDepth.connect(chopGain.gain);
+            chopOsc.start();
+
+            // 2. Breath / Formant Enhancer Filter (息の擦過音・高域ブレスを強調)
+            const breathHighpass = audioContext.createBiquadFilter();
+            breathHighpass.type = 'highpass';
+            breathHighpass.frequency.setValueAtTime(1100, audioContext.currentTime);
+
+            const breathPeak = audioContext.createBiquadFilter();
+            breathPeak.type = 'peaking';
+            breathPeak.frequency.setValueAtTime(2600, audioContext.currentTime);
+            breathPeak.Q.setValueAtTime(2.5, audioContext.currentTime);
+            breathPeak.gain.setValueAtTime(8, audioContext.currentTime);
+
+            const breathGain = audioContext.createGain();
+            breathGain.gain.setValueAtTime(1.2, audioContext.currentTime);
+
+            // Routing
+            micGainNode.connect(chopGain);
+            chopGain.connect(breathHighpass);
+            breathHighpass.connect(breathPeak);
+            breathPeak.connect(breathGain);
+            breathGain.connect(fxDestinationNode);
+
+            currentFxNodes.push(chopGain, chopOsc, chopDepth, breathHighpass, breathPeak, breathGain);
+
+        } else if (fxType === 'alien') {
+            // --- 「宇宙人」 (Alien / High-Pitch Ring Modulator Voice: 高音ピッチシフト) ---
+            const carrierOsc = audioContext.createOscillator();
+            carrierOsc.type = 'sine';
+            carrierOsc.frequency.setValueAtTime(540, audioContext.currentTime); // High pitch carrier
+
+            const modGain = audioContext.createGain();
+            modGain.gain.setValueAtTime(0.0, audioContext.currentTime);
+
+            carrierOsc.connect(modGain.gain);
+            carrierOsc.start();
+
+            const highpass = audioContext.createBiquadFilter();
+            highpass.type = 'highpass';
+            highpass.frequency.setValueAtTime(900, audioContext.currentTime);
+
+            const bandpass = audioContext.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.setValueAtTime(3200, audioContext.currentTime);
+            bandpass.Q.setValueAtTime(2.0, audioContext.currentTime);
+
+            const alienGain = audioContext.createGain();
+            alienGain.gain.setValueAtTime(2.2, audioContext.currentTime);
+
+            // Routing
+            micGainNode.connect(modGain);
+            modGain.connect(highpass);
+            highpass.connect(bandpass);
+            bandpass.connect(alienGain);
+            alienGain.connect(fxDestinationNode);
+
+            currentFxNodes.push(carrierOsc, modGain, highpass, bandpass, alienGain);
+
+        } else {
+            // --- 「ノーマル」 (Normal: 原音クリーン) ---
+            const directGain = audioContext.createGain();
+            directGain.gain.setValueAtTime(1.0, audioContext.currentTime);
+            micGainNode.connect(directGain);
+            directGain.connect(fxDestinationNode);
+            currentFxNodes.push(directGain);
+        }
+
+        // Update active UI buttons & select dropdowns
+        document.querySelectorAll('.voice-fx-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-fx') === fxType);
+        });
+        const barSelect = document.getElementById('voiceFxQuickSelect');
+        if (barSelect && barSelect.value !== fxType) {
+            barSelect.value = fxType;
+        }
+
+        // If Mic Test Monitor is active, re-route to speakers for local auditioning
+        if (isMicTesting && micTestMonitorNode) {
+            try { micTestMonitorNode.disconnect(); } catch(e) {}
+            micTestMonitorNode = audioContext.createGain();
+            micTestMonitorNode.gain.setValueAtTime(0.9, audioContext.currentTime);
+            fxDestinationNode.connect(micTestMonitorNode);
+            micTestMonitorNode.connect(audioContext.destination);
+        }
+    }
+
+    // Helper to get active sending audio track for WebRTC
+    function getSendingAudioTrack() {
+        if (processedAudioStream && processedAudioStream.getAudioTracks().length > 0) {
+            return processedAudioStream.getAudioTracks()[0];
+        }
+        if (localAudioStream && localAudioStream.getAudioTracks().length > 0) {
+            return localAudioStream.getAudioTracks()[0];
+        }
+        return null;
     }
 
     // Real-time Audio Visualizer & Speaking Glow Detector
@@ -1108,14 +1313,15 @@
         const pc = new RTCPeerConnection(rtcConfig);
         peerConnections[targetUid] = pc;
 
-        // Add local audio tracks if available
-        if (localAudioStream && localAudioStream.getAudioTracks().length > 0) {
-            const audioTrack = localAudioStream.getAudioTracks()[0];
+        // Add local audio tracks if available (with voice FX applied!)
+        const audioTrack = getSendingAudioTrack();
+        if (audioTrack) {
+            const audioStream = processedAudioStream || localAudioStream;
             const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
             if (audioSender) {
                 audioSender.replaceTrack(audioTrack).catch(() => {});
             } else {
-                pc.addTrack(audioTrack, localAudioStream);
+                pc.addTrack(audioTrack, audioStream);
             }
         }
 
@@ -1174,33 +1380,33 @@
 
                 const screenVideo = document.getElementById('screenShareVideo');
                 const screenStage = document.getElementById('screenShareStage');
+                const screenTitle = document.getElementById('screenSharePresenterName');
 
-                if (currentVoiceRoomId) {
-                    db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).once('value', (snap) => {
-                        const ssData = snap.val();
-                        if (ssData && ssData.active && ssData.uid === targetUid) {
-                            if (screenVideo && screenStage) {
-                                screenVideo.srcObject = remoteVideoStream;
-                                screenVideo.muted = true;
-                                screenVideo.play().catch(e => console.log("Remote video play handled:", e));
-                                screenStage.classList.add('active');
+                if (screenVideo && screenStage) {
+                    screenVideo.srcObject = remoteVideoStream;
+                    screenVideo.muted = true;
+                    
+                    event.track.onunmute = () => {
+                        screenVideo.play().catch(e => console.log("Remote video play onunmute:", e));
+                    };
+                    screenVideo.play().catch(e => console.log("Remote video play handled:", e));
+                    screenStage.classList.add('active');
+
+                    if (currentVoiceRoomId) {
+                        db.ref(`voiceRooms/${currentVoiceRoomId}/members/${targetUid}`).once('value', (snap) => {
+                            const mData = snap.val();
+                            if (mData && screenTitle) {
+                                screenTitle.innerText = `${mData.name} さんの画面共有`;
                             }
-                        }
-                    });
+                        });
+                    }
                 }
 
                 event.track.onended = () => {
                     delete remoteVideoStreams[targetUid];
-                    if (!isScreenSharing && currentVoiceRoomId) {
-                        db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).once('value', (snap) => {
-                            const ssData = snap.val();
-                            if (ssData && ssData.uid === targetUid) {
-                                const stage = document.getElementById('screenShareStage');
-                                const video = document.getElementById('screenShareVideo');
-                                if (stage) stage.classList.remove('active');
-                                if (video) video.srcObject = null;
-                            }
-                        });
+                    if (screenVideo && screenVideo.srcObject === remoteVideoStream) {
+                        if (screenStage) screenStage.classList.remove('active');
+                        screenVideo.srcObject = null;
                     }
                 };
             }
@@ -1924,22 +2130,55 @@
             document.getElementById('noiseGateDisplay').innerText = `${val}%`;
         };
 
-        // Mic Test Button
-        document.getElementById('testMicBtn').onclick = async () => {
-            await setupLocalAudioStream();
-            playTone(440, 0.1, 'sine', 0.1);
-            alert("マイクテストを開始しました！声を出して音量メーターが動くか確認してください。");
-        };
+        // Mic Test & Self-Monitoring Button
+        const testMicBtn = document.getElementById('testMicBtn');
+        if (testMicBtn) {
+            testMicBtn.onclick = async () => {
+                await setupLocalAudioStream();
+                isMicTesting = !isMicTesting;
+                if (isMicTesting) {
+                    testMicBtn.className = 'btn-danger';
+                    testMicBtn.innerHTML = '<i class="fas fa-stop-circle"></i> テスト停止 (試聴中)';
+                    if (audioContext && fxDestinationNode) {
+                        try { if (micTestMonitorNode) micTestMonitorNode.disconnect(); } catch(e) {}
+                        micTestMonitorNode = audioContext.createGain();
+                        micTestMonitorNode.gain.setValueAtTime(0.85, audioContext.currentTime);
+                        fxDestinationNode.connect(micTestMonitorNode);
+                        micTestMonitorNode.connect(audioContext.destination);
+                    }
+                    playTone(520, 0.1, 'sine', 0.15);
+                } else {
+                    testMicBtn.className = 'btn-secondary';
+                    testMicBtn.innerHTML = '<i class="fas fa-vial"></i> マイクテスト開始';
+                    if (micTestMonitorNode) {
+                        try { micTestMonitorNode.disconnect(); } catch(e) {}
+                        micTestMonitorNode = null;
+                    }
+                    playTone(330, 0.1, 'sine', 0.15);
+                }
+            };
+        }
 
-        // Voice FX Buttons
+        // Voice FX Buttons (Settings Tab)
         document.querySelectorAll('.voice-fx-btn').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.voice-fx-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                selectedVoiceFx = btn.getAttribute('data-fx');
-                playTone(550, 0.1, 'sine', 0.15);
+            btn.onclick = async () => {
+                const fx = btn.getAttribute('data-fx');
+                await setupLocalAudioStream().catch(() => {});
+                applyVoiceFxGraph(fx);
+                playTone(580, 0.08, 'sine', 0.12);
             };
         });
+
+        // Voice FX Quick Select (Bottom Control Bar)
+        const quickFxSelect = document.getElementById('voiceFxQuickSelect');
+        if (quickFxSelect) {
+            quickFxSelect.onchange = async (e) => {
+                const fx = e.target.value;
+                await setupLocalAudioStream().catch(() => {});
+                applyVoiceFxGraph(fx);
+                playTone(580, 0.08, 'sine', 0.12);
+            };
+        }
     }
 
     // --- Master Volume Setting & Presets ---
