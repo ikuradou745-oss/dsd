@@ -1,0 +1,9 @@
+{
+  "name": "forcord",
+  "version": "1.0.0",
+  "description": "WebRTC対応の超高音質リアルタイムボイスチャット＆メッセージングアプリ",
+  "scripts": {
+    "build": "mkdir -p dist && cp index.html dist/index.html 2>/dev/null || cp index.html dist/"
+  },
+  "dependencies": {}
+}
