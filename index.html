@@ -87,8 +87,13 @@
         .global-invite-area > * { pointer-events: auto; }
         .invite-notification { background: var(--bg-card); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; animation: slideInRight 0.3s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4); border: 1px solid var(--border-color); position: relative; }
         .invite-notification.call-invite { border-left-color: var(--success); }
+        .invite-notification.summon-alert { border-left-color: #ff334b; background: linear-gradient(135deg, rgba(255, 51, 75, 0.15), var(--bg-card)); border: 2px solid #ff334b; animation: summonPulse 0.8s infinite alternate, slideInRight 0.3s ease; box-shadow: 0 0 28px rgba(255, 51, 75, 0.6); }
+        @keyframes summonPulse { 0% { transform: scale(1); box-shadow: 0 0 16px rgba(255, 51, 75, 0.4); } 100% { transform: scale(1.03); box-shadow: 0 0 32px rgba(255, 51, 75, 0.8); } }
         .invite-close-btn { position: absolute; top: 8px; right: 10px; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 4px; }
         .invite-close-btn:hover { color: var(--danger); }
+        
+        .btn-summon { background: linear-gradient(135deg, #ff4757, #ff6b81) !important; color: white !important; font-weight: 700; box-shadow: 0 2px 8px rgba(255, 71, 87, 0.35); }
+        .btn-summon:hover { filter: brightness(1.15); transform: translateY(-1px) scale(1.04); box-shadow: 0 4px 14px rgba(255, 71, 87, 0.6); }
         
         /* Common Buttons & UI */
         button { background: var(--accent); border: none; border-radius: 20px; padding: 8px 18px; color: white; font-weight: 600; cursor: pointer; transition: 0.15s; font-family: inherit; font-size: 0.9rem; }
@@ -776,6 +781,81 @@
             osc.start();
             osc.stop(ctx.currentTime + duration);
         } catch(e) { console.warn("Audio play error", e); }
+    }
+
+    // High Impact Explosive Loud Summon Sound (爆音・アラート通知音)
+    function playLoudSummonSound() {
+        try {
+            const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Multi-oscillator energetic siren & alarm blasts (3 consecutive loud bursts)
+            const sirenNotes = [
+                { f1: 600, f2: 1200, start: 0, dur: 0.28 },
+                { f1: 750, f2: 1400, start: 0.32, dur: 0.28 },
+                { f1: 900, f2: 1760, start: 0.64, dur: 0.45 },
+                { f1: 600, f2: 1200, start: 1.15, dur: 0.28 },
+                { f1: 750, f2: 1400, start: 1.47, dur: 0.28 },
+                { f1: 900, f2: 1760, start: 1.79, dur: 0.55 }
+            ];
+
+            sirenNotes.forEach(note => {
+                const osc = ctx.createOscillator();
+                const osc2 = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc2.type = 'square';
+
+                osc.frequency.setValueAtTime(note.f1, now + note.start);
+                osc.frequency.exponentialRampToValueAtTime(note.f2, now + note.start + note.dur);
+
+                osc2.frequency.setValueAtTime(note.f1 * 1.01, now + note.start);
+                osc2.frequency.exponentialRampToValueAtTime(note.f2 * 1.01, now + note.start + note.dur);
+
+                // High loud volume (0.85 - 0.95)
+                gain.gain.setValueAtTime(0.85, now + note.start);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + note.start + note.dur);
+
+                osc.connect(gain);
+                osc2.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now + note.start);
+                osc2.start(now + note.start);
+                osc.stop(now + note.start + note.dur + 0.05);
+                osc2.stop(now + note.start + note.dur + 0.05);
+            });
+        } catch(e) {
+            console.warn("Loud sound playback error:", e);
+        }
+    }
+
+    // System Desktop Notification helper (パソコン上の通知)
+    function requestSystemNotificationPermission() {
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission().catch(() => {});
+        }
+    }
+
+    function showDesktopNotification(title, body, icon = '🔔') {
+        if ("Notification" in window && Notification.permission === "granted") {
+            try {
+                const notif = new Notification(title, {
+                    body: body,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/3602/3602145.png',
+                    requireInteraction: true,
+                    silent: false
+                });
+                notif.onclick = () => {
+                    window.focus();
+                    notif.close();
+                };
+            } catch(e) {
+                console.warn("Notification error:", e);
+            }
+        }
     }
 
     function playRtcSound(type) {
@@ -1903,9 +1983,11 @@
         startNewMessageListener();
         setupSpeechRecognition();
         startChannelCounters();
+        requestSystemNotificationPermission();
 
         // Global User Interaction Audio Unlock (Browser Autoplay Policy handling)
         const unlockAudio = () => {
+            requestSystemNotificationPermission();
             if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume().catch(() => {});
             }
@@ -2221,8 +2303,9 @@
         }
     }
 
-    // --- Voice Invite Notifications (Auto-dismiss and Manual close) ---
+    // --- Voice Invite & Summon Notifications (Auto-dismiss and Manual close) ---
     function listenVoiceInvites() {
+        // 1. Direct Voice Call Invites
         db.ref(`voiceInvites/${currentUser.uid}`).on('child_added', (snap) => {
             const invite = snap.val();
             if (!invite) return;
@@ -2249,6 +2332,9 @@
             `;
             inviteArea.prepend(div);
             playTone(800, 0.2, 'sine', 0.3);
+
+            // Desktop notification if user is on another window
+            showDesktopNotification("📞 通話の着信", `${invite.fromName || 'フレンド'} さんから通話の着信があります！`);
 
             const dismissNotification = () => {
                 div.style.opacity = '0';
@@ -2286,6 +2372,91 @@
         // Also clean up removed invites from other tabs
         db.ref(`voiceInvites/${currentUser.uid}`).on('child_removed', (snap) => {
             const el = document.getElementById(`invite_${snap.key}`);
+            if (el) el.remove();
+        });
+
+        // 2. High-Priority Summon Nudge Notifications (「〇〇が呼んでいるよ！」＆ 爆音アラート)
+        db.ref(`summonAlerts/${currentUser.uid}`).on('child_added', async (snap) => {
+            const alertData = snap.val();
+            if (!alertData) return;
+            const alertKey = snap.key;
+            
+            // Only process recent alerts (within 30 seconds)
+            if (alertData.timestamp && alertData.timestamp < Date.now() - 30000) {
+                await snap.ref.remove();
+                return;
+            }
+
+            const inviteArea = document.getElementById('globalInviteArea');
+            const div = document.createElement('div');
+            div.className = 'invite-notification summon-alert';
+            div.id = `summon_${alertKey}`;
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="font-size:28px; animation: bounce 0.6s infinite alternate;">🚨</div>
+                        <div>
+                            <div style="font-size:1.05rem; font-weight:800; color:#ff4d6d;">
+                                📢 ${escapeHtml(alertData.fromName || 'フレンド')} が呼んでいるよ！
+                            </div>
+                            <div style="font-size:0.8rem; color:var(--text-main); margin-top:2px;">
+                                ${escapeHtml(alertData.message || '緊急呼び出し！アプリを確認してください！')}
+                            </div>
+                        </div>
+                    </div>
+                    <button class="invite-dismiss-btn" title="閉じる"><i class="fas fa-times"></i></button>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:10px;">
+                    <button class="btn-success openChatFromSummonBtn" style="flex:1;"><i class="fas fa-comment-dots"></i> チャットを開く</button>
+                    <button class="btn-danger dismissSummonBtn" style="padding:6px 14px;"><i class="fas fa-check"></i> 確認</button>
+                </div>
+            `;
+            inviteArea.prepend(div);
+
+            // Play explosive loud alert sound on the active browser tab
+            playLoudSummonSound();
+
+            // Desktop system level notification: "〇〇が呼んでいるよ！"
+            showDesktopNotification(
+                `🚨 ${alertData.fromName || 'フレンド'}が呼んでいるよ！`,
+                `「${alertData.fromName || 'フレンド'}」から呼び出し通知が届きました！すぐに確認してください。`
+            );
+
+            const dismissSummon = () => {
+                div.style.opacity = '0';
+                div.style.transform = 'translateY(-10px)';
+                div.style.transition = 'all 0.25s ease';
+                setTimeout(() => { if (div.parentNode) div.remove(); }, 250);
+            };
+
+            div.querySelector('.invite-dismiss-btn').onclick = async () => {
+                await snap.ref.remove();
+                dismissSummon();
+            };
+
+            div.querySelector('.dismissSummonBtn').onclick = async () => {
+                await snap.ref.remove();
+                dismissSummon();
+            };
+
+            div.querySelector('.openChatFromSummonBtn').onclick = async () => {
+                await snap.ref.remove();
+                dismissSummon();
+                document.querySelector('.sidebar-icon[data-tab="messages"]').click();
+                openChat(`friend_${alertData.fromUid}`, 'friend');
+            };
+
+            // Auto dismiss after 20 seconds
+            setTimeout(async () => {
+                if (div.parentNode) {
+                    await snap.ref.remove();
+                    dismissSummon();
+                }
+            }, 20000);
+        });
+
+        db.ref(`summonAlerts/${currentUser.uid}`).on('child_removed', (snap) => {
+            const el = document.getElementById(`summon_${snap.key}`);
             if (el) el.remove();
         });
     }
@@ -2356,9 +2527,10 @@
                 li.innerHTML = `
                     <span>${fdata.icon || '😀'} <strong>${escapeHtml(fdata.name)}</strong></span>
                     <div class="friend-actions">
+                        <button class="btn-summon summonFriendBtn" data-uid="${friendId}" data-name="${fdata.name}" title="相手のPC画面へ「〇〇が呼んでいるよ！」通知＆爆音を鳴らして呼び出します"><i class="fas fa-bell"></i> 呼び出し (通知＆爆音)</button>
                         <button class="btn-success directCallBtn" data-uid="${friendId}" data-name="${fdata.name}"><i class="fas fa-phone-alt"></i> 発信</button>
-                        <button class="btn-secondary directChatBtn" data-uid="${friendId}"><i class="fas fa-comment"></i></button>
-                        <button class="btn-danger removeFriendBtn" data-uid="${friendId}"><i class="fas fa-trash"></i></button>
+                        <button class="btn-secondary directChatBtn" data-uid="${friendId}" title="チャットを開く"><i class="fas fa-comment"></i></button>
+                        <button class="btn-danger removeFriendBtn" data-uid="${friendId}" title="フレンド解除"><i class="fas fa-trash"></i></button>
                     </div>
                 `;
                 list.appendChild(li);
@@ -2371,11 +2543,40 @@
                         <h4>${fdata.icon || '😀'} ${escapeHtml(fdata.name)}</h4>
                         <span class="voice-channel-members-count">${fdata.online ? '🟢 オンライン' : '⚪ オフライン'}</span>
                     </div>
-                    <button class="btn-success directCallBtn" data-uid="${friendId}" data-name="${fdata.name}" style="padding:4px 10px; font-size:0.8rem;"><i class="fas fa-phone"></i> 通話</button>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-summon summonFriendBtn" data-uid="${friendId}" data-name="${fdata.name}" style="padding:4px 10px; font-size:0.8rem;"><i class="fas fa-bell"></i> 呼出</button>
+                        <button class="btn-success directCallBtn" data-uid="${friendId}" data-name="${fdata.name}" style="padding:4px 10px; font-size:0.8rem;"><i class="fas fa-phone"></i> 通話</button>
+                    </div>
                 `;
                 quickCallList.appendChild(quickRow);
             }
         }
+
+        // Summon / Nudge Alert triggers (「〇〇が呼んでいるよ！」＆ 爆音アラート送信)
+        document.querySelectorAll('.summonFriendBtn').forEach(btn => {
+            btn.onclick = async () => {
+                const targetUid = btn.getAttribute('data-uid');
+                const targetName = btn.getAttribute('data-name');
+                
+                // Ask desktop notification permission proactively
+                requestSystemNotificationPermission();
+
+                const customMsg = prompt(`🚨 ${targetName} さんに呼び出し通知＆爆音アラートを送信します。\nメッセージがあれば入力してください (空欄の場合はデフォルト):`, "ボイスチャットに来て！今すぐ話そう！");
+                if (customMsg === null) return; // cancelled
+
+                await db.ref(`summonAlerts/${targetUid}`).push({
+                    fromName: currentUser.name,
+                    fromIcon: currentUser.icon || '😀',
+                    fromUid: currentUser.uid,
+                    message: customMsg.trim() || 'ボイスチャットに来て！今すぐ話そう！',
+                    timestamp: Date.now()
+                });
+
+                playTone(1000, 0.1, 'sine', 0.2);
+                setTimeout(() => playTone(1400, 0.15, 'sine', 0.25), 100);
+                alert(`⚡ ${targetName} さんのPCへ「${currentUser.name}が呼んでいるよ！」通知を送信し、爆音アラートを鳴らしました！`);
+            };
+        });
 
         // Direct Call triggers
         document.querySelectorAll('.directCallBtn').forEach(btn => {
