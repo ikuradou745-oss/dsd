@@ -251,6 +251,27 @@
         .sound-btn { background: var(--bg-darker); border: 1px solid var(--border-color); padding: 12px 8px; border-radius: 14px; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; transition: 0.15s; }
         .sound-btn:hover { background: var(--accent); transform: scale(1.03); }
         
+        /* YouTube Watch Party Stage in VC */
+        .youtube-stage { background: #0f0f12; border-bottom: 2px solid #ff0000; padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; max-height: 480px; }
+        .youtube-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .youtube-title { font-weight: 700; font-size: 0.95rem; color: white; display: flex; align-items: center; gap: 8px; }
+        .youtube-video-wrap { width: 100%; aspect-ratio: 16/9; max-height: 380px; background: #000; border-radius: 14px; overflow: hidden; position: relative; }
+        .youtube-video-wrap iframe { width: 100%; height: 100%; border: none; }
+        
+        /* YouTube Chat Embed Card */
+        .youtube-chat-card { margin-top: 8px; background: #14151a; border: 1px solid rgba(255, 0, 0, 0.4); border-radius: 14px; overflow: hidden; max-width: 480px; width: 100%; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+        .youtube-chat-thumb-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; cursor: pointer; overflow: hidden; }
+        .youtube-chat-thumb { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+        .youtube-chat-thumb-wrap:hover .youtube-chat-thumb { transform: scale(1.04); }
+        .youtube-play-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); transition: background 0.2s; }
+        .youtube-play-overlay:hover { background: rgba(0,0,0,0.1); }
+        .youtube-play-btn-circle { width: 56px; height: 56px; border-radius: 50%; background: #ff0000; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; box-shadow: 0 4px 16px rgba(255,0,0,0.6); }
+        .youtube-chat-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+        .youtube-chat-title { font-weight: 700; font-size: 0.85rem; color: #fff; line-height: 1.3; }
+        .youtube-chat-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; gap: 8px; }
+        .youtube-vc-play-btn { background: #ff0000; color: white; border: none; border-radius: 12px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: 0.15s; }
+        .youtube-vc-play-btn:hover { background: #cc0000; transform: scale(1.03); }
+
         @keyframes pulseGreen { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); } }
     </style>
 </head>
@@ -356,12 +377,32 @@
                                 <i class="fas fa-circle"></i> 未接続
                             </span>
                         </div>
-                        <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <button id="openVcYoutubeBtn" class="screenshare-btn" style="background:#cc0000; color:white;" title="YouTube動画をVCメンバー全員で同時再生"><i class="fab fa-youtube"></i> YouTube同時再生</button>
                             <button id="inviteToVoiceBtn" style="background:#3c3f45; display:none;"><i class="fas fa-user-plus"></i> 招待</button>
                             <button id="openSoundboardBtn" style="background:#3c3f45;"><i class="fas fa-music"></i> 効果音</button>
                             <button id="toggleSubtitlesBtn" class="btn-secondary"><i class="fas fa-closed-captioning"></i> 字幕: OFF</button>
                         </div>
                     </div>
+
+            <!-- YouTube Watch Party Stage in VC -->
+            <div class="youtube-stage" id="youtubeStage" style="display:none;">
+                <div class="youtube-header">
+                    <div class="youtube-title" id="youtubeTitleDisplay">
+                        <i class="fab fa-youtube" style="color:#ff0000; font-size:1.2rem;"></i>
+                        <span id="youtubeCurrentTitle">YouTube Watch Party</span>
+                        <span id="youtubeSharerBadge" style="font-size:0.75rem; background:rgba(255,0,0,0.2); border:1px solid #ff0000; color:#ff8080; padding:2px 8px; border-radius:10px; margin-left:8px;">同時視聴中</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button id="changeVcYoutubeBtn" class="screenshare-btn" style="background:#3c3f45;" title="動画を変更"><i class="fas fa-sync-alt"></i> 動画変更</button>
+                        <button id="fullscreenVcYoutubeBtn" class="screenshare-btn" title="全画面表示"><i class="fas fa-expand"></i> 全画面</button>
+                        <button id="closeVcYoutubeBtn" class="screenshare-btn" style="background:var(--danger);" title="YouTube同時再生を終了"><i class="fas fa-times"></i> 終了</button>
+                    </div>
+                </div>
+                <div class="youtube-video-wrap" id="youtubeIframeWrap">
+                    <!-- YouTube iframe injected dynamically -->
+                </div>
+            </div>
 
             <!-- Screen Sharing Stage -->
             <div class="screenshare-stage" id="screenShareStage">
@@ -471,8 +512,9 @@
                     <div class="messages-history" id="messagesHistory"></div>
                     <div id="replyPreviewContainer" style="padding: 0 16px;"></div>
                     <div class="message-input-area">
-                        <input type="text" id="messageInput" placeholder="メッセージを入力... (画像貼り付け Ctrl+V やドラッグ＆ドロップ対応)">
+                        <input type="text" id="messageInput" placeholder="メッセージを入力... (YouTubeのURL貼り付けや画像 Ctrl+V にも対応)">
                         <button id="sendStampBtn" class="btn-secondary" title="スタンプ"><i class="fas fa-smile"></i></button>
+                        <button id="sendYoutubeBtn" class="btn-secondary" title="YouTube動画を送信" style="color:#ff4444;"><i class="fab fa-youtube"></i> YouTube</button>
                         <button id="sendImageBtn" class="btn-secondary" title="写真を送信"><i class="fas fa-image"></i> 写真</button>
                         <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
                         <button id="sendMsgBtn">送信</button>
@@ -626,6 +668,48 @@
 </div>
 
 <!-- Modals -->
+<!-- YouTube Player & Share Modal -->
+<div id="youtubeModal" class="modal" style="width:500px;">
+    <h3 style="display:flex; align-items:center; gap:8px;"><i class="fab fa-youtube" style="color:#ff0000;"></i> YouTube 動画の共有・再生</h3>
+    <p class="info-text" style="margin-bottom:12px;">YouTubeの動画URLを入力するか、おすすめプリセットから選んでチャットに送信したりVCで一緒に流せます。</p>
+    
+    <div style="margin-bottom:12px;">
+        <label style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">YouTube 動画URL または 動画ID:</label>
+        <input type="text" id="youtubeUrlInput" placeholder="例: https://www.youtube.com/watch?v=... または youtu.be/..." style="width:100%; margin-top:4px; padding:10px 14px; background:var(--bg-darker); border:1px solid var(--border-color); border-radius:12px; color:white;">
+    </div>
+
+    <!-- Quick Presets -->
+    <div style="margin-bottom:14px;">
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px; font-weight:700;"><i class="fas fa-sparkles"></i> 人気の作業用BGM・定番プリセット:</div>
+        <div style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto; padding-right:4px;">
+            <div class="youtube-preset-item" data-url="https://www.youtube.com/watch?v=jfKfPfyJRdk" data-title="☕ lofi hip hop radio - beats to relax/study to" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px; cursor:pointer; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center; transition:0.15s;">
+                <span>🎧 <strong>Lofi Hip Hop Radio</strong> (Chill BGM)</span>
+                <span style="color:#57f287; font-size:0.7rem;">選択</span>
+            </div>
+            <div class="youtube-preset-item" data-url="https://www.youtube.com/watch?v=5qap5aO4i9A" data-title="🎹 Lofi Hip Hop Radio - beats to sleep/chill to" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px; cursor:pointer; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center; transition:0.15s;">
+                <span>🌙 <strong>Lofi Sleep & Relax</strong> (安眠・リラックス)</span>
+                <span style="color:#57f287; font-size:0.7rem;">選択</span>
+            </div>
+            <div class="youtube-preset-item" data-url="https://www.youtube.com/watch?v=WPni755-Krg" data-title="🌧️ Coffee Shop with Rain & Jazz Music" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px; cursor:pointer; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center; transition:0.15s;">
+                <span>☕ <strong>雨のカフェ＆ジャズBGM</strong> (作業・通話用)</span>
+                <span style="color:#57f287; font-size:0.7rem;">選択</span>
+            </div>
+            <div class="youtube-preset-item" data-url="https://www.youtube.com/watch?v=4xDzrJKXOOY" data-title="🎮 Synthwave Radio - chill synth / retro beats" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px; cursor:pointer; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center; transition:0.15s;">
+                <span>🕹️ <strong>Synthwave & Retro Beats</strong> (サイバー・ゲーム)</span>
+                <span style="color:#57f287; font-size:0.7rem;">選択</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+        <button id="submitYoutubeToChatBtn" class="btn-secondary" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;"><i class="fas fa-comment"></i> チャットに送信</button>
+        <button id="submitYoutubeToVcBtn" style="flex:1; background:#cc0000; color:white; display:flex; align-items:center; justify-content:center; gap:6px;"><i class="fab fa-youtube"></i> VCで全員と再生</button>
+    </div>
+    <div style="margin-top:10px; text-align:center;">
+        <button id="closeYoutubeModalBtn" class="btn-secondary" style="width:100%; padding:6px;">閉じる</button>
+    </div>
+</div>
+
 <!-- Screen Share Source & Materials Selection Modal -->
 <div id="screenShareSourceModal" class="modal" style="width:480px;">
     <h3><i class="fas fa-desktop"></i> 画面共有・配信素材の選択</h3>
@@ -813,6 +897,107 @@
     let materialCanvas = null;
     let materialAnimId = null;
     let activeScreenShareSource = 'display';
+
+    // --- YouTube Watch Party & Share Engine ---
+    let currentVcYoutubeId = null;
+
+    function extractYoutubeVideoId(urlOrText) {
+        if (!urlOrText || typeof urlOrText !== 'string') return null;
+        const regExp = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+        const match = urlOrText.match(regExp);
+        if (match && match[1]) return match[1];
+        if (/^[a-zA-Z0-9_-]{11}$/.test(urlOrText.trim())) return urlOrText.trim();
+        return null;
+    }
+
+    async function startVcYoutubeParty(videoId, title = "YouTube 動画") {
+        if (!currentVoiceRoomId) {
+            alert("ボイスチャンネルに接続していません。まずボイスチャンネルに参加してください！");
+            return;
+        }
+        const vId = extractYoutubeVideoId(videoId);
+        if (!vId) {
+            alert("有効なYouTube URLまたは動画IDを入力してください。");
+            return;
+        }
+
+        const sanitizedTitle = filterNsfwWords(title || 'YouTube 動画').text;
+
+        await db.ref(`voiceRooms/${currentVoiceRoomId}/youtubeParty`).set({
+            active: true,
+            videoId: vId,
+            title: sanitizedTitle,
+            startedBy: currentUser.name,
+            timestamp: Date.now()
+        });
+
+        // Hide Modal
+        document.getElementById('youtubeModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        playTone(600, 0.1, 'sine', 0.2);
+    }
+
+    async function stopVcYoutubeParty() {
+        if (!currentVoiceRoomId) return;
+        await db.ref(`voiceRooms/${currentVoiceRoomId}/youtubeParty`).set({
+            active: false,
+            timestamp: Date.now()
+        });
+        const stage = document.getElementById('youtubeStage');
+        const wrap = document.getElementById('youtubeIframeWrap');
+        if (stage) stage.style.display = 'none';
+        if (wrap) wrap.innerHTML = '';
+        currentVcYoutubeId = null;
+        playTone(300, 0.1, 'sine', 0.2);
+    }
+
+    function setupVoiceRoomYoutubeListener(roomId) {
+        db.ref(`voiceRooms/${roomId}/youtubeParty`).on('value', (snap) => {
+            const data = snap.val();
+            const stage = document.getElementById('youtubeStage');
+            const wrap = document.getElementById('youtubeIframeWrap');
+            const titleEl = document.getElementById('youtubeCurrentTitle');
+            const badgeEl = document.getElementById('youtubeSharerBadge');
+
+            if (data && data.active && data.videoId) {
+                if (stage) stage.style.display = 'flex';
+                if (titleEl) titleEl.innerText = data.title || "YouTube 動画";
+                if (badgeEl) badgeEl.innerText = `${data.startedBy || 'メンバー'} が流しています`;
+
+                if (currentVcYoutubeId !== data.videoId) {
+                    currentVcYoutubeId = data.videoId;
+                    if (wrap) {
+                        wrap.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+                    }
+                }
+            } else {
+                if (stage) stage.style.display = 'none';
+                if (wrap) wrap.innerHTML = '';
+                currentVcYoutubeId = null;
+            }
+        });
+    }
+
+    window.playYoutubeInline = (cardId, videoId) => {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const thumbWrap = card.querySelector('.youtube-chat-thumb-wrap');
+        if (thumbWrap) {
+            thumbWrap.innerHTML = `
+                <iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>
+            `;
+            thumbWrap.style.cursor = 'default';
+            thumbWrap.onclick = null;
+        }
+    };
+
+    window.playYoutubeInCurrentVc = async (videoId, title) => {
+        if (!currentVoiceRoomId) {
+            alert("ボイスチャンネルに接続していません。左側のボイスチャンネル（例: 💬 ロビー 1）に接続してから「VCで一緒に流す」を押してください！");
+            return;
+        }
+        await startVcYoutubeParty(videoId, title);
+    };
 
     const defaultStamps = ['やっほー！', 'おーい！', 'バイバイ！', 'ボイチャできる？'];
     const stampEmojis = { 'やっほー！': '👋', 'おーい！': '📣', 'バイバイ！': '👋', 'ボイチャできる？': '🎤', 'Yes!!!': '✅', 'No!!!': '❌', 'そろそろやめるかも': '😴', 'よろしくぅ！': '🙌', 'わからん': '🤔', 'うんうん': '👍', 'へぇ〜〜': '😮', '話聞けやボケェ': '💢' };
@@ -1393,6 +1578,9 @@
 
         // Setup Live Subtitles & Soundboard listeners for this room
         setupRoomEventBroadcasting(roomId);
+
+        // Setup YouTube Watch Party listener for this room
+        setupVoiceRoomYoutubeListener(roomId);
     }
 
     function setupSignalingListeners(roomId) {
@@ -1688,6 +1876,12 @@
 
         currentVoiceRoomId = null;
         currentVoiceRoomName = "";
+
+        const ytStage = document.getElementById('youtubeStage');
+        const ytWrap = document.getElementById('youtubeIframeWrap');
+        if (ytStage) ytStage.style.display = 'none';
+        if (ytWrap) ytWrap.innerHTML = '';
+        currentVcYoutubeId = null;
 
         document.getElementById('activeVoiceRoomName').innerText = "未接続 (チャンネルを選択してください)";
         document.getElementById('rtcConnectionBadge').className = 'rtc-badge disconnected';
@@ -2372,6 +2566,7 @@
         listenVoiceInvites();
         renderShop();
         setupGroupModal();
+        setupYoutubeInteractions();
         startNewMessageListener();
         setupSpeechRecognition();
         startChannelCounters();
@@ -3451,10 +3646,39 @@
                     if (msg.imageUrl) {
                         imageHtml = `<img src="${msg.imageUrl}" class="message-image" alt="添付写真" onclick="window.openImageViewer('${msg.imageUrl}')" title="クリックして全画面表示">`;
                     }
+                    
+                    // YouTube Embed Card
+                    let ytCardHtml = '';
+                    const ytVideoId = msg.youtubeId || extractYoutubeVideoId(msg.text);
+                    if (ytVideoId) {
+                        const ytCardId = `yt_card_${msgId}`;
+                        const safeYtTitle = escapeHtml(msg.youtubeTitle || 'YouTube 動画');
+                        ytCardHtml = `
+                            <div class="youtube-chat-card" id="${ytCardId}">
+                                <div class="youtube-chat-thumb-wrap" onclick="window.playYoutubeInline('${ytCardId}', '${ytVideoId}')" title="クリックしてチャット内で再生">
+                                    <img src="https://img.youtube.com/vi/${ytVideoId}/hqdefault.jpg" class="youtube-chat-thumb" alt="YouTube Thumbnail">
+                                    <div class="youtube-play-overlay">
+                                        <div class="youtube-play-btn-circle"><i class="fas fa-play" style="margin-left:4px;"></i></div>
+                                    </div>
+                                </div>
+                                <div class="youtube-chat-info">
+                                    <div class="youtube-chat-title"><i class="fab fa-youtube" style="color:#ff0000;"></i> ${safeYtTitle}</div>
+                                    <div class="youtube-chat-actions">
+                                        <button class="youtube-vc-play-btn" onclick="window.playYoutubeInCurrentVc('${ytVideoId}', '${safeYtTitle.replace(/'/g, "\\'")}')" title="接続中のボイスチャットでメンバー全員と一緒に再生">
+                                            <i class="fab fa-youtube"></i> 🔊 VCで一緒に流す
+                                        </button>
+                                        <a href="https://www.youtube.com/watch?v=${ytVideoId}" target="_blank" rel="noopener noreferrer" style="font-size:0.75rem; color:#a8b4fc; text-decoration:none;">YouTubeで開く ↗</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
                     div.innerHTML = `
                         <div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${escapeHtml(msg.senderName)}</strong></div>
                         ${replyHtml}
                         ${msg.text ? `<div class="message-text">${escapeHtml(msg.text || '')}</div>` : ''}
+                        ${ytCardHtml}
                         ${imageHtml}
                         <div class="message-footer">${replyBtn}<span class="timestamp">${formatTime(msg.timestamp)}</span></div>
                     `;
@@ -3510,6 +3734,14 @@
             timestamp: Date.now(),
             readBy: { [currentUser.uid]: true }
         };
+        
+        // Auto-detect YouTube URL in text
+        const detectedYtId = extractYoutubeVideoId(text);
+        if (detectedYtId) {
+            msgData.youtubeId = detectedYtId;
+            msgData.youtubeTitle = "YouTube 動画";
+        }
+
         if (pendingImageAttachment) {
             msgData.imageUrl = pendingImageAttachment;
         }
@@ -3612,6 +3844,143 @@
             modal.style.display = 'none';
             document.getElementById('overlay').style.display = 'none';
         };
+    }
+
+    // --- YouTube Modals, Watch Party & Chat Send Integration ---
+    function setupYoutubeInteractions() {
+        const modal = document.getElementById('youtubeModal');
+        const overlay = document.getElementById('overlay');
+        const urlInput = document.getElementById('youtubeUrlInput');
+
+        const openModal = (defaultUrl = '') => {
+            if (modal) {
+                if (urlInput) urlInput.value = defaultUrl;
+                modal.style.display = 'block';
+                if (overlay) overlay.style.display = 'block';
+                if (urlInput) urlInput.focus();
+            }
+        };
+
+        const closeModal = () => {
+            if (modal) modal.style.display = 'none';
+            if (overlay) overlay.style.display = 'none';
+        };
+
+        // Button to open YouTube modal from Chat
+        document.getElementById('sendYoutubeBtn')?.addEventListener('click', () => {
+            openModal('');
+        });
+
+        // Button to open YouTube Watch Party from VC Header
+        document.getElementById('openVcYoutubeBtn')?.addEventListener('click', () => {
+            if (!currentVoiceRoomId) {
+                alert("ボイスチャンネルに接続していません。まず左側のチャンネル（例: 💬 ロビー 1）に接続してください！");
+                return;
+            }
+            openModal('');
+        });
+
+        // Button to change video from VC YouTube Stage
+        document.getElementById('changeVcYoutubeBtn')?.addEventListener('click', () => {
+            openModal('');
+        });
+
+        // Fullscreen YouTube Stage
+        document.getElementById('fullscreenVcYoutubeBtn')?.addEventListener('click', () => {
+            const wrap = document.getElementById('youtubeIframeWrap');
+            if (!wrap) return;
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            } else {
+                wrap.requestFullscreen().catch(() => {});
+            }
+        });
+
+        // Close/Stop VC YouTube Watch Party
+        document.getElementById('closeVcYoutubeBtn')?.addEventListener('click', async () => {
+            if (confirm("全員のYouTube同時再生を終了しますか？")) {
+                await stopVcYoutubeParty();
+            }
+        });
+
+        // Close Modal button
+        document.getElementById('closeYoutubeModalBtn')?.addEventListener('click', closeModal);
+
+        // Preset items click
+        document.querySelectorAll('.youtube-preset-item').forEach(item => {
+            item.onclick = () => {
+                const url = item.getAttribute('data-url');
+                const title = item.getAttribute('data-title');
+                if (urlInput) {
+                    urlInput.value = url;
+                    urlInput.setAttribute('data-preset-title', title);
+                }
+                document.querySelectorAll('.youtube-preset-item').forEach(i => i.style.borderColor = 'var(--border-color)');
+                item.style.borderColor = 'var(--accent)';
+                playTone(550, 0.05, 'sine', 0.1);
+            };
+        });
+
+        // Submit to Chat Button
+        document.getElementById('submitYoutubeToChatBtn')?.addEventListener('click', async () => {
+            if (!currentChatId) {
+                alert("チャットを選択してください");
+                return;
+            }
+            const val = urlInput?.value.trim() || '';
+            const videoId = extractYoutubeVideoId(val);
+            if (!videoId) {
+                alert("有効なYouTubeのURLまたは動画IDを入力してください");
+                return;
+            }
+
+            const presetTitle = urlInput?.getAttribute('data-preset-title') || 'YouTube 動画';
+            const cleanTitle = filterNsfwWords(presetTitle).text;
+
+            const msgData = {
+                senderId: currentUser.uid,
+                senderName: currentUser.name,
+                senderIcon: currentUser.icon,
+                text: `https://www.youtube.com/watch?v=${videoId}`,
+                youtubeId: videoId,
+                youtubeTitle: cleanTitle,
+                timestamp: Date.now(),
+                readBy: { [currentUser.uid]: true }
+            };
+
+            if (currentChatType === 'global') await db.ref('globalMessages').push(msgData);
+            else if (currentChatType === 'friend') await db.ref(`privateChats/${[currentUser.uid, currentChatId.replace('friend_', '')].sort().join('_')}/messages`).push(msgData);
+            else await db.ref(`groups/${currentChatId}/messages`).push(msgData);
+
+            closeModal();
+            if (urlInput) {
+                urlInput.value = '';
+                urlInput.removeAttribute('data-preset-title');
+            }
+            playTone(700, 0.08, 'sine', 0.15);
+        });
+
+        // Submit to VC Watch Party Button
+        document.getElementById('submitYoutubeToVcBtn')?.addEventListener('click', async () => {
+            if (!currentVoiceRoomId) {
+                alert("ボイスチャンネルに未接続です。まずボイスチャンネルに参加してください！");
+                return;
+            }
+            const val = urlInput?.value.trim() || '';
+            const videoId = extractYoutubeVideoId(val);
+            if (!videoId) {
+                alert("有効なYouTubeのURLまたは動画IDを入力してください");
+                return;
+            }
+
+            const presetTitle = urlInput?.getAttribute('data-preset-title') || 'YouTube 動画';
+            await startVcYoutubeParty(videoId, presetTitle);
+            closeModal();
+            if (urlInput) {
+                urlInput.value = '';
+                urlInput.removeAttribute('data-preset-title');
+            }
+        });
     }
 
     // --- Shop System ---
