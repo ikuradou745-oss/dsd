@@ -354,21 +354,21 @@
                         </div>
                     </div>
 
-                    <!-- Screen Sharing Stage -->
-                    <div class="screenshare-stage" id="screenShareStage">
-                        <div class="screenshare-header">
-                            <div class="screenshare-title" id="screenShareTitle">
-                                <i class="fas fa-desktop"></i> <span id="screenSharePresenterName">画面共有中</span>
-                            </div>
-                            <div style="display:flex; gap:8px;">
-                                <button id="fullscreenScreenShareBtn" class="screenshare-btn"><i class="fas fa-expand"></i> 全画面</button>
-                                <button id="stopMyScreenShareBtn" class="screenshare-btn" style="background:var(--danger); display:none;"><i class="fas fa-stop-circle"></i> 共有停止</button>
-                            </div>
-                        </div>
-                        <div class="screenshare-video-wrap">
-                            <video id="screenShareVideo" class="screenshare-video" autoplay playsinline></video>
-                        </div>
+            <!-- Screen Sharing Stage -->
+            <div class="screenshare-stage" id="screenShareStage">
+                <div class="screenshare-header">
+                    <div class="screenshare-title" id="screenShareTitle">
+                        <i class="fas fa-desktop"></i> <span id="screenSharePresenterName">画面共有中</span>
                     </div>
+                    <div style="display:flex; gap:8px;">
+                        <button id="fullscreenScreenShareBtn" class="screenshare-btn"><i class="fas fa-expand"></i> 全画面</button>
+                        <button id="stopMyScreenShareBtn" class="screenshare-btn" style="background:var(--danger); display:none;"><i class="fas fa-stop-circle"></i> 共有停止</button>
+                    </div>
+                </div>
+                <div class="screenshare-video-wrap">
+                    <video id="screenShareVideo" class="screenshare-video" autoplay playsinline muted></video>
+                </div>
+            </div>
 
                     <!-- Participant Cards Grid -->
                     <div class="voice-grid-area" id="voiceParticipantsGrid">
@@ -721,6 +721,7 @@
     let currentVoiceRoomName = "";
     let peerConnections = {}; // targetUid -> RTCPeerConnection
     let remoteAudioElements = {}; // targetUid -> HTMLAudioElement
+    let remoteVideoStreams = {}; // targetUid -> MediaStream (Screen share)
     let peerGainNodes = {}; // targetUid -> GainNode (for 0% - 500% amplification)
     let pendingCandidates = {}; // targetUid -> array of RTCIceCandidate
     let userVolumes = {}; // targetUid -> volume factor (e.g. 0.5 = 50%, 1.0 = 100%, 5.0 = 500%)
@@ -959,22 +960,44 @@
         db.ref(`voiceRooms/${roomId}/screenshare`).on('value', (snap) => {
             const ssData = snap.val();
             const stage = document.getElementById('screenShareStage');
+            const videoEl = document.getElementById('screenShareVideo');
             const title = document.getElementById('screenSharePresenterName');
             const stopBtn = document.getElementById('stopMyScreenShareBtn');
 
             if (ssData && ssData.active) {
-                stage.classList.add('active');
-                title.innerText = `${ssData.name} さんの画面共有`;
+                if (stage) stage.classList.add('active');
+                if (title) title.innerText = `${ssData.name} さんの画面共有`;
+
                 if (ssData.uid === currentUser.uid) {
-                    stopBtn.style.display = 'inline-block';
+                    // Current user is the presenter
+                    if (stopBtn) stopBtn.style.display = 'inline-block';
+                    if (localScreenStream && videoEl) {
+                        if (videoEl.srcObject !== localScreenStream) {
+                            videoEl.srcObject = localScreenStream;
+                        }
+                        videoEl.muted = true;
+                        videoEl.play().catch(e => console.log("Local video play handled:", e));
+                    }
                 } else {
-                    stopBtn.style.display = 'none';
+                    // Remote peer is the presenter
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    const presenterUid = ssData.uid;
+                    const rStream = remoteVideoStreams[presenterUid];
+                    if (rStream && videoEl) {
+                        if (videoEl.srcObject !== rStream) {
+                            videoEl.srcObject = rStream;
+                        }
+                        videoEl.muted = true;
+                        videoEl.play().catch(e => console.log("Remote video play handled:", e));
+                    }
                 }
-            } else if (!isScreenSharing) {
-                stage.classList.remove('active');
-                const videoEl = document.getElementById('screenShareVideo');
+            } else {
+                if (stage) stage.classList.remove('active');
                 if (videoEl) videoEl.srcObject = null;
-                stopBtn.style.display = 'none';
+                if (stopBtn) stopBtn.style.display = 'none';
+                if (isScreenSharing && localScreenStream) {
+                    stopScreenShare();
+                }
             }
         });
 
@@ -1085,19 +1108,10 @@
         const pc = new RTCPeerConnection(rtcConfig);
         peerConnections[targetUid] = pc;
 
-        // Proactively add transceivers so SDP negotiation always creates both audio and video m-lines
-        try {
-            pc.addTransceiver('audio', { direction: 'sendrecv' });
-            pc.addTransceiver('video', { direction: 'sendrecv' });
-        } catch(e) {
-            console.warn("addTransceiver fallback:", e);
-        }
-
         // Add local audio tracks if available
         if (localAudioStream && localAudioStream.getAudioTracks().length > 0) {
             const audioTrack = localAudioStream.getAudioTracks()[0];
-            const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio') ||
-                                pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'audio')?.sender;
+            const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
             if (audioSender) {
                 audioSender.replaceTrack(audioTrack).catch(() => {});
             } else {
@@ -1108,8 +1122,7 @@
         // Add local screen share track if currently sharing
         if (localScreenStream && localScreenStream.getVideoTracks().length > 0) {
             const videoTrack = localScreenStream.getVideoTracks()[0];
-            const videoSender = pc.getSenders().find(s => s.track && s.track.kind === 'video') ||
-                                pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video')?.sender;
+            const videoSender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
             if (videoSender) {
                 videoSender.replaceTrack(videoTrack).catch(() => {});
             } else {
@@ -1156,21 +1169,38 @@
                 }
             } else if (event.track.kind === 'video') {
                 // Screen Sharing video track from remote peer
+                const remoteVideoStream = event.streams[0] || new MediaStream([event.track]);
+                remoteVideoStreams[targetUid] = remoteVideoStream;
+
                 const screenVideo = document.getElementById('screenShareVideo');
                 const screenStage = document.getElementById('screenShareStage');
-                if (screenVideo && screenStage) {
-                    const remoteVideoStream = event.streams[0] || new MediaStream([event.track]);
-                    screenVideo.srcObject = remoteVideoStream;
-                    screenVideo.play().catch(e => console.log("Video play handled:", e));
-                    screenStage.classList.add('active');
+
+                if (currentVoiceRoomId) {
+                    db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).once('value', (snap) => {
+                        const ssData = snap.val();
+                        if (ssData && ssData.active && ssData.uid === targetUid) {
+                            if (screenVideo && screenStage) {
+                                screenVideo.srcObject = remoteVideoStream;
+                                screenVideo.muted = true;
+                                screenVideo.play().catch(e => console.log("Remote video play handled:", e));
+                                screenStage.classList.add('active');
+                            }
+                        }
+                    });
                 }
 
                 event.track.onended = () => {
-                    if (!isScreenSharing) {
-                        const video = document.getElementById('screenShareVideo');
-                        const stage = document.getElementById('screenShareStage');
-                        if (video) video.srcObject = null;
-                        if (stage) stage.classList.remove('active');
+                    delete remoteVideoStreams[targetUid];
+                    if (!isScreenSharing && currentVoiceRoomId) {
+                        db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).once('value', (snap) => {
+                            const ssData = snap.val();
+                            if (ssData && ssData.uid === targetUid) {
+                                const stage = document.getElementById('screenShareStage');
+                                const video = document.getElementById('screenShareVideo');
+                                if (stage) stage.classList.remove('active');
+                                if (video) video.srcObject = null;
+                            }
+                        });
                     }
                 };
             }
@@ -1241,6 +1271,7 @@
             try { peerGainNodes[targetUid].disconnect(); } catch(e) {}
             delete peerGainNodes[targetUid];
         }
+        delete remoteVideoStreams[targetUid];
         delete pendingCandidates[targetUid];
     }
 
@@ -1260,6 +1291,7 @@
 
         // Close peer connections
         Object.keys(peerConnections).forEach(uid => closePeerConnection(uid));
+        remoteVideoStreams = {};
 
         if (signalingRef) {
             signalingRef.off();
@@ -1288,7 +1320,7 @@
         }
         try {
             localScreenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always", frameRate: { max: 30 } },
+                video: { cursor: "always", frameRate: { ideal: 30, max: 30 } },
                 audio: false
             });
 
@@ -1301,27 +1333,28 @@
             const screenTitle = document.getElementById('screenSharePresenterName');
             const stopBtn = document.getElementById('stopMyScreenShareBtn');
 
-            screenStage.classList.add('active');
-            screenVideo.srcObject = localScreenStream;
-            screenTitle.innerText = `${currentUser.name} さんの画面共有 (配信中)`;
-            stopBtn.style.display = 'inline-block';
+            if (screenStage && screenVideo) {
+                screenStage.classList.add('active');
+                screenVideo.srcObject = localScreenStream;
+                screenVideo.muted = true;
+                screenVideo.play().catch(e => console.log("Local video play:", e));
+                if (screenTitle) screenTitle.innerText = `${currentUser.name} さんの画面共有 (配信中)`;
+                if (stopBtn) stopBtn.style.display = 'inline-block';
+            }
 
-            // Add/replace track in all peer connections and broadcast renegotiation offer
+            // Broadcast track to all connected peers
             for (const targetUid of Object.keys(peerConnections)) {
                 const pc = peerConnections[targetUid];
-                let replaced = false;
                 const senders = pc.getSenders();
                 const vSender = senders.find(s => s.track && s.track.kind === 'video') ||
                                 senders.find(s => !s.track || s.track.kind === 'video');
                 if (vSender) {
                     try {
                         await vSender.replaceTrack(videoTrack);
-                        replaced = true;
                     } catch(e) {
                         console.warn("replaceTrack error:", e);
                     }
-                }
-                if (!replaced) {
+                } else {
                     try {
                         pc.addTrack(videoTrack, localScreenStream);
                     } catch(e) {
@@ -1364,6 +1397,7 @@
             playTone(700, 0.15, 'sine', 0.2);
         } catch(err) {
             console.warn("Screen share cancelled or failed:", err);
+            isScreenSharing = false;
         }
     }
 
@@ -1378,7 +1412,7 @@
         const screenVideo = document.getElementById('screenShareVideo');
         const stopBtn = document.getElementById('stopMyScreenShareBtn');
 
-        screenStage.classList.remove('active');
+        if (screenStage) screenStage.classList.remove('active');
         if (screenVideo) screenVideo.srcObject = null;
         if (stopBtn) stopBtn.style.display = 'none';
 
