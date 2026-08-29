@@ -1085,18 +1085,36 @@
         const pc = new RTCPeerConnection(rtcConfig);
         peerConnections[targetUid] = pc;
 
-        // Add local audio tracks
-        if (localAudioStream) {
-            localAudioStream.getAudioTracks().forEach(track => {
-                pc.addTrack(track, localAudioStream);
-            });
+        // Proactively add transceivers so SDP negotiation always creates both audio and video m-lines
+        try {
+            pc.addTransceiver('audio', { direction: 'sendrecv' });
+            pc.addTransceiver('video', { direction: 'sendrecv' });
+        } catch(e) {
+            console.warn("addTransceiver fallback:", e);
+        }
+
+        // Add local audio tracks if available
+        if (localAudioStream && localAudioStream.getAudioTracks().length > 0) {
+            const audioTrack = localAudioStream.getAudioTracks()[0];
+            const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio') ||
+                                pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'audio')?.sender;
+            if (audioSender) {
+                audioSender.replaceTrack(audioTrack).catch(() => {});
+            } else {
+                pc.addTrack(audioTrack, localAudioStream);
+            }
         }
 
         // Add local screen share track if currently sharing
-        if (localScreenStream) {
-            localScreenStream.getVideoTracks().forEach(track => {
-                pc.addTrack(track, localScreenStream);
-            });
+        if (localScreenStream && localScreenStream.getVideoTracks().length > 0) {
+            const videoTrack = localScreenStream.getVideoTracks()[0];
+            const videoSender = pc.getSenders().find(s => s.track && s.track.kind === 'video') ||
+                                pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video')?.sender;
+            if (videoSender) {
+                videoSender.replaceTrack(videoTrack).catch(() => {});
+            } else {
+                pc.addTrack(videoTrack, localScreenStream);
+            }
         }
 
         // Handle remote stream tracks (Audio & Screen Share Video)
@@ -1141,9 +1159,20 @@
                 const screenVideo = document.getElementById('screenShareVideo');
                 const screenStage = document.getElementById('screenShareStage');
                 if (screenVideo && screenStage) {
-                    screenVideo.srcObject = event.streams[0];
+                    const remoteVideoStream = event.streams[0] || new MediaStream([event.track]);
+                    screenVideo.srcObject = remoteVideoStream;
+                    screenVideo.play().catch(e => console.log("Video play handled:", e));
                     screenStage.classList.add('active');
                 }
+
+                event.track.onended = () => {
+                    if (!isScreenSharing) {
+                        const video = document.getElementById('screenShareVideo');
+                        const stage = document.getElementById('screenShareStage');
+                        if (video) video.srcObject = null;
+                        if (stage) stage.classList.remove('active');
+                    }
+                };
             }
         };
 
@@ -1277,10 +1306,42 @@
             screenTitle.innerText = `${currentUser.name} さんの画面共有 (配信中)`;
             stopBtn.style.display = 'inline-block';
 
-            // Add video track to all active peer connections
-            Object.values(peerConnections).forEach(pc => {
-                pc.addTrack(videoTrack, localScreenStream);
-            });
+            // Add/replace track in all peer connections and broadcast renegotiation offer
+            for (const targetUid of Object.keys(peerConnections)) {
+                const pc = peerConnections[targetUid];
+                let replaced = false;
+                const senders = pc.getSenders();
+                const vSender = senders.find(s => s.track && s.track.kind === 'video') ||
+                                senders.find(s => !s.track || s.track.kind === 'video');
+                if (vSender) {
+                    try {
+                        await vSender.replaceTrack(videoTrack);
+                        replaced = true;
+                    } catch(e) {
+                        console.warn("replaceTrack error:", e);
+                    }
+                }
+                if (!replaced) {
+                    try {
+                        pc.addTrack(videoTrack, localScreenStream);
+                    } catch(e) {
+                        console.warn("addTrack error:", e);
+                    }
+                }
+
+                // Send renegotiation offer to peer so they receive video stream
+                try {
+                    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+                    offer.sdp = tuneSdpAudio(offer.sdp);
+                    await pc.setLocalDescription(offer);
+                    await db.ref(`voiceSignals/${currentVoiceRoomId}/${targetUid}/offers`).push({
+                        fromUid: currentUser.uid,
+                        offer: { type: offer.type, sdp: offer.sdp }
+                    });
+                } catch(renegErr) {
+                    console.error("Renegotiation offer error:", renegErr);
+                }
+            }
 
             // Update database state
             await db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).set({
@@ -1296,7 +1357,10 @@
             };
 
             const toggleBtn = document.getElementById('toggleScreenShareBtn');
-            if (toggleBtn) toggleBtn.classList.add('active-toggle');
+            if (toggleBtn) {
+                toggleBtn.classList.add('active-toggle');
+                toggleBtn.title = "画面共有を停止";
+            }
             playTone(700, 0.15, 'sine', 0.2);
         } catch(err) {
             console.warn("Screen share cancelled or failed:", err);
@@ -1318,21 +1382,34 @@
         if (screenVideo) screenVideo.srcObject = null;
         if (stopBtn) stopBtn.style.display = 'none';
 
-        // Remove video track senders from peer connections
-        Object.values(peerConnections).forEach(pc => {
+        // Clear video tracks from peer connections & renegotiate
+        for (const targetUid of Object.keys(peerConnections)) {
+            const pc = peerConnections[targetUid];
             const senders = pc.getSenders();
             const vSender = senders.find(s => s.track && s.track.kind === 'video');
             if (vSender) {
-                try { pc.removeTrack(vSender); } catch(e) {}
+                try { await vSender.replaceTrack(null); } catch(e) {}
             }
-        });
+            try {
+                const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+                offer.sdp = tuneSdpAudio(offer.sdp);
+                await pc.setLocalDescription(offer);
+                await db.ref(`voiceSignals/${currentVoiceRoomId}/${targetUid}/offers`).push({
+                    fromUid: currentUser.uid,
+                    offer: { type: offer.type, sdp: offer.sdp }
+                });
+            } catch(e) {}
+        }
 
         if (currentVoiceRoomId) {
             await db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).remove();
         }
 
         const toggleBtn = document.getElementById('toggleScreenShareBtn');
-        if (toggleBtn) toggleBtn.classList.remove('active-toggle');
+        if (toggleBtn) {
+            toggleBtn.classList.remove('active-toggle');
+            toggleBtn.title = "🖥️ 画面共有 (Screen Share)";
+        }
         playTone(350, 0.12, 'sine', 0.2);
     }
 
@@ -1667,6 +1744,41 @@
                 });
             }
         };
+
+        // Screen Share Toggle Button
+        const screenShareToggleBtn = document.getElementById('toggleScreenShareBtn');
+        if (screenShareToggleBtn) {
+            screenShareToggleBtn.onclick = async () => {
+                if (isScreenSharing) {
+                    await stopScreenShare();
+                } else {
+                    await startScreenShare();
+                }
+            };
+        }
+
+        // Stop My Screen Share Button inside stage
+        const stopMyScreenBtn = document.getElementById('stopMyScreenShareBtn');
+        if (stopMyScreenBtn) {
+            stopMyScreenBtn.onclick = async () => {
+                await stopScreenShare();
+            };
+        }
+
+        // Fullscreen Screen Share Button
+        const fullscreenBtn = document.getElementById('fullscreenScreenShareBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.onclick = () => {
+                const video = document.getElementById('screenShareVideo');
+                if (video) {
+                    if (video.requestFullscreen) {
+                        video.requestFullscreen();
+                    } else if (video.webkitRequestFullscreen) {
+                        video.webkitRequestFullscreen();
+                    }
+                }
+            };
+        }
 
         // Leave Voice Room
         document.getElementById('leaveRtcVoiceBtn').onclick = () => leaveRtcVoiceRoom();
