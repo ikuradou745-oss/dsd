@@ -374,7 +374,7 @@
                     </div>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <button id="refreshScreenShareBtn" class="screenshare-btn" style="background:#3c3f45;" title="映像の再読込・リフレッシュ"><i class="fas fa-sync-alt"></i> 再読込</button>
-                        <button id="toggleScreenModeBtn" class="screenshare-btn" style="background:#3c3f45;" title="WebRTCとリレー配信の切り替え"><i class="fas fa-satellite-dish"></i> モード切替</button>
+                        <button id="pipScreenShareBtn" class="screenshare-btn" style="background:#3c3f45;" title="ピクチャーインピクチャー (子画面表示)"><i class="fas fa-external-link-alt"></i> 子画面(PiP)</button>
                         <button id="fullscreenScreenShareBtn" class="screenshare-btn" title="全画面表示"><i class="fas fa-expand"></i> 全画面</button>
                         <button id="stopMyScreenShareBtn" class="screenshare-btn" style="background:var(--danger); display:none;" title="自分の画面共有を終了"><i class="fas fa-stop-circle"></i> 共有停止</button>
                     </div>
@@ -786,8 +786,28 @@
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun.services.mozilla.com' }
-        ]
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' },
+            { urls: 'stun:stun.services.mozilla.com' },
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelay',
+                credential: 'openrelay'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelay',
+                credential: 'openrelay'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelay',
+                credential: 'openrelay'
+            }
+        ],
+        iceCandidatePoolSize: 10,
+        bundlePolicy: 'max-bundle'
     };
 
     let localAudioStream = null;
@@ -1309,7 +1329,7 @@
             if (ssData && ssData.active) {
                 activePresenterUid = ssData.uid;
                 if (stage) stage.classList.add('active');
-                if (title) title.innerText = `${ssData.name} さんの画面共有`;
+                if (title) title.innerText = `${ssData.name || 'メンバー'} さんの画面共有`;
 
                 if (ssData.uid === currentUser.uid) {
                     // Current user is the presenter
@@ -1319,6 +1339,7 @@
                             videoEl.srcObject = localScreenStream;
                         }
                         videoEl.muted = true;
+                        videoEl.playsInline = true;
                         videoEl.style.display = 'block';
                         if (canvasEl) canvasEl.style.display = 'none';
                         videoEl.play().catch(e => console.log("Local video play handled:", e));
@@ -1327,6 +1348,13 @@
                 } else {
                     // Remote peer is the presenter
                     if (stopBtn) stopBtn.style.display = 'none';
+                    
+                    // Show notification if user is currently browsing other tabs (e.g. Chat)
+                    const isVoiceTabActive = document.querySelector('.sidebar-icon[data-tab="voice"]')?.classList.contains('active');
+                    if (!isVoiceTabActive) {
+                        showScreenShareToast(ssData.name || 'メンバー');
+                    }
+
                     updateRemoteScreenDisplay();
                 }
             } else {
@@ -1348,12 +1376,12 @@
             }
         });
 
-        // Listen for Real-Time Frame Relay (High-definition zero-black-screen stream)
+        // Listen for Real-Time Frame Relay (Instant zero-fail visual mirror across all networks)
         db.ref(`voiceRooms/${roomId}/screenFrame`).on('value', (snap) => {
             const frameData = snap.val();
-            if (frameData && frameData.frame && frameData.uid !== currentUser.uid && activePresenterUid === frameData.uid) {
+            if (frameData && frameData.frame && frameData.uid !== currentUser.uid) {
                 lastReceivedFrameTs = Date.now();
-                renderRelayFrame(frameData.frame);
+                renderRelayFrame(frameData.frame, frameData.name);
             }
         });
 
@@ -1618,6 +1646,44 @@
         delete pendingCandidates[targetUid];
     }
 
+    // --- Global Screen Share Notification Toast ---
+    function showScreenShareToast(presenterName) {
+        const area = document.getElementById('globalInviteArea');
+        if (!area || document.getElementById('screenShareToast')) return;
+        const toast = document.createElement('div');
+        toast.className = 'invite-notification call-invite';
+        toast.id = 'screenShareToast';
+        toast.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="font-size:24px; color:var(--accent);"><i class="fas fa-desktop"></i></div>
+                    <div>
+                        <strong>${escapeHtml(presenterName)}</strong> さんが画面共有中！
+                        <div style="font-size:0.8rem; color:var(--text-muted);">ボイスチャンネルで画面を配信しています</div>
+                    </div>
+                </div>
+                <button class="invite-dismiss-btn" title="閉じる"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="margin-top:8px;">
+                <button class="btn-success openVoiceFromShareBtn" style="width:100%;"><i class="fas fa-tv"></i> 共有画面を見る</button>
+            </div>
+        `;
+        area.prepend(toast);
+        playTone(650, 0.1, 'sine', 0.2);
+
+        toast.querySelector('.invite-dismiss-btn').onclick = () => {
+            toast.remove();
+        };
+        toast.querySelector('.openVoiceFromShareBtn').onclick = () => {
+            toast.remove();
+            document.querySelector('.sidebar-icon[data-tab="voice"]').click();
+        };
+
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 15000);
+    }
+
     // --- Dual Engine Screen Rendering ---
     function updateRemoteScreenDisplay() {
         if (!activePresenterUid) return;
@@ -1630,57 +1696,64 @@
         const remoteStream = remoteVideoStreams[activePresenterUid];
         const hasActiveWebRtcTrack = remoteStream && remoteStream.getVideoTracks().some(t => t.readyState === 'live' && t.enabled);
 
-        if (screenShareDisplayMode === 'relay') {
-            // Force Relay Canvas mode
-            if (videoEl) {
-                videoEl.style.display = 'none';
-                videoEl.pause();
-            }
-            if (canvasEl) canvasEl.style.display = 'block';
-            if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:#58a6ff;"></i> HDリレー配信 (固定)';
-            return;
-        }
-
-        if (hasActiveWebRtcTrack && videoEl && screenShareDisplayMode !== 'relay') {
+        if (hasActiveWebRtcTrack && videoEl) {
             if (videoEl.srcObject !== remoteStream) {
                 videoEl.srcObject = remoteStream;
             }
             videoEl.muted = true;
             videoEl.playsInline = true;
-            videoEl.style.display = 'block';
-            if (canvasEl) canvasEl.style.display = 'none';
+
+            const onVideoReady = () => {
+                if (videoEl.videoWidth > 0 && !videoEl.paused) {
+                    videoEl.style.display = 'block';
+                    if (canvasEl) canvasEl.style.display = 'none';
+                    if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:var(--success);"></i> WebRTC P2P (超低遅延)';
+                }
+            };
+
+            videoEl.onloadedmetadata = onVideoReady;
+            videoEl.onplaying = onVideoReady;
 
             videoEl.play().then(() => {
-                if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:var(--success);"></i> WebRTC P2P (超低遅延)';
+                onVideoReady();
             }).catch(err => {
-                console.log("WebRTC video play failed, switching to relay canvas:", err);
-                if (canvasEl) {
-                    canvasEl.style.display = 'block';
-                    if (videoEl) videoEl.style.display = 'none';
-                }
-                if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:#58a6ff;"></i> HDリレー配信 (自動切替)';
+                console.log("WebRTC video play pending, keeping canvas visible:", err);
+                if (canvasEl) canvasEl.style.display = 'block';
+                if (videoEl) videoEl.style.display = 'none';
+                if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:#58a6ff;"></i> HDリアルタイム同期 (接続中)';
             });
         } else {
-            // If WebRTC is not ready yet or restricted by NAT, automatically show the HD Frame canvas
+            // When WebRTC is connecting or blocked, seamlessly present the real-time frame canvas
             if (canvasEl) canvasEl.style.display = 'block';
             if (videoEl) videoEl.style.display = 'none';
-            if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:#58a6ff;"></i> HDリレー配信 (接続中)';
+            if (badge) badge.innerHTML = '<i class="fas fa-circle" style="color:#58a6ff;"></i> HDリアルタイム同期 (接続中)';
         }
     }
 
-    function renderRelayFrame(base64Image) {
+    function renderRelayFrame(base64Image, presenterName) {
         if (!base64Image) return;
+        const stage = document.getElementById('screenShareStage');
         const canvas = document.getElementById('screenShareCanvas');
         const videoEl = document.getElementById('screenShareVideo');
         const badge = document.getElementById('screenShareModeBadge');
+        const title = document.getElementById('screenSharePresenterName');
         if (!canvas) return;
 
-        // If WebRTC is not currently showing, display canvas
-        if (screenShareDisplayMode === 'relay' || (videoEl && videoEl.style.display === 'none')) {
+        if (stage && !stage.classList.contains('active')) {
+            stage.classList.add('active');
+        }
+        if (title && presenterName) {
+            title.innerText = `${presenterName} さんの画面共有`;
+        }
+
+        // If WebRTC is not yet fully rendering video frames, display canvas
+        const isWebRtcLive = videoEl && videoEl.srcObject && videoEl.videoWidth > 0 && !videoEl.paused && videoEl.style.display !== 'none';
+
+        if (!isWebRtcLive) {
             canvas.style.display = 'block';
             if (videoEl) videoEl.style.display = 'none';
-            if (badge && !badge.innerText.includes('リレー')) {
-                badge.innerHTML = '<i class="fas fa-circle" style="color:#58a6ff;"></i> HDリレー配信 (安定接続)';
+            if (badge) {
+                badge.innerHTML = '<i class="fas fa-circle" style="color:var(--success);"></i> LIVE (リアルタイム同期)';
             }
         }
 
@@ -1696,24 +1769,10 @@
         img.src = base64Image;
     }
 
-    function cycleScreenShareMode() {
-        if (screenShareDisplayMode === 'auto') {
-            screenShareDisplayMode = 'relay';
-            alert("画面共有モード: 【HDリレー配信 (固定)】に切り替えました。ファイアウォール下でも100%確実に表示されます。");
-        } else if (screenShareDisplayMode === 'relay') {
-            screenShareDisplayMode = 'webrtc';
-            alert("画面共有モード: 【WebRTC P2P (固定)】に切り替えました。超低遅延で表示します。");
-        } else {
-            screenShareDisplayMode = 'auto';
-            alert("画面共有モード: 【自動判定 (Auto)】に戻しました。P2P接続優先、失敗時はリレーへ自動切替します。");
-        }
-        updateRemoteScreenDisplay();
-    }
-
     async function refreshScreenShare() {
         playTone(600, 0.08, 'sine', 0.15);
         if (currentVoiceRoomId && activePresenterUid) {
-            // Request renegotiation offer
+            // Request renegotiation offer with ICE restart
             for (const targetUid of Object.keys(peerConnections)) {
                 const pc = peerConnections[targetUid];
                 try {
@@ -1812,6 +1871,7 @@
                 screenStage.classList.add('active');
                 screenVideo.srcObject = localScreenStream;
                 screenVideo.muted = true;
+                screenVideo.playsInline = true;
                 screenVideo.style.display = 'block';
                 if (screenCanvas) screenCanvas.style.display = 'none';
                 screenVideo.play().catch(e => console.log("Local video play:", e));
@@ -1854,42 +1914,44 @@
                 }
             }
 
-            // 2. Start HD Frame Streamer Loop (Relay engine ensures 100% visibility even under strict NAT/Firewall)
-            const hiddenVideo = document.createElement('video');
-            hiddenVideo.srcObject = localScreenStream;
-            hiddenVideo.muted = true;
-            hiddenVideo.playsInline = true;
-            await hiddenVideo.play().catch(() => {});
-
+            // 2. Start Real-Time Frame Relay Engine (Captures directly from the active screen preview element)
             const offscreenCanvas = document.createElement('canvas');
-            const offCtx = offscreenCanvas.getContext('2d');
+            const offCtx = offscreenCanvas.getContext('2d', { alpha: false });
 
-            screenFrameRelayTimer = setInterval(() => {
+            const sendFrame = () => {
                 if (!isScreenSharing || !localScreenStream || !currentVoiceRoomId) {
-                    if (screenFrameRelayTimer) clearInterval(screenFrameRelayTimer);
+                    if (screenFrameRelayTimer) {
+                        clearInterval(screenFrameRelayTimer);
+                        screenFrameRelayTimer = null;
+                    }
                     return;
                 }
-                if (hiddenVideo.videoWidth > 0 && hiddenVideo.videoHeight > 0) {
-                    // Scale down proportionally to 960px width for fast, smooth, real-time transmission
-                    const maxDim = 960;
-                    let targetW = hiddenVideo.videoWidth;
-                    let targetH = hiddenVideo.videoHeight;
+                const vEl = document.getElementById('screenShareVideo');
+                if (vEl && vEl.videoWidth > 0 && vEl.videoHeight > 0) {
+                    const maxDim = 854; // Smooth crisp 480p/720p scalable resolution
+                    let targetW = vEl.videoWidth;
+                    let targetH = vEl.videoHeight;
                     if (targetW > maxDim) {
                         targetH = Math.round((targetH * maxDim) / targetW);
                         targetW = maxDim;
                     }
                     offscreenCanvas.width = targetW;
                     offscreenCanvas.height = targetH;
-                    offCtx.drawImage(hiddenVideo, 0, 0, targetW, targetH);
-                    const base64Jpeg = offscreenCanvas.toDataURL('image/jpeg', 0.65);
+                    offCtx.drawImage(vEl, 0, 0, targetW, targetH);
+                    const base64Jpeg = offscreenCanvas.toDataURL('image/jpeg', 0.6);
                     
                     db.ref(`voiceRooms/${currentVoiceRoomId}/screenFrame`).set({
                         uid: currentUser.uid,
+                        name: currentUser.name,
                         frame: base64Jpeg,
                         timestamp: Date.now()
                     }).catch(() => {});
                 }
-            }, 120); // ~8-10 FPS real-time relay
+            };
+
+            // Capture initial frame quickly, then every 120ms (~8 FPS real-time sync)
+            setTimeout(sendFrame, 200);
+            screenFrameRelayTimer = setInterval(sendFrame, 120);
 
             // Update database state
             await db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).set({
@@ -2351,11 +2413,24 @@
             };
         }
 
-        // Toggle Screen Mode (Auto / WebRTC / Relay) Button
-        const toggleModeBtn = document.getElementById('toggleScreenModeBtn');
-        if (toggleModeBtn) {
-            toggleModeBtn.onclick = () => {
-                cycleScreenShareMode();
+        // Picture-in-Picture Screen Share Button
+        const pipBtn = document.getElementById('pipScreenShareBtn');
+        if (pipBtn) {
+            pipBtn.onclick = async () => {
+                const video = document.getElementById('screenShareVideo');
+                if (video && document.pictureInPictureEnabled) {
+                    try {
+                        if (document.pictureInPictureElement) {
+                            await document.exitPictureInPicture();
+                        } else {
+                            await video.requestPictureInPicture();
+                        }
+                    } catch(e) {
+                        alert("子画面 (PiP) 表示に対応していません: " + (e.message || e));
+                    }
+                } else {
+                    alert("お使いのブラウザはピクチャーインピクチャー (PiP) に対応していません。");
+                }
             };
         }
 
