@@ -408,19 +408,17 @@
             <div class="screenshare-stage" id="screenShareStage">
                 <div class="screenshare-header">
                     <div class="screenshare-title" id="screenShareTitle">
-                        <i class="fas fa-desktop"></i> <span id="screenSharePresenterName">画面共有中</span>
-                        <span id="screenShareSourceBadge" style="font-size:0.75rem; background:rgba(88,101,242,0.25); border:1px solid var(--accent); color:#a8b4fc; padding:2px 8px; border-radius:10px; margin-left:8px;">素材配信中</span>
+                        <i class="fas fa-desktop" style="color:var(--accent);"></i>
+                        <span id="screenSharePresenterName" style="color:white; font-weight:700;">画面共有中</span>
+                        <span class="rtc-badge" style="margin-left:8px; font-size:0.75rem;"><i class="fas fa-circle" style="font-size:8px;"></i> WebRTC LIVE</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <button id="refreshScreenShareBtn" class="screenshare-btn" title="映像を再読み込み・更新"><i class="fas fa-sync-alt"></i> 再読込</button>
-                        <button id="changeScreenSourceBtn" class="screenshare-btn" style="background:#3c3f45;" title="共有素材・ソースを変更"><i class="fas fa-layer-group"></i> 素材変更</button>
-                        <button id="fullscreenScreenShareBtn" class="screenshare-btn"><i class="fas fa-expand"></i> 全画面</button>
-                        <button id="stopMyScreenShareBtn" class="screenshare-btn" style="background:var(--danger); display:none;"><i class="fas fa-stop-circle"></i> 共有停止</button>
+                        <button id="fullscreenScreenShareBtn" class="screenshare-btn" title="全画面表示"><i class="fas fa-expand"></i> 全画面</button>
+                        <button id="stopMyScreenShareBtn" class="screenshare-btn" style="background:var(--danger); display:none;" title="自分の画面共有を終了"><i class="fas fa-stop-circle"></i> 共有停止</button>
                     </div>
                 </div>
                 <div class="screenshare-video-wrap">
                     <video id="screenShareVideo" class="screenshare-video" autoplay playsinline muted></video>
-                    <canvas id="screenShareCanvas" class="screenshare-video" style="display:none;"></canvas>
                 </div>
             </div>
 
@@ -707,58 +705,6 @@
     </div>
     <div style="margin-top:10px; text-align:center;">
         <button id="closeYoutubeModalBtn" class="btn-secondary" style="width:100%; padding:6px;">閉じる</button>
-    </div>
-</div>
-
-<!-- Screen Share Source & Materials Selection Modal -->
-<div id="screenShareSourceModal" class="modal" style="width:480px;">
-    <h3><i class="fas fa-desktop"></i> 画面共有・配信素材の選択</h3>
-    <p class="info-text" style="margin-bottom:14px;">配信する画面または高画質グラフィック素材を選択してください。確実に全メンバーへ映像が届きます。</p>
-    
-    <div style="display:flex; flex-direction:column; gap:10px;">
-        <div class="screen-source-card" data-source="display" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:16px; padding:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:0.2s;">
-            <div style="font-size:28px; background:rgba(88,101,242,0.2); width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#5865f2;"><i class="fas fa-desktop"></i></div>
-            <div style="flex:1;">
-                <div style="font-weight:700; font-size:0.95rem; color:white;">🖥️ PC画面 / ウィンドウ / タブ共有</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">PCのディスプレイ全体や特定アプリウィンドウを共有</div>
-            </div>
-        </div>
-
-        <div class="screen-source-card" data-source="neon_visualizer" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:16px; padding:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:0.2s;">
-            <div style="font-size:28px; background:rgba(235,77,75,0.2); width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#eb4d4b;"><i class="fas fa-wave-square"></i></div>
-            <div style="flex:1;">
-                <div style="font-weight:700; font-size:0.95rem; color:white;">🎨 ネオン・サイバーグラフィック素材 (60fps)</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">オーディオ波形＆動的ネオンアニメーション素材</div>
-            </div>
-        </div>
-
-        <div class="screen-source-card" data-source="retro_game" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:16px; padding:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:0.2s;">
-            <div style="font-size:28px; background:rgba(35,165,89,0.2); width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#23a559;"><i class="fas fa-gamepad"></i></div>
-            <div style="flex:1;">
-                <div style="font-weight:700; font-size:0.95rem; color:white;">🎮 レトロ・アーケードゲーム素材 (60fps)</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">宇宙シューティング＆スターフィールドのライブ映像</div>
-            </div>
-        </div>
-
-        <div class="screen-source-card" data-source="studio_test" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:16px; padding:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:0.2s;">
-            <div style="font-size:28px; background:rgba(240,185,11,0.2); width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#f0b90b;"><i class="fas fa-tv"></i></div>
-            <div style="flex:1;">
-                <div style="font-weight:700; font-size:0.95rem; color:white;">📺 放送局スタジオ・カラーバー＆タイムコード</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">SMPTEカラーバー＆ミリ秒リアルタイム時計素材</div>
-            </div>
-        </div>
-
-        <div class="screen-source-card" data-source="camera" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:16px; padding:14px; cursor:pointer; display:flex; align-items:center; gap:14px; transition:0.2s;">
-            <div style="font-size:28px; background:rgba(168,85,247,0.2); width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#a855f7;"><i class="fas fa-video"></i></div>
-            <div style="flex:1;">
-                <div style="font-weight:700; font-size:0.95rem; color:white;">📷 Webカメラ / 仮想カメラ映像</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">接続されているWebカメラのビデオをストリーミング</div>
-            </div>
-        </div>
-    </div>
-
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
-        <button id="closeScreenSourceModal" class="btn-secondary" style="width:100%;">キャンセル</button>
     </div>
 </div>
 
@@ -1894,270 +1840,26 @@
         renderVoiceParticipants({});
     }
 
-    // --- Multi-Source Screen Sharing & High-Quality Material Streams Generator ---
-    function generateCanvasMaterialStream(sourceType) {
-        if (!materialCanvas) {
-            materialCanvas = document.createElement('canvas');
-            materialCanvas.width = 1280;
-            materialCanvas.height = 720;
-        }
-        const ctx = materialCanvas.getContext('2d');
-        if (materialAnimId) {
-            cancelAnimationFrame(materialAnimId);
-            materialAnimId = null;
-        }
-
-        let frame = 0;
-        const stars = Array.from({ length: 90 }, () => ({
-            x: Math.random() * 1280,
-            y: Math.random() * 720,
-            speed: 1.5 + Math.random() * 3.5,
-            size: 1.5 + Math.random() * 2.5
-        }));
-
-        const enemies = [
-            { x: 240, y: 160, dx: 3.2, color: '#eb4d4b' },
-            { x: 640, y: 190, dx: -2.8, color: '#f0b90b' },
-            { x: 1040, y: 150, dx: 3.5, color: '#eb4d4b' }
-        ];
-
-        function drawLoop() {
-            frame++;
-            const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}.${now.getMilliseconds().toString().padStart(3,'0')}`;
-
-            if (sourceType === 'neon_visualizer') {
-                // --- 1. Cyberpunk Neon Visualizer (60 FPS) ---
-                const bgGrad = ctx.createLinearGradient(0, 0, 0, 720);
-                bgGrad.addColorStop(0, '#090a10');
-                bgGrad.addColorStop(1, '#18122c');
-                ctx.fillStyle = bgGrad;
-                ctx.fillRect(0, 0, 1280, 720);
-
-                // Perspective Neon Floor Grid
-                ctx.strokeStyle = 'rgba(88, 101, 242, 0.28)';
-                ctx.lineWidth = 1.5;
-                for (let y = 380; y <= 720; y += 32) {
-                    const py = y + (y - 380) * 0.45;
-                    ctx.beginPath();
-                    ctx.moveTo(0, py);
-                    ctx.lineTo(1280, py);
-                    ctx.stroke();
-                }
-                for (let x = -200; x <= 1480; x += 64) {
-                    ctx.beginPath();
-                    ctx.moveTo(640 + (x - 640) * 0.15, 380);
-                    ctx.lineTo(x, 720);
-                    ctx.stroke();
-                }
-
-                // Glowing Neon Center Orb
-                const rad = 85 + Math.sin(frame * 0.08) * 16;
-                const radGrad = ctx.createRadialGradient(640, 270, 10, 640, 270, rad * 1.6);
-                radGrad.addColorStop(0, 'rgba(255, 71, 87, 0.85)');
-                radGrad.addColorStop(0.5, 'rgba(88, 101, 242, 0.45)');
-                radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                ctx.fillStyle = radGrad;
-                ctx.beginPath();
-                ctx.arc(640, 270, rad * 1.6, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Dynamic Spectrum Equalizer Bars (38 bars)
-                const barCount = 38;
-                const startX = 180;
-                const barWidth = 20;
-                const gap = 4;
-                for (let i = 0; i < barCount; i++) {
-                    const barHeight = 45 + Math.abs(Math.sin(frame * 0.07 + i * 0.32)) * 145 + Math.cos(frame * 0.04 + i) * 35;
-                    const bx = startX + i * (barWidth + gap);
-                    const by = 550 - barHeight;
-                    const barGrad = ctx.createLinearGradient(bx, by, bx, 550);
-                    barGrad.addColorStop(0, '#ff4757');
-                    barGrad.addColorStop(0.5, '#5865f2');
-                    barGrad.addColorStop(1, '#2ed573');
-                    ctx.fillStyle = barGrad;
-                    ctx.fillRect(bx, by, barWidth, barHeight);
-                    // Peak Cap
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(bx, by - 4, barWidth, 3);
-                }
-
-                // Cyberpunk Header HUD
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 30px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('FORCORD STREAM - NEON VISUALIZER 60FPS', 640, 85);
-
-                ctx.fillStyle = '#a8b4fc';
-                ctx.font = 'bold 18px monospace';
-                ctx.fillText(`LIVE TIMECODE: ${timeStr}  |  RES: 1080p 60FPS  |  STREAM: ULTRA STABLE`, 640, 122);
-
-                // Neon Outer Frame Border
-                ctx.strokeStyle = '#5865f2';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(36, 36, 1208, 648);
-
-            } else if (sourceType === 'retro_game') {
-                // --- 2. Retro Space Arcade Game (60 FPS) ---
-                ctx.fillStyle = '#06070a';
-                ctx.fillRect(0, 0, 1280, 720);
-
-                // Moving Starfield
-                ctx.fillStyle = '#ffffff';
-                stars.forEach(s => {
-                    s.y += s.speed;
-                    if (s.y > 720) { s.y = 0; s.x = Math.random() * 1280; }
-                    ctx.fillRect(s.x, s.y, s.size, s.size);
-                });
-
-                // Player Fighter Ship
-                const shipX = 640 + Math.sin(frame * 0.04) * 280;
-                const shipY = 570;
-                ctx.fillStyle = '#23a559';
-                ctx.beginPath();
-                ctx.moveTo(shipX, shipY - 32);
-                ctx.lineTo(shipX - 26, shipY + 22);
-                ctx.lineTo(shipX + 26, shipY + 22);
-                ctx.closePath();
-                ctx.fill();
-
-                // Blaster Lasers
-                ctx.fillStyle = '#ff4757';
-                for (let l = 0; l < 5; l++) {
-                    const ly = (shipY - 40 - (frame * 14 + l * 75) % 520);
-                    ctx.fillRect(shipX - 14, ly, 5, 20);
-                    ctx.fillRect(shipX + 9, ly, 5, 20);
-                }
-
-                // Enemy Ships
-                enemies.forEach((e) => {
-                    e.x += e.dx;
-                    if (e.x < 140 || e.x > 1140) e.dx *= -1;
-                    ctx.fillStyle = e.color;
-                    ctx.fillRect(e.x - 32, e.y - 16, 64, 32);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(e.x - 20, e.y - 6, 12, 12);
-                    ctx.fillRect(e.x + 8, e.y - 6, 12, 12);
-                });
-
-                // Arcade Retro HUD
-                ctx.fillStyle = '#23a559';
-                ctx.font = 'bold 26px monospace';
-                ctx.textAlign = 'left';
-                ctx.fillText(`SCORE: ${(24800 + frame * 15).toString().padStart(7, '0')}`, 60, 75);
-                ctx.fillText(`STAGE 07  SHIELD: [||||||||]`, 60, 110);
-                ctx.textAlign = 'right';
-                ctx.fillText(`ARCADE 60FPS: ${timeStr}`, 1220, 75);
-
-                // Frame
-                ctx.strokeStyle = '#23a559';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(36, 36, 1208, 648);
-
-            } else if (sourceType === 'studio_test') {
-                // --- 3. Broadcast Studio SMPTE Color Bars & Timecode ---
-                const colors = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'];
-                const barW = 1280 / colors.length;
-                colors.forEach((col, i) => {
-                    ctx.fillStyle = col;
-                    ctx.fillRect(i * barW, 0, barW, 460);
-                });
-
-                const midColors = ['#0000c0', '#131313', '#c000c0', '#131313', '#00c0c0', '#131313', '#c0c0c0'];
-                midColors.forEach((col, i) => {
-                    ctx.fillStyle = col;
-                    ctx.fillRect(i * barW, 460, barW, 60);
-                });
-
-                ctx.fillStyle = '#0a0a0a';
-                ctx.fillRect(0, 520, 1280, 200);
-
-                // Live Oscilloscope Waveform
-                ctx.strokeStyle = '#57f287';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                for (let x = 0; x < 1280; x += 10) {
-                    const wy = 620 + Math.sin(x * 0.04 + frame * 0.16) * 45 + Math.cos(x * 0.08) * 22;
-                    if (x === 0) ctx.moveTo(x, wy);
-                    else ctx.lineTo(x, wy);
-                }
-                ctx.stroke();
-
-                // Radar Sweep Line
-                const sweepAngle = (frame * 0.05) % (Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-                ctx.lineWidth = 2.5;
-                ctx.beginPath();
-                ctx.moveTo(640, 230);
-                ctx.lineTo(640 + Math.cos(sweepAngle) * 200, 230 + Math.sin(sweepAngle) * 200);
-                ctx.stroke();
-
-                // Studio Timecode Box
-                ctx.fillStyle = 'rgba(0,0,0,0.85)';
-                ctx.fillRect(380, 180, 520, 95);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(380, 180, 520, 95);
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 36px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(timeStr, 640, 242);
-            }
-
-            materialAnimId = requestAnimationFrame(drawLoop);
-        }
-
-        drawLoop();
-        return materialCanvas.captureStream(30);
-    }
-
-    async function startScreenShareWithSource(sourceType) {
+    // --- WebRTC Screen Sharing Implementation ---
+    async function startScreenShare() {
         if (!currentVoiceRoomId) {
             alert("画面共有を開始するには、まずボイスチャンネルに接続してください。");
             return;
         }
-        
-        // Hide Modal & Overlay
-        const sourceModal = document.getElementById('screenShareSourceModal');
-        if (sourceModal) sourceModal.style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
 
         try {
             if (localScreenStream) {
                 localScreenStream.getTracks().forEach(t => t.stop());
                 localScreenStream = null;
             }
-            if (materialAnimId) {
-                cancelAnimationFrame(materialAnimId);
-                materialAnimId = null;
-            }
 
-            activeScreenShareSource = sourceType;
-            let sourceDisplayName = "画面";
-
-            if (sourceType === 'display') {
-                sourceDisplayName = "PC画面";
-                try {
-                    localScreenStream = await navigator.mediaDevices.getDisplayMedia({
-                        video: { cursor: "always", frameRate: { ideal: 30, max: 30 } },
-                        audio: false
-                    });
-                } catch(e) {
-                    console.warn("getDisplayMedia denied/failed in iframe, auto-switching to Neon Visualizer material:", e);
-                    alert("ブラウザまたはiframeのセキュリティ制限により通常の画面共有が許可されなかったため、高画質「ネオン素材ストリーム」に自動切り替えしました！");
-                    return startScreenShareWithSource('neon_visualizer');
-                }
-            } else if (sourceType === 'camera') {
-                sourceDisplayName = "Webカメラ";
-                localScreenStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 1280, height: 720 }
-                });
-            } else {
-                if (sourceType === 'neon_visualizer') sourceDisplayName = "ネオン素材";
-                else if (sourceType === 'retro_game') sourceDisplayName = "レトロゲーム素材";
-                else if (sourceType === 'studio_test') sourceDisplayName = "カラーバー素材";
-                localScreenStream = generateCanvasMaterialStream(sourceType);
-            }
+            localScreenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always",
+                    frameRate: { ideal: 30, max: 60 }
+                },
+                audio: false
+            });
 
             isScreenSharing = true;
             const videoTrack = localScreenStream.getVideoTracks()[0];
@@ -2166,7 +1868,6 @@
             const screenStage = document.getElementById('screenShareStage');
             const screenVideo = document.getElementById('screenShareVideo');
             const screenTitle = document.getElementById('screenSharePresenterName');
-            const sourceBadge = document.getElementById('screenShareSourceBadge');
             const stopBtn = document.getElementById('stopMyScreenShareBtn');
 
             if (screenStage && screenVideo) {
@@ -2174,8 +1875,7 @@
                 screenVideo.srcObject = localScreenStream;
                 screenVideo.muted = true;
                 screenVideo.play().catch(e => console.log("Local video play:", e));
-                if (screenTitle) screenTitle.innerText = `${currentUser.name} さんの画面共有 (${sourceDisplayName})`;
-                if (sourceBadge) sourceBadge.innerText = `${sourceDisplayName} 配信中`;
+                if (screenTitle) screenTitle.innerText = `${currentUser.name} さんの画面共有`;
                 if (stopBtn) stopBtn.style.display = 'inline-block';
             }
 
@@ -2217,13 +1917,11 @@
             await db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).set({
                 uid: currentUser.uid,
                 name: currentUser.name,
-                sourceName: sourceDisplayName,
-                sourceType: sourceType,
                 active: true,
                 timestamp: Date.now()
             });
 
-            // If user stops sharing via browser bar UI
+            // If user stops sharing via browser native UI bar
             videoTrack.onended = () => {
                 stopScreenShare();
             };
@@ -2237,15 +1935,13 @@
         } catch(err) {
             console.warn("Screen share cancelled or failed:", err);
             isScreenSharing = false;
-            alert("配信の開始に失敗しました: " + (err.message || err));
+            if (err.name !== 'NotAllowedError') {
+                alert("画面共有の開始に失敗しました: " + (err.message || err));
+            }
         }
     }
 
     async function stopScreenShare() {
-        if (materialAnimId) {
-            cancelAnimationFrame(materialAnimId);
-            materialAnimId = null;
-        }
         if (localScreenStream) {
             localScreenStream.getTracks().forEach(t => t.stop());
             localScreenStream = null;
@@ -2286,33 +1982,9 @@
         const toggleBtn = document.getElementById('toggleScreenShareBtn');
         if (toggleBtn) {
             toggleBtn.classList.remove('active-toggle');
-            toggleBtn.title = "🖥️ 画面共有・素材配信 (Screen Share)";
+            toggleBtn.title = "🖥️ 画面共有 (Screen Share)";
         }
         playTone(350, 0.12, 'sine', 0.2);
-    }
-
-    // Refresh video stage & retrigger playback / stream reattachment
-    function refreshScreenShareVideo() {
-        const video = document.getElementById('screenShareVideo');
-        const stage = document.getElementById('screenShareStage');
-        if (!video || !stage) return;
-        
-        if (isScreenSharing && localScreenStream) {
-            video.srcObject = localScreenStream;
-            video.play().catch(e => console.log("Refresh local play error:", e));
-        } else if (currentVoiceRoomId) {
-            db.ref(`voiceRooms/${currentVoiceRoomId}/screenshare`).once('value', (snap) => {
-                const ssData = snap.val();
-                if (ssData && ssData.active && ssData.uid !== currentUser.uid) {
-                    const rStream = remoteVideoStreams[ssData.uid];
-                    if (rStream) {
-                        video.srcObject = rStream;
-                        video.play().catch(e => console.log("Refresh remote play error:", e));
-                    }
-                }
-            });
-        }
-        playTone(600, 0.08, 'sine', 0.1);
     }
 
     // --- Render Voice Participant Grid Cards with 50% - 500% Volume Controls ---
@@ -2655,6 +2327,7 @@
         };
 
         // Screen Share & Material Selection Modal Trigger
+        // Screen Share Button Trigger
         const screenShareToggleBtn = document.getElementById('toggleScreenShareBtn');
         if (screenShareToggleBtn) {
             screenShareToggleBtn.onclick = () => {
@@ -2665,46 +2338,8 @@
                 if (isScreenSharing) {
                     stopScreenShare();
                 } else {
-                    document.getElementById('screenShareSourceModal').style.display = 'block';
-                    document.getElementById('overlay').style.display = 'block';
+                    startScreenShare();
                 }
-            };
-        }
-
-        // Change Source Button on Stage
-        const changeSourceBtn = document.getElementById('changeScreenSourceBtn');
-        if (changeSourceBtn) {
-            changeSourceBtn.onclick = () => {
-                if (!currentVoiceRoomId) return;
-                document.getElementById('screenShareSourceModal').style.display = 'block';
-                document.getElementById('overlay').style.display = 'block';
-            };
-        }
-
-        // Refresh Video Stream Button on Stage
-        const refreshVideoBtn = document.getElementById('refreshScreenShareBtn');
-        if (refreshVideoBtn) {
-            refreshVideoBtn.onclick = () => {
-                refreshScreenShareVideo();
-            };
-        }
-
-        // Screen Source Card Clicks
-        document.querySelectorAll('.screen-source-card').forEach(card => {
-            card.onclick = () => {
-                const source = card.getAttribute('data-source');
-                if (source) {
-                    startScreenShareWithSource(source);
-                }
-            };
-        });
-
-        // Close Screen Source Modal
-        const closeSourceModalBtn = document.getElementById('closeScreenSourceModal');
-        if (closeSourceModalBtn) {
-            closeSourceModalBtn.onclick = () => {
-                document.getElementById('screenShareSourceModal').style.display = 'none';
-                document.getElementById('overlay').style.display = 'none';
             };
         }
 
