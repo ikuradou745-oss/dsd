@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Forcord - 超高音質WebRTCボイスチャット</title>
-    <meta name="description" content="WebRTC対応の超高音質リアルタイムボイスチャット＆メッセージングアプリ">
+    <meta name="description" content="WebRTC対応の超高音質リアルタイムボイスチャット、ボイスチェンジャー、画面共有、動画・音声送信＆YouTubeボイスチャット同期再生対応メッセージングアプリ">
     <meta property="og:title" content="Forcord - 超高音質WebRTCボイスチャット">
-    <meta property="og:description" content="WebRTC対応の超高音質リアルタイムボイスチャット＆メッセージングアプリ">
+    <meta property="og:description" content="WebRTC対応の超高音質リアルタイムボイスチャット、ボイスチェンジャー、画面共有、動画・音声送信＆YouTubeボイスチャット同期再生対応メッセージングアプリ">
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -73,15 +74,48 @@
         .screenshare-btn { background: rgba(30, 31, 34, 0.9); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 6px 12px; border-radius: 10px; font-size: 0.8rem; cursor: pointer; backdrop-filter: blur(4px); transition: 0.15s; display: inline-flex; align-items: center; gap: 6px; }
         .screenshare-btn:hover { background: var(--accent); border-color: var(--accent); transform: translateY(-1px); }
 
-        /* Image Viewer Modal */
-        .image-viewer-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.88); z-index: 1500; display: none; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
-        .image-viewer-content { max-width: 90vw; max-height: 90vh; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.8); object-fit: contain; }
-        .image-viewer-close { position: absolute; top: 24px; right: 24px; font-size: 2rem; color: white; cursor: pointer; background: rgba(0,0,0,0.5); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); }
-        .image-viewer-close:hover { background: var(--danger); }
+        /* Image & Universal Media Viewer Modal */
+        .image-viewer-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 1500; display: none; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        .image-viewer-modal.active { display: flex; }
+        .image-viewer-content { max-width: 90vw; max-height: 85vh; border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.85); object-fit: contain; }
+        .image-viewer-close { position: absolute; top: 24px; right: 24px; font-size: 2rem; color: white; cursor: pointer; background: rgba(0,0,0,0.6); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); transition: 0.15s; }
+        .image-viewer-close:hover { background: var(--danger); transform: scale(1.08); }
 
-        /* Image Upload Drag & Drop Preview */
-        .chat-image-preview-bar { background: var(--bg-darker); border-top: 1px solid var(--border-color); padding: 10px 16px; display: none; align-items: center; gap: 12px; }
-        .chat-image-preview-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border-color); }
+        /* Media Upload Drag & Drop Preview Bar */
+        .chat-media-preview-bar { background: var(--bg-darker); border-top: 1px solid var(--border-color); padding: 10px 16px; display: none; align-items: center; gap: 14px; }
+        .chat-media-preview-bar.active { display: flex; }
+        .chat-media-preview-thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; border: 1px solid var(--border-color); background: #000; flex-shrink: 0; }
+        .chat-media-preview-icon { width: 52px; height: 52px; border-radius: 10px; background: var(--bg-card); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: var(--accent); flex-shrink: 0; border: 1px solid var(--border-color); }
+
+        /* Video, Audio & YouTube Message Styles */
+        .message-video { max-width: 340px; width: 100%; max-height: 240px; border-radius: 14px; margin-top: 6px; background: #000; outline: none; border: 1px solid var(--border-color); }
+        .message-audio-wrap { display: flex; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.35); padding: 8px 12px; border-radius: 14px; margin-top: 6px; border: 1px solid rgba(255,255,255,0.1); min-width: 260px; max-width: 360px; }
+        .message-audio { width: 100%; height: 36px; outline: none; }
+        .message-audio-title { font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 6px; color: var(--text-main); }
+        
+        .message-youtube-card { background: #16171a; border-radius: 14px; border: 1px solid #ff334b; overflow: hidden; margin-top: 8px; max-width: 360px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: flex; flex-direction: column; }
+        .youtube-thumb-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; cursor: pointer; overflow: hidden; }
+        .youtube-thumb-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s ease; }
+        .youtube-thumb-wrap:hover .youtube-thumb-img { transform: scale(1.04); }
+        .youtube-play-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); transition: 0.15s; }
+        .youtube-play-icon { width: 48px; height: 48px; background: #ff0000; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
+        .youtube-card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+        .youtube-card-title { font-size: 0.85rem; font-weight: 700; color: #fff; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .youtube-card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .btn-youtube-vc { background: linear-gradient(135deg, #ff0000, #cc0000); color: white; padding: 5px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none; transition: 0.15s; }
+        .btn-youtube-vc:hover { filter: brightness(1.15); transform: translateY(-1px); }
+        .youtube-embed-frame { width: 100%; aspect-ratio: 16/9; border: none; border-radius: 14px; background: #000; }
+
+        /* YouTube VC Synchronized Player Stage */
+        .youtube-vc-stage { width: 100%; background: #0c0d0e; border-radius: 16px; margin-bottom: 16px; overflow: hidden; position: relative; display: none; flex-direction: column; border: 2px solid #ff334b; box-shadow: 0 12px 36px rgba(255,0,0,0.25); }
+        .youtube-vc-stage.active { display: flex; }
+        .youtube-vc-header { background: rgba(22, 23, 26, 0.95); backdrop-filter: blur(8px); padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 5; flex-wrap: wrap; gap: 8px; }
+        .youtube-vc-title { font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #ff5252; }
+        .youtube-vc-player-wrap { width: 100%; aspect-ratio: 16/9; max-height: 480px; min-height: 240px; background: #000; display: flex; align-items: center; justify-content: center; position: relative; }
+        .youtube-vc-player-wrap iframe { width: 100%; height: 100%; border: none; }
+        .youtube-vc-quick-bar { background: var(--bg-darker); padding: 8px 16px; display: flex; gap: 8px; align-items: center; overflow-x: auto; border-top: 1px solid var(--border-color); }
+        .youtube-preset-chip { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; white-space: nowrap; transition: 0.15s; display: inline-flex; align-items: center; gap: 5px; }
+        .youtube-preset-chip:hover { background: #ff0000; color: white; border-color: #ff0000; }
 
         /* Floating Notifications with Dismiss Button */
         .global-invite-area { position: fixed; top: 16px; right: 20px; z-index: 1000; width: 340px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -358,11 +392,45 @@
                             </span>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <button id="openYoutubeVcBtn" class="screenshare-btn" style="background:linear-gradient(135deg, #ff0000, #c40000); color:white; border-color:#ff4444;" title="YouTube動画や音楽をVCメンバー全員と同時視聴・再生"><i class="fab fa-youtube"></i> YouTube同期再生</button>
                             <button id="inviteToVoiceBtn" style="background:#3c3f45; display:none;"><i class="fas fa-user-plus"></i> 招待</button>
                             <button id="openSoundboardBtn" style="background:#3c3f45;"><i class="fas fa-music"></i> 効果音</button>
                             <button id="toggleSubtitlesBtn" class="btn-secondary"><i class="fas fa-closed-captioning"></i> 字幕: OFF</button>
                         </div>
                     </div>
+
+            <!-- YouTube VC Synchronized Player Stage (Watch & Listen Together in Real Time) -->
+            <div class="youtube-vc-stage" id="youtubeVcStage">
+                <div class="youtube-vc-header">
+                    <div class="youtube-vc-title" id="youtubeVcTitle">
+                        <i class="fab fa-youtube" style="font-size:1.2rem; color:#ff0000;"></i>
+                        <span id="youtubeVcCurrentTitle" style="color:white; font-weight:700; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">YouTube 同期再生</span>
+                        <span id="youtubeVcStatusBadge" class="rtc-badge" style="background:rgba(255,0,0,0.15); border-color:#ff334b; color:#ff5252; margin-left:8px; font-size:0.75rem;"><i class="fas fa-circle" style="font-size:8px;"></i> LIVE 同期中</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <button id="youtubeVcChangeBtn" class="screenshare-btn" style="background:#3c3f45;" title="動画やBGMを変更"><i class="fas fa-search"></i> 動画/曲変更</button>
+                        <button id="youtubeVcSyncBtn" class="screenshare-btn" style="background:#3c3f45;" title="他メンバーの再生時間に即時同期"><i class="fas fa-sync-alt"></i> 再生同期</button>
+                        <div style="display:flex; align-items:center; gap:6px; background:rgba(0,0,0,0.5); padding:4px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.15);" title="YouTube音量調整 (あなたのみに適用)">
+                            <i class="fas fa-volume-up" style="font-size:0.8rem; color:var(--text-muted);"></i>
+                            <input type="range" id="youtubeVcVolumeSlider" min="0" max="100" value="70" style="width:70px; height:6px; accent-color:#ff0000; cursor:pointer;">
+                            <span id="youtubeVcVolumeVal" style="font-size:0.75rem; font-weight:700; min-width:32px;">70%</span>
+                        </div>
+                        <button id="youtubeVcStopBtn" class="screenshare-btn" style="background:var(--danger);" title="YouTube再生を終了して閉じる"><i class="fas fa-stop-circle"></i> 停止</button>
+                    </div>
+                </div>
+                <div class="youtube-vc-player-wrap" id="youtubeVcPlayerWrap">
+                    <div id="youtubeVcPlayerContainer" style="width:100%; height:100%;"></div>
+                </div>
+                <!-- Quick Preset Bar for instant BGM / Popular Videos -->
+                <div class="youtube-vc-quick-bar">
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; white-space:nowrap;"><i class="fas fa-bolt" style="color:var(--warning);"></i> クイックBGM:</span>
+                    <button class="youtube-preset-chip" data-vid="jfKfPfyJRdk" data-title="☕ Lofi Girl - beats to relax/study to"><i class="fas fa-headphones"></i> ☕ Lo-Fi BGM</button>
+                    <button class="youtube-preset-chip" data-vid="lTRiuFIWV54" data-title="🎮 Synthwave Radio - chill synth / retro"><i class="fas fa-gamepad"></i> 🎮 ゲームBGM</button>
+                    <button class="youtube-preset-chip" data-vid="5qap5aO4i9A" data-title="🌿 Lofi Hip Hop Radio - beats to sleep/chill to"><i class="fas fa-coffee"></i> 🌿 カフェJazz</button>
+                    <button class="youtube-preset-chip" data-vid="4xDzrJKXOOY" data-title="🎹 Relaxing Piano Music for Stress Relief"><i class="fas fa-music"></i> 🎹 癒やしピアノ</button>
+                    <button class="youtube-preset-chip" data-vid="r2b3i3H49xQ" data-title="⚡ High Energy EDM Workout & Gaming"><i class="fas fa-bolt"></i> ⚡ EDM/作業用</button>
+                </div>
+            </div>
 
             <!-- Screen Sharing Stage (High Precision WebRTC + Instant HD Relay Dual-Engine) -->
             <div class="screenshare-stage" id="screenShareStage">
@@ -475,20 +543,31 @@
                     <div class="messages-history" id="messagesHistory"></div>
                     <div id="replyPreviewContainer" style="padding: 0 16px;"></div>
                     <div class="message-input-area">
-                        <input type="text" id="messageInput" placeholder="メッセージを入力... (画像 Ctrl+V / ドラッグ＆ドロップ対応)">
+                        <input type="text" id="messageInput" placeholder="メッセージを入力... (動画/音声/写真/YouTube対応)">
                         <button id="sendStampBtn" class="btn-secondary" title="スタンプ"><i class="fas fa-smile"></i></button>
                         <button id="sendImageBtn" class="btn-secondary" title="写真を送信"><i class="fas fa-image"></i> 写真</button>
+                        <button id="sendVideoBtn" class="btn-secondary" title="動画ファイルを送信"><i class="fas fa-video"></i> 動画</button>
+                        <button id="sendAudioBtn" class="btn-secondary" title="音声・音楽ファイルを送信"><i class="fas fa-music"></i> 音声</button>
+                        <button id="sendYoutubeBtn" class="btn-secondary" style="color:#ff5252;" title="YouTubeを送信 / VCで流す"><i class="fab fa-youtube"></i> YouTube</button>
                         <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+                        <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*" style="display:none;">
+                        <input type="file" id="audioFileInput" accept="audio/mp3,audio/wav,audio/m4a,audio/ogg,audio/aac,audio/mpeg,audio/*" style="display:none;">
                         <button id="sendMsgBtn">送信</button>
                     </div>
-                    <!-- Image Attachment Preview Bar -->
-                    <div id="chatImagePreviewBar" class="chat-image-preview-bar">
-                        <img id="chatImagePreviewThumb" class="chat-image-preview-thumb" src="" alt="preview">
-                        <div style="flex:1; font-size:0.85rem;">
-                            <strong id="chatImageFileName">画像ファイル</strong>
-                            <div class="info-text">添付されました (メッセージ送信時に送信されます)</div>
+                    <!-- Universal Media Attachment Preview Bar -->
+                    <div id="chatMediaPreviewBar" class="chat-media-preview-bar">
+                        <div id="chatMediaPreviewContainer" style="display:flex; align-items:center;">
+                            <img id="chatMediaPreviewThumb" class="chat-media-preview-thumb" src="" alt="preview" style="display:none;">
+                            <div id="chatMediaPreviewIcon" class="chat-media-preview-icon" style="display:none;"><i class="fas fa-file"></i></div>
                         </div>
-                        <button id="cancelImageAttachmentBtn" class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;"><i class="fas fa-times"></i> 取消</button>
+                        <div style="flex:1; font-size:0.85rem; min-width:0;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <strong id="chatMediaFileName" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px;">メディアファイル</strong>
+                                <span id="chatMediaBadge" class="rtc-badge" style="padding:2px 8px; font-size:0.7rem;">画像</span>
+                            </div>
+                            <div id="chatMediaSubText" class="info-text">添付されました (送信ボタンで送信)</div>
+                        </div>
+                        <button id="cancelMediaAttachmentBtn" class="btn-secondary" style="padding:5px 12px; font-size:0.8rem;"><i class="fas fa-times"></i> 取消</button>
                     </div>
                 </div>
             </div>
@@ -676,10 +755,53 @@
     <div id="stampList" class="clearfix"></div>
 </div>
 
-<!-- Fullscreen Image Viewer Modal -->
+<!-- YouTube Select / Share Modal -->
+<div id="youtubeModal" class="modal" style="width:480px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="color:#ff5252; display:flex; align-items:center; gap:8px;"><i class="fab fa-youtube"></i> YouTube 共有・同期再生</h3>
+        <span id="closeYoutubeModalBtn" style="font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</span>
+    </div>
+    <p class="info-text" style="margin-bottom:14px;">YouTubeのURLや動画IDを入力して、チャットに共有したりボイスチャット(VC)で全員と同時再生できます。</p>
+    
+    <div style="display:flex; gap:6px; margin-bottom:14px;">
+        <input type="text" id="youtubeUrlInput" placeholder="https://www.youtube.com/watch?v=... または動画ID" style="flex:1; padding:10px 14px; background:var(--bg-darker); border:1px solid var(--border-color); border-radius:14px; color:white; font-size:0.9rem;">
+        <button id="pasteYoutubeBtn" class="btn-secondary" style="padding:10px 14px;" title="クリップボードから貼付"><i class="fas fa-paste"></i></button>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-bottom:18px;">
+        <button id="youtubeSendToChatBtn" class="btn-secondary" style="flex:1; padding:10px; font-size:0.85rem;"><i class="fas fa-paper-plane"></i> チャットに送信</button>
+        <button id="youtubePlayInVcBtn" class="btn-youtube-vc" style="flex:1; padding:10px; font-size:0.85rem; justify-content:center;"><i class="fab fa-youtube"></i> VCで同期再生</button>
+    </div>
+
+    <hr style="margin:12px 0;">
+    <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;"><i class="fas fa-bolt" style="color:var(--warning);"></i> おすすめBGM & 人気プリセット:</h4>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; max-height:180px; overflow-y:auto; padding-right:4px;">
+        <div class="youtube-preset-card" data-vid="jfKfPfyJRdk" data-title="☕ Lofi Girl - beats to relax/study to" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:12px; padding:8px 10px; cursor:pointer; font-size:0.8rem;">
+            <div style="font-weight:700; color:#fff;">☕ 24/7 Lo-Fi BGM</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">まったり作業・睡眠</div>
+        </div>
+        <div class="youtube-preset-card" data-vid="lTRiuFIWV54" data-title="🎮 Synthwave Radio - chill synth / retro" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:12px; padding:8px 10px; cursor:pointer; font-size:0.8rem;">
+            <div style="font-weight:700; color:#fff;">🎮 Synthwave / Gaming</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">レトロゲームBGM</div>
+        </div>
+        <div class="youtube-preset-card" data-vid="5qap5aO4i9A" data-title="🌿 Lofi Hip Hop Radio - beats to sleep/chill to" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:12px; padding:8px 10px; cursor:pointer; font-size:0.8rem;">
+            <div style="font-weight:700; color:#fff;">🌿 Cafe Jazz / Chill</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">カフェの落ち着いた雰囲気</div>
+        </div>
+        <div class="youtube-preset-card" data-vid="4xDzrJKXOOY" data-title="🎹 Relaxing Piano Music for Stress Relief" style="background:var(--bg-darker); border:1px solid var(--border-color); border-radius:12px; padding:8px 10px; cursor:pointer; font-size:0.8rem;">
+            <div style="font-weight:700; color:#fff;">🎹 癒やしピアノ</div>
+            <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">勉強・リラックス用</div>
+        </div>
+    </div>
+</div>
+
+<!-- Fullscreen Image & Video Viewer Modal -->
 <div id="imageViewerModal" class="image-viewer-modal">
     <span class="image-viewer-close" id="closeImageViewerBtn">&times;</span>
-    <img id="imageViewerImg" class="image-viewer-content" src="" alt="拡大画像">
+    <div id="imageViewerContentContainer" style="display:flex; flex-direction:column; align-items:center; max-width:90vw; max-height:90vh;">
+        <img id="imageViewerImg" class="image-viewer-content" src="" alt="拡大画像" style="display:none;">
+        <video id="imageViewerVideo" class="image-viewer-content" controls playsinline style="display:none; max-width:90vw; max-height:85vh; background:#000;"></video>
+    </div>
 </div>
 
 <div id="overlay" class="overlay"></div>
@@ -714,7 +836,19 @@
     let lastStampTime = 0;
     let replyingTo = null;
     let unreadCounts = {};
-    let pendingImageAttachment = null; // base64 dataUrl or null
+    let pendingMediaAttachment = null; // { type: 'image'|'video'|'audio'|'youtube', dataUrl: '', name: '', duration: 0, youtubeId: '', title: '' }
+    let pendingImageAttachment = null; // backward compatibility
+
+    // YouTube Voice Chat Synchronized Player State
+    let ytVcPlayer = null;
+    let isYtApiReady = false;
+    let ytVcRoomRef = null;
+    let ytVcLocalVolume = 70;
+    let lastSyncedYtState = null;
+
+    window.onYouTubeIframeAPIReady = () => {
+        isYtApiReady = true;
+    };
 
     // Cache state to eliminate chat list flickering
     let cachedFriends = {};
@@ -1385,6 +1519,14 @@
             }
         });
 
+        // Listen for YouTube Synchronized VC Player State
+        if (ytVcRoomRef) ytVcRoomRef.off();
+        ytVcRoomRef = db.ref(`voiceRooms/${roomId}/youtube`);
+        ytVcRoomRef.on('value', (snap) => {
+            const data = snap.val();
+            handleYouTubeVcStateUpdate(data);
+        });
+
         // Setup Signaling Listeners (Offers, Answers, ICE Candidates, Renegotiation)
         setupSignalingListeners(roomId);
 
@@ -1812,6 +1954,12 @@
             signalingRef.off();
             signalingRef = null;
         }
+
+        if (ytVcRoomRef) {
+            ytVcRoomRef.off();
+            ytVcRoomRef = null;
+        }
+        stopAndHideYouTubeVc();
 
         currentVoiceRoomId = null;
         currentVoiceRoomName = "";
@@ -3191,29 +3339,104 @@
     }
     window.cancelReply = () => { replyingTo = null; updateReplyPreview(); };
 
-    // --- Image Preview & Modal Viewer ---
-    function setPendingImage(dataUrl, fileName = "画像ファイル") {
-        pendingImageAttachment = dataUrl;
-        const previewBar = document.getElementById('chatImagePreviewBar');
-        const thumb = document.getElementById('chatImagePreviewThumb');
-        const nameEl = document.getElementById('chatImageFileName');
+    // ==========================================
+    // --- Universal Media Attachment & YouTube Engine ---
+    // ==========================================
+    function setPendingMedia(mediaObj) {
+        pendingMediaAttachment = mediaObj;
+        pendingImageAttachment = mediaObj && mediaObj.type === 'image' ? mediaObj.dataUrl : null;
 
-        if (previewBar && thumb) {
-            thumb.src = dataUrl;
-            if (nameEl) nameEl.innerText = fileName;
+        const previewBar = document.getElementById('chatMediaPreviewBar');
+        const thumb = document.getElementById('chatMediaPreviewThumb');
+        const iconWrap = document.getElementById('chatMediaPreviewIcon');
+        const nameEl = document.getElementById('chatMediaFileName');
+        const badgeEl = document.getElementById('chatMediaBadge');
+        const subEl = document.getElementById('chatMediaSubText');
+
+        if (!previewBar) return;
+
+        if (mediaObj) {
+            if (mediaObj.type === 'image') {
+                if (thumb) { thumb.src = mediaObj.dataUrl; thumb.style.display = 'block'; }
+                if (iconWrap) iconWrap.style.display = 'none';
+                if (badgeEl) { badgeEl.innerText = '写真'; badgeEl.className = 'rtc-badge'; }
+            } else if (mediaObj.type === 'video') {
+                if (thumb) thumb.style.display = 'none';
+                if (iconWrap) {
+                    iconWrap.innerHTML = '<i class="fas fa-video" style="color:var(--accent);"></i>';
+                    iconWrap.style.display = 'flex';
+                }
+                if (badgeEl) { badgeEl.innerText = '動画'; badgeEl.className = 'rtc-badge'; badgeEl.style.color = '#58a6ff'; }
+            } else if (mediaObj.type === 'audio') {
+                if (thumb) thumb.style.display = 'none';
+                if (iconWrap) {
+                    iconWrap.innerHTML = '<i class="fas fa-music" style="color:var(--warning);"></i>';
+                    iconWrap.style.display = 'flex';
+                }
+                if (badgeEl) { badgeEl.innerText = '音声'; badgeEl.className = 'rtc-badge'; badgeEl.style.color = '#f1e05a'; }
+            } else if (mediaObj.type === 'youtube') {
+                if (thumb) {
+                    thumb.src = `https://img.youtube.com/vi/${mediaObj.youtubeId}/hqdefault.jpg`;
+                    thumb.style.display = 'block';
+                }
+                if (iconWrap) iconWrap.style.display = 'none';
+                if (badgeEl) { badgeEl.innerText = 'YouTube'; badgeEl.className = 'rtc-badge'; badgeEl.style.color = '#ff5252'; }
+            }
+            if (nameEl) nameEl.innerText = mediaObj.name || '添付メディア';
+            if (subEl) subEl.innerText = '添付されました (送信ボタンで送信)';
             previewBar.classList.add('active');
+        } else {
+            previewBar.classList.remove('active');
         }
     }
 
-    function clearPendingImage() {
+    function clearPendingMedia() {
+        pendingMediaAttachment = null;
         pendingImageAttachment = null;
-        const previewBar = document.getElementById('chatImagePreviewBar');
-        const fileInput = document.getElementById('imageFileInput');
+        const previewBar = document.getElementById('chatMediaPreviewBar');
         if (previewBar) previewBar.classList.remove('active');
-        if (fileInput) fileInput.value = '';
+        const fileInputs = ['imageFileInput', 'videoFileInput', 'audioFileInput'];
+        fileInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
     }
 
-    // High quality client-side image compression to base64 DataURL (Ultra fast & offline-ready)
+    // Helper: Extract YouTube 11-char Video ID from any YouTube URL or raw ID
+    function extractYouTubeId(url) {
+        if (!url || typeof url !== 'string') return null;
+        const trimmed = url.trim();
+        if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+            return trimmed;
+        }
+        const regExp = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+        const match = trimmed.match(regExp);
+        return match ? match[1] : null;
+    }
+
+    // Upload helper with storage fallback to fast base64 dataUrl
+    async function uploadMediaFile(file, folder = "media") {
+        try {
+            if (storage && storage.ref) {
+                const ext = file.name.split('.').pop() || 'bin';
+                const fileRef = storage.ref().child(`${folder}/${currentUser.uid}_${Date.now()}_${Math.random().toString(36).substring(2,7)}.${ext}`);
+                const snapshot = await fileRef.put(file);
+                const downloadUrl = await snapshot.ref.getDownloadURL();
+                return downloadUrl;
+            }
+        } catch(err) {
+            console.warn("Storage upload fallback to DataURL:", err);
+        }
+        // Fallback to DataURL
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // High quality client-side image compression
     function processImageFile(file) {
         if (!file || !file.type.startsWith('image/')) {
             alert('画像ファイルを選択してください');
@@ -3226,7 +3449,7 @@
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
-                const maxDim = 1200; // max dimension for ultra crisp messaging
+                const maxDim = 1200;
 
                 if (width > maxDim || height > maxDim) {
                     if (width > height) {
@@ -3243,68 +3466,448 @@
                 ctx.drawImage(img, 0, 0, width, height);
 
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                setPendingImage(dataUrl, file.name);
+                setPendingMedia({
+                    type: 'image',
+                    dataUrl: dataUrl,
+                    name: file.name
+                });
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
     }
 
-    window.openImageViewer = (imageUrl) => {
+    // Process Video File
+    async function processVideoFile(file) {
+        if (!file || !file.type.startsWith('video/')) {
+            alert('動画ファイル (MP4, WebM, MOV等) を選択してください');
+            return;
+        }
+        if (file.size > 50 * 1024 * 1024) {
+            alert('動画ファイルサイズは 50MB 以下にしてください');
+            return;
+        }
+
+        const previewBar = document.getElementById('chatMediaPreviewBar');
+        const nameEl = document.getElementById('chatMediaFileName');
+        const subEl = document.getElementById('chatMediaSubText');
+        const iconWrap = document.getElementById('chatMediaPreviewIcon');
+        const thumb = document.getElementById('chatMediaPreviewThumb');
+
+        if (previewBar) {
+            if (thumb) thumb.style.display = 'none';
+            if (iconWrap) {
+                iconWrap.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--accent);"></i>';
+                iconWrap.style.display = 'flex';
+            }
+            if (nameEl) nameEl.innerText = file.name;
+            if (subEl) subEl.innerText = '動画を処理中...';
+            previewBar.classList.add('active');
+        }
+
+        try {
+            const mediaUrl = await uploadMediaFile(file, 'videos');
+            setPendingMedia({
+                type: 'video',
+                dataUrl: mediaUrl,
+                name: file.name
+            });
+        } catch(err) {
+            alert('動画の読み込みに失敗しました: ' + err.message);
+            clearPendingMedia();
+        }
+    }
+
+    // Process Audio File
+    async function processAudioFile(file) {
+        if (!file || !file.type.startsWith('audio/')) {
+            alert('音声ファイル (MP3, WAV, M4A, OGG等) を選択してください');
+            return;
+        }
+        if (file.size > 30 * 1024 * 1024) {
+            alert('音声ファイルサイズは 30MB 以下にしてください');
+            return;
+        }
+
+        const previewBar = document.getElementById('chatMediaPreviewBar');
+        const nameEl = document.getElementById('chatMediaFileName');
+        const subEl = document.getElementById('chatMediaSubText');
+        const iconWrap = document.getElementById('chatMediaPreviewIcon');
+        const thumb = document.getElementById('chatMediaPreviewThumb');
+
+        if (previewBar) {
+            if (thumb) thumb.style.display = 'none';
+            if (iconWrap) {
+                iconWrap.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--warning);"></i>';
+                iconWrap.style.display = 'flex';
+            }
+            if (nameEl) nameEl.innerText = file.name;
+            if (subEl) subEl.innerText = '音声を処理中...';
+            previewBar.classList.add('active');
+        }
+
+        try {
+            const mediaUrl = await uploadMediaFile(file, 'audios');
+            setPendingMedia({
+                type: 'audio',
+                dataUrl: mediaUrl,
+                name: file.name
+            });
+        } catch(err) {
+            alert('音声ファイルの読み込みに失敗しました: ' + err.message);
+            clearPendingMedia();
+        }
+    }
+
+    // Process YouTube URL to pending attachment
+    function processYouTubeUrl(inputUrl, customTitle = '') {
+        const vid = extractYouTubeId(inputUrl);
+        if (!vid) {
+            alert('有効なYouTubeのURLまたは動画IDを入力してください');
+            return false;
+        }
+        const title = customTitle || `YouTube (${vid})`;
+        setPendingMedia({
+            type: 'youtube',
+            youtubeId: vid,
+            name: title,
+            title: title
+        });
+        return true;
+    }
+
+    // Fullscreen Universal Media Viewer (Image & Video)
+    window.openMediaViewer = (type, url, title = '') => {
         const modal = document.getElementById('imageViewerModal');
         const img = document.getElementById('imageViewerImg');
-        if (modal && img) {
-            img.src = imageUrl;
-            modal.classList.add('active');
+        const video = document.getElementById('imageViewerVideo');
+        if (!modal) return;
+
+        if (type === 'image') {
+            if (img) { img.src = url; img.style.display = 'block'; }
+            if (video) { video.pause(); video.src = ''; video.style.display = 'none'; }
+        } else if (type === 'video') {
+            if (img) { img.src = ''; img.style.display = 'none'; }
+            if (video) {
+                video.src = url;
+                video.style.display = 'block';
+                video.play().catch(() => {});
+            }
         }
+        modal.classList.add('active');
     };
+
+    window.openImageViewer = (imageUrl) => {
+        window.openMediaViewer('image', imageUrl);
+    };
+
+    // Toggle inline embedded YouTube player in chat messages
+    window.toggleInlineYouTube = (thumbWrapEl, ytId) => {
+        const card = thumbWrapEl.closest('.message-youtube-card');
+        if (!card) return;
+        card.innerHTML = `
+            <iframe class="youtube-embed-frame" src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            <div class="youtube-card-body">
+                <div class="youtube-card-actions">
+                    <button class="btn-youtube-vc" onclick="window.playYouTubeInVoiceRoom('${ytId}', 'YouTube 動画')"><i class="fab fa-youtube"></i> 🔊 VCで同期再生</button>
+                    <a href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener noreferrer" style="font-size:0.75rem; color:#58a6ff; text-decoration:none;"><i class="fas fa-external-link-alt"></i> YouTubeで開く</a>
+                </div>
+            </div>
+        `;
+    };
+
+    // Play YouTube synchronized in the Voice Chat Room
+    window.playYouTubeInVoiceRoom = async (videoId, title = 'YouTube 動画') => {
+        const cleanVid = extractYouTubeId(videoId);
+        if (!cleanVid) {
+            alert('有効なYouTube動画IDが見つかりませんでした');
+            return;
+        }
+
+        // If not in voice room, automatically join public lobby
+        if (!currentVoiceRoomId) {
+            document.querySelector('.sidebar-icon[data-tab="voice"]')?.click();
+            await joinRtcVoiceRoom('public_lobby_1', '🔊 一般ロビー 1');
+        }
+
+        // Broadcast to current voice room
+        if (currentVoiceRoomId) {
+            await db.ref(`voiceRooms/${currentVoiceRoomId}/youtube`).set({
+                videoId: cleanVid,
+                title: title,
+                state: 'playing',
+                currentTime: 0,
+                updatedAt: Date.now(),
+                updatedBy: currentUser.name,
+                senderUid: currentUser.uid
+            });
+            playTone(800, 0.15, 'sine', 0.2);
+        }
+
+        // Close modal if open
+        const modal = document.getElementById('youtubeModal');
+        if (modal) modal.style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    };
+
+    // Synchronized YouTube VC State Handler
+    function handleYouTubeVcStateUpdate(data) {
+        const stage = document.getElementById('youtubeVcStage');
+        const titleEl = document.getElementById('youtubeVcCurrentTitle');
+        const container = document.getElementById('youtubeVcPlayerContainer');
+
+        if (!data || !data.videoId) {
+            stopAndHideYouTubeVc();
+            return;
+        }
+
+        if (stage) stage.classList.add('active');
+        if (titleEl) titleEl.innerText = data.title || 'YouTube 同期再生';
+
+        const elapsedSec = data.state === 'playing' ? Math.max(0, (Date.now() - (data.updatedAt || Date.now())) / 1000) : 0;
+        const targetTime = (data.currentTime || 0) + elapsedSec;
+
+        lastSyncedYtState = data;
+
+        if (window.YT && window.YT.Player) {
+            if (ytVcPlayer && typeof ytVcPlayer.loadVideoById === 'function') {
+                try {
+                    const currentVid = ytVcPlayer.getVideoData ? ytVcPlayer.getVideoData().video_id : null;
+                    if (currentVid !== data.videoId) {
+                        ytVcPlayer.loadVideoById({
+                            videoId: data.videoId,
+                            startSeconds: Math.floor(targetTime)
+                        });
+                        ytVcPlayer.setVolume(ytVcLocalVolume);
+                    } else {
+                        const curTime = ytVcPlayer.getCurrentTime ? ytVcPlayer.getCurrentTime() : 0;
+                        if (Math.abs(curTime - targetTime) > 3.0) {
+                            ytVcPlayer.seekTo(targetTime, true);
+                        }
+                        if (data.state === 'playing' && ytVcPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                            ytVcPlayer.playVideo();
+                        } else if (data.state === 'paused' && ytVcPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+                            ytVcPlayer.pauseVideo();
+                        }
+                    }
+                } catch(e) {
+                    console.warn("YouTube player sync error:", e);
+                }
+            } else {
+                container.innerHTML = '<div id="youtubeVcPlayerEmbed"></div>';
+                try {
+                    ytVcPlayer = new YT.Player('youtubeVcPlayerEmbed', {
+                        videoId: data.videoId,
+                        playerVars: {
+                            autoplay: 1,
+                            controls: 1,
+                            rel: 0,
+                            enablejsapi: 1,
+                            playsinline: 1,
+                            start: Math.floor(targetTime)
+                        },
+                        events: {
+                            onReady: (event) => {
+                                event.target.setVolume(ytVcLocalVolume);
+                                if (data.state === 'playing') event.target.playVideo();
+                            }
+                        }
+                    });
+                } catch(err) {
+                    container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(targetTime)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
+                }
+            }
+        } else {
+            container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(targetTime)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
+        }
+    }
+
+    function stopAndHideYouTubeVc() {
+        const stage = document.getElementById('youtubeVcStage');
+        if (stage) stage.classList.remove('active');
+        if (ytVcPlayer && typeof ytVcPlayer.stopVideo === 'function') {
+            try { ytVcPlayer.stopVideo(); } catch(e) {}
+        }
+        const container = document.getElementById('youtubeVcPlayerContainer');
+        if (container) container.innerHTML = '';
+        lastSyncedYtState = null;
+    }
 
     function setupImageViewerModal() {
         const modal = document.getElementById('imageViewerModal');
         const closeBtn = document.getElementById('closeImageViewerBtn');
+        const video = document.getElementById('imageViewerVideo');
 
         const closeModal = () => {
             if (modal) modal.classList.remove('active');
+            if (video) { video.pause(); video.src = ''; }
         };
 
         if (closeBtn) closeBtn.onclick = closeModal;
         if (modal) {
             modal.onclick = (e) => {
-                if (e.target === modal || e.target.tagName === 'DIV') closeModal();
+                if (e.target === modal || e.target.id === 'imageViewerContentContainer') closeModal();
             };
         }
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeModal();
         });
 
-        // Cancel attachment button
-        document.getElementById('cancelImageAttachmentBtn')?.addEventListener('click', clearPendingImage);
+        // Cancel media attachment button
+        document.getElementById('cancelMediaAttachmentBtn')?.addEventListener('click', clearPendingMedia);
+        document.getElementById('cancelImageAttachmentBtn')?.addEventListener('click', clearPendingMedia);
 
-        // Photo button trigger
-        const fileInput = document.getElementById('imageFileInput');
+        // Photo file button trigger
+        const imgInput = document.getElementById('imageFileInput');
         document.getElementById('sendImageBtn')?.addEventListener('click', () => {
-            if (fileInput) fileInput.click();
+            if (imgInput) imgInput.click();
         });
-        if (fileInput) {
-            fileInput.onchange = (e) => {
+        if (imgInput) {
+            imgInput.onchange = (e) => {
                 const file = e.target.files[0];
                 if (file) processImageFile(file);
             };
         }
 
-        // Paste event listener for images (Ctrl + V)
+        // Video file button trigger
+        const videoInput = document.getElementById('videoFileInput');
+        document.getElementById('sendVideoBtn')?.addEventListener('click', () => {
+            if (videoInput) videoInput.click();
+        });
+        if (videoInput) {
+            videoInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) processVideoFile(file);
+            };
+        }
+
+        // Audio file button trigger
+        const audioInput = document.getElementById('audioFileInput');
+        document.getElementById('sendAudioBtn')?.addEventListener('click', () => {
+            if (audioInput) audioInput.click();
+        });
+        if (audioInput) {
+            audioInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) processAudioFile(file);
+            };
+        }
+
+        // YouTube Modal Openers
+        const ytModal = document.getElementById('youtubeModal');
+        const openYtModal = () => {
+            if (ytModal) {
+                ytModal.style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+                document.getElementById('youtubeUrlInput')?.focus();
+            }
+        };
+        document.getElementById('sendYoutubeBtn')?.addEventListener('click', openYtModal);
+        document.getElementById('openYoutubeVcBtn')?.addEventListener('click', openYtModal);
+        document.getElementById('youtubeVcChangeBtn')?.addEventListener('click', openYtModal);
+
+        document.getElementById('closeYoutubeModalBtn')?.addEventListener('click', () => {
+            if (ytModal) ytModal.style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        });
+
+        document.getElementById('pasteYoutubeBtn')?.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) document.getElementById('youtubeUrlInput').value = text.trim();
+            } catch(e) {
+                alert("クリップボードからの貼り付けに失敗しました。手動で入力してください。");
+            }
+        });
+
+        document.getElementById('youtubeSendToChatBtn')?.addEventListener('click', () => {
+            const val = document.getElementById('youtubeUrlInput').value.trim();
+            if (processYouTubeUrl(val)) {
+                if (ytModal) ytModal.style.display = 'none';
+                document.getElementById('overlay').style.display = 'none';
+                document.getElementById('youtubeUrlInput').value = '';
+                document.getElementById('messageInput').focus();
+            }
+        });
+
+        document.getElementById('youtubePlayInVcBtn')?.addEventListener('click', () => {
+            const val = document.getElementById('youtubeUrlInput').value.trim();
+            const vid = extractYouTubeId(val);
+            if (vid) {
+                playYouTubeInVoiceRoom(vid, 'YouTube 動画');
+                document.getElementById('youtubeUrlInput').value = '';
+            } else {
+                alert('有効なYouTubeのURLまたは動画IDを入力してください');
+            }
+        });
+
+        // Preset cards inside YouTube Modal
+        document.querySelectorAll('.youtube-preset-card').forEach(card => {
+            card.onclick = () => {
+                const vid = card.getAttribute('data-vid');
+                const title = card.getAttribute('data-title');
+                if (vid) {
+                    playYouTubeInVoiceRoom(vid, title);
+                }
+            };
+        });
+
+        // Preset chips on YouTube VC Stage
+        document.querySelectorAll('.youtube-preset-chip').forEach(chip => {
+            chip.onclick = () => {
+                const vid = chip.getAttribute('data-vid');
+                const title = chip.getAttribute('data-title');
+                if (vid) {
+                    playYouTubeInVoiceRoom(vid, title);
+                }
+            };
+        });
+
+        // YouTube VC Stage Controls
+        document.getElementById('youtubeVcSyncBtn')?.addEventListener('click', () => {
+            if (lastSyncedYtState) {
+                handleYouTubeVcStateUpdate(lastSyncedYtState);
+                playTone(700, 0.08, 'sine', 0.15);
+            }
+        });
+
+        document.getElementById('youtubeVcVolumeSlider')?.addEventListener('input', (e) => {
+            const vol = parseInt(e.target.value);
+            ytVcLocalVolume = vol;
+            const disp = document.getElementById('youtubeVcVolumeVal');
+            if (disp) disp.innerText = `${vol}%`;
+            if (ytVcPlayer && typeof ytVcPlayer.setVolume === 'function') {
+                ytVcPlayer.setVolume(vol);
+            }
+        });
+
+        document.getElementById('youtubeVcStopBtn')?.addEventListener('click', async () => {
+            if (currentVoiceRoomId) {
+                await db.ref(`voiceRooms/${currentVoiceRoomId}/youtube`).remove();
+            }
+            stopAndHideYouTubeVc();
+        });
+
+        // Paste event listener for media (Ctrl + V)
         window.addEventListener('paste', (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (let item of items) {
-                if (item.kind === 'file' && item.type.startsWith('image/')) {
-                    const file = item.getAsFile();
-                    processImageFile(file);
-                    break;
+                if (item.kind === 'file') {
+                    if (item.type.startsWith('image/')) {
+                        processImageFile(item.getAsFile());
+                        break;
+                    } else if (item.type.startsWith('video/')) {
+                        processVideoFile(item.getAsFile());
+                        break;
+                    } else if (item.type.startsWith('audio/')) {
+                        processAudioFile(item.getAsFile());
+                        break;
+                    }
                 }
             }
         });
 
-        // Drag & Drop for images onto chat area
+        // Drag & Drop for all media files onto chat area
         const chatArea = document.querySelector('.chat-area');
         if (chatArea) {
             chatArea.addEventListener('dragover', (e) => {
@@ -3318,7 +3921,10 @@
                 e.preventDefault();
                 chatArea.style.borderColor = '';
                 if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    processImageFile(e.dataTransfer.files[0]);
+                    const f = e.dataTransfer.files[0];
+                    if (f.type.startsWith('image/')) processImageFile(f);
+                    else if (f.type.startsWith('video/')) processVideoFile(f);
+                    else if (f.type.startsWith('audio/')) processAudioFile(f);
                 }
             });
         }
@@ -3362,16 +3968,58 @@
                     div.style.background = 'transparent';
                     div.style.border = 'none';
                 } else {
-                    let imageHtml = '';
+                    let mediaHtml = '';
                     if (msg.imageUrl) {
-                        imageHtml = `<img src="${msg.imageUrl}" class="message-image" alt="添付写真" onclick="window.openImageViewer('${msg.imageUrl}')" title="クリックして全画面表示">`;
+                        mediaHtml += `<img src="${msg.imageUrl}" class="message-image" alt="添付写真" onclick="window.openMediaViewer('image', '${msg.imageUrl}')" title="クリックして拡大表示">`;
+                    }
+                    if (msg.videoUrl) {
+                        mediaHtml += `
+                            <div style="position:relative; margin-top:6px;">
+                                <video src="${msg.videoUrl}" controls playsinline preload="metadata" class="message-video"></video>
+                                <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; margin-top:3px;">
+                                    <span><i class="fas fa-video" style="color:var(--accent);"></i> ${escapeHtml(msg.videoName || '動画')}</span>
+                                    <span onclick="window.openMediaViewer('video', '${msg.videoUrl}', '${escapeHtml(msg.videoName || '動画')}')" style="cursor:pointer; color:#58a6ff; font-weight:700;"><i class="fas fa-expand"></i> 全画面</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (msg.audioUrl) {
+                        mediaHtml += `
+                            <div class="message-audio-wrap">
+                                <div class="message-audio-title"><i class="fas fa-music" style="color:var(--accent);"></i> ${escapeHtml(msg.audioName || '音声ファイル')}</div>
+                                <audio src="${msg.audioUrl}" controls preload="metadata" class="message-audio"></audio>
+                            </div>
+                        `;
+                    }
+
+                    // YouTube Card (Explicit or auto-detected in message text)
+                    const detectedYtId = (msg.youtube && msg.youtube.videoId) || extractYouTubeId(msg.text || '');
+                    if (detectedYtId) {
+                        const ytTitle = (msg.youtube && msg.youtube.title) || 'YouTube 動画';
+                        mediaHtml += `
+                            <div class="message-youtube-card">
+                                <div class="youtube-thumb-wrap" onclick="window.toggleInlineYouTube(this, '${detectedYtId}')" title="クリックしてチャット内で再生">
+                                    <img src="https://img.youtube.com/vi/${detectedYtId}/hqdefault.jpg" class="youtube-thumb-img" alt="YouTube Thumbnail" onerror="this.src='https://img.youtube.com/vi/${detectedYtId}/0.jpg'">
+                                    <div class="youtube-play-overlay">
+                                        <div class="youtube-play-icon"><i class="fas fa-play"></i></div>
+                                    </div>
+                                </div>
+                                <div class="youtube-card-body">
+                                    <div class="youtube-card-title"><i class="fab fa-youtube" style="color:#ff0000;"></i> ${escapeHtml(ytTitle)}</div>
+                                    <div class="youtube-card-actions">
+                                        <button class="btn-youtube-vc" onclick="window.playYouTubeInVoiceRoom('${detectedYtId}', '${escapeHtml(ytTitle).replace(/'/g, "\\'")}')" title="この動画をボイスチャット(VC)で全員と同時再生"><i class="fab fa-youtube"></i> 🔊 VCで同期再生</button>
+                                        <a href="https://www.youtube.com/watch?v=${detectedYtId}" target="_blank" rel="noopener noreferrer" style="font-size:0.75rem; color:#58a6ff; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-external-link-alt"></i> 開く</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                     }
 
                     div.innerHTML = `
                         <div class="message-sender"><span>${msg.senderIcon || '😀'}</span> <strong>${escapeHtml(msg.senderName)}</strong></div>
                         ${replyHtml}
                         ${msg.text ? `<div class="message-text">${escapeHtml(msg.text || '')}</div>` : ''}
-                        ${imageHtml}
+                        ${mediaHtml}
                         <div class="message-footer">${replyBtn}<span class="timestamp">${formatTime(msg.timestamp)}</span></div>
                     `;
                 }
@@ -3399,7 +4047,7 @@
             return;
         }
         const text = document.getElementById('messageInput').value.trim();
-        if (!text && !pendingImageAttachment) return;
+        if (!text && !pendingMediaAttachment && !pendingImageAttachment) return;
         
         const now = Date.now();
         if (now - lastMessageTime < messageCooldown) {
@@ -3427,9 +4075,33 @@
             readBy: { [currentUser.uid]: true }
         };
 
-        if (pendingImageAttachment) {
+        if (pendingMediaAttachment) {
+            if (pendingMediaAttachment.type === 'image') {
+                msgData.imageUrl = pendingMediaAttachment.dataUrl;
+            } else if (pendingMediaAttachment.type === 'video') {
+                msgData.videoUrl = pendingMediaAttachment.dataUrl;
+                msgData.videoName = pendingMediaAttachment.name || '動画ファイル';
+            } else if (pendingMediaAttachment.type === 'audio') {
+                msgData.audioUrl = pendingMediaAttachment.dataUrl;
+                msgData.audioName = pendingMediaAttachment.name || '音声ファイル';
+            } else if (pendingMediaAttachment.type === 'youtube') {
+                msgData.youtube = {
+                    videoId: pendingMediaAttachment.youtubeId,
+                    title: pendingMediaAttachment.title || 'YouTube 動画'
+                };
+            }
+        } else if (pendingImageAttachment) {
             msgData.imageUrl = pendingImageAttachment;
         }
+
+        // Also check if text itself contains a YouTube URL
+        if (!msgData.youtube && text) {
+            const ytId = extractYouTubeId(text);
+            if (ytId) {
+                msgData.youtube = { videoId: ytId, title: 'YouTube 動画' };
+            }
+        }
+
         if (replyingTo) msgData.replyTo = replyingTo;
 
         if (currentChatType === 'global') await db.ref('globalMessages').push(msgData);
@@ -3437,7 +4109,7 @@
         else await db.ref(`groups/${currentChatId}/messages`).push(msgData);
 
         document.getElementById('messageInput').value = '';
-        clearPendingImage();
+        clearPendingMedia();
         replyingTo = null;
         updateReplyPreview();
     };
