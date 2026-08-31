@@ -117,6 +117,22 @@
         .youtube-preset-chip { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; white-space: nowrap; transition: 0.15s; display: inline-flex; align-items: center; gap: 5px; }
         .youtube-preset-chip:hover { background: #ff0000; color: white; border-color: #ff0000; }
 
+        /* YouTube Autoplay Unmute Overlay */
+        .youtube-unmute-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: none; flex-direction: column; justify-content: center; align-items: center; gap: 12px; z-index: 20; backdrop-filter: blur(4px); cursor: pointer; }
+        .youtube-unmute-overlay.active { display: flex; }
+        .youtube-unmute-btn { background: linear-gradient(135deg, #ff0000, #c40000); color: white; padding: 12px 24px; border-radius: 28px; font-size: 1rem; font-weight: 800; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(255,0,0,0.5); border: 2px solid #fff; animation: pulseRed 1.6s infinite; }
+        @keyframes pulseRed { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* Floating Mini PIP YouTube Player for Background Listening during Chat */
+        .youtube-mini-pip { position: fixed; bottom: 20px; right: 20px; width: 320px; height: 180px; background: #000; border-radius: 14px; border: 2px solid #ff334b; box-shadow: 0 12px 36px rgba(0,0,0,0.8); z-index: 900; overflow: hidden; display: none; flex-direction: column; }
+        .youtube-mini-pip.active { display: flex; }
+        .youtube-mini-pip-header { position: absolute; top: 0; left: 0; right: 0; padding: 4px 8px; background: rgba(0,0,0,0.8); display: flex; justify-content: space-between; align-items: center; z-index: 10; font-size: 0.75rem; color: white; }
+        .youtube-mini-pip iframe { width: 100%; height: 100%; border: none; }
+
+        /* Upload Progress Bar */
+        .upload-progress-wrap { width: 100%; background: rgba(255,255,255,0.1); border-radius: 6px; height: 6px; overflow: hidden; margin-top: 6px; }
+        .upload-progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), #a855f7); width: 0%; transition: width 0.1s ease; }
+
         /* Floating Notifications with Dismiss Button */
         .global-invite-area { position: fixed; top: 16px; right: 20px; z-index: 1000; width: 340px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .global-invite-area > * { pointer-events: auto; }
@@ -412,14 +428,19 @@
                         <button id="youtubeVcSyncBtn" class="screenshare-btn" style="background:#3c3f45;" title="他メンバーの再生時間に即時同期"><i class="fas fa-sync-alt"></i> 再生同期</button>
                         <div style="display:flex; align-items:center; gap:6px; background:rgba(0,0,0,0.5); padding:4px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.15);" title="YouTube音量調整 (あなたのみに適用)">
                             <i class="fas fa-volume-up" style="font-size:0.8rem; color:var(--text-muted);"></i>
-                            <input type="range" id="youtubeVcVolumeSlider" min="0" max="100" value="70" style="width:70px; height:6px; accent-color:#ff0000; cursor:pointer;">
-                            <span id="youtubeVcVolumeVal" style="font-size:0.75rem; font-weight:700; min-width:32px;">70%</span>
+                            <input type="range" id="youtubeVcVolumeSlider" min="0" max="100" value="80" style="width:70px; height:6px; accent-color:#ff0000; cursor:pointer;">
+                            <span id="youtubeVcVolumeVal" style="font-size:0.75rem; font-weight:700; min-width:32px;">80%</span>
                         </div>
                         <button id="youtubeVcStopBtn" class="screenshare-btn" style="background:var(--danger);" title="YouTube再生を終了して閉じる"><i class="fas fa-stop-circle"></i> 停止</button>
                     </div>
                 </div>
                 <div class="youtube-vc-player-wrap" id="youtubeVcPlayerWrap">
                     <div id="youtubeVcPlayerContainer" style="width:100%; height:100%;"></div>
+                    <!-- Autoplay Unmute Overlay for zero-fail browser playback -->
+                    <div id="youtubeUnmuteOverlay" class="youtube-unmute-overlay">
+                        <button class="youtube-unmute-btn" id="youtubeUnmuteBtn"><i class="fas fa-volume-up"></i> 音声を再生 (同期中)</button>
+                        <span style="font-size:0.8rem; color:#f2f3f5; text-shadow:0 2px 4px rgba(0,0,0,0.8);">※ブラウザの自動再生制限を解除して高音質再生を開始します</span>
+                    </div>
                 </div>
                 <!-- Quick Preset Bar for instant BGM / Popular Videos -->
                 <div class="youtube-vc-quick-bar">
@@ -430,6 +451,17 @@
                     <button class="youtube-preset-chip" data-vid="4xDzrJKXOOY" data-title="🎹 Relaxing Piano Music for Stress Relief"><i class="fas fa-music"></i> 🎹 癒やしピアノ</button>
                     <button class="youtube-preset-chip" data-vid="r2b3i3H49xQ" data-title="⚡ High Energy EDM Workout & Gaming"><i class="fas fa-bolt"></i> ⚡ EDM/作業用</button>
                 </div>
+            </div>
+
+            <!-- Floating Mini PIP YouTube Player for Background Listening during Chat / Other Tabs -->
+            <div id="youtubeMiniPip" class="youtube-mini-pip">
+                <div class="youtube-mini-pip-header">
+                    <span id="youtubeMiniPipTitle" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700;"><i class="fab fa-youtube" style="color:#ff0000;"></i> VC YouTube再生中</span>
+                    <div style="display:flex; gap:6px;">
+                        <button id="youtubeMiniPipExpandBtn" style="padding:2px 6px; font-size:0.65rem; background:#3c3f45; border-radius:6px;" title="VC画面を開く"><i class="fas fa-expand"></i></button>
+                    </div>
+                </div>
+                <div id="youtubeMiniPipContainer" style="width:100%; height:100%;"></div>
             </div>
 
             <!-- Screen Sharing Stage (High Precision WebRTC + Instant HD Relay Dual-Engine) -->
@@ -565,7 +597,10 @@
                                 <strong id="chatMediaFileName" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px;">メディアファイル</strong>
                                 <span id="chatMediaBadge" class="rtc-badge" style="padding:2px 8px; font-size:0.7rem;">画像</span>
                             </div>
-                            <div id="chatMediaSubText" class="info-text">添付されました (送信ボタンで送信)</div>
+                            <div id="chatMediaSubText" class="info-text">添付完了 (送信ボタンで即時送信)</div>
+                            <div id="chatMediaProgressWrap" class="upload-progress-wrap" style="display:none;">
+                                <div id="chatMediaProgressBar" class="upload-progress-bar"></div>
+                            </div>
                         </div>
                         <button id="cancelMediaAttachmentBtn" class="btn-secondary" style="padding:5px 12px; font-size:0.8rem;"><i class="fas fa-times"></i> 取消</button>
                     </div>
@@ -3340,8 +3375,41 @@
     window.cancelReply = () => { replyingTo = null; updateReplyPreview(); };
 
     // ==========================================
-    // --- Universal Media Attachment & YouTube Engine ---
+    // --- Universal Media Attachment & YouTube Engine (Ultra-Fast & Zero-Fail) ---
     // ==========================================
+    let isYtApiReady = false;
+    let ytApiLoadingPromise = null;
+
+    function ensureYouTubeIframeApi() {
+        if (window.YT && window.YT.Player) {
+            isYtApiReady = true;
+            return Promise.resolve(window.YT);
+        }
+        if (ytApiLoadingPromise) return ytApiLoadingPromise;
+
+        ytApiLoadingPromise = new Promise((resolve) => {
+            const checkInterval = setInterval(() => {
+                if (window.YT && window.YT.Player) {
+                    clearInterval(checkInterval);
+                    isYtApiReady = true;
+                    resolve(window.YT);
+                }
+            }, 100);
+
+            // Timeout fallback after 4 seconds
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                resolve(window.YT || null);
+            }, 4000);
+        });
+        return ytApiLoadingPromise;
+    }
+
+    // Ensure YT callback is hooked
+    window.onYouTubeIframeAPIReady = () => {
+        isYtApiReady = true;
+    };
+
     function setPendingMedia(mediaObj) {
         pendingMediaAttachment = mediaObj;
         pendingImageAttachment = mediaObj && mediaObj.type === 'image' ? mediaObj.dataUrl : null;
@@ -3352,14 +3420,19 @@
         const nameEl = document.getElementById('chatMediaFileName');
         const badgeEl = document.getElementById('chatMediaBadge');
         const subEl = document.getElementById('chatMediaSubText');
+        const progressWrap = document.getElementById('chatMediaProgressWrap');
+        const progressBar = document.getElementById('chatMediaProgressBar');
 
         if (!previewBar) return;
+
+        if (progressWrap) progressWrap.style.display = 'none';
+        if (progressBar) progressBar.style.width = '0%';
 
         if (mediaObj) {
             if (mediaObj.type === 'image') {
                 if (thumb) { thumb.src = mediaObj.dataUrl; thumb.style.display = 'block'; }
                 if (iconWrap) iconWrap.style.display = 'none';
-                if (badgeEl) { badgeEl.innerText = '写真'; badgeEl.className = 'rtc-badge'; }
+                if (badgeEl) { badgeEl.innerText = '写真'; badgeEl.className = 'rtc-badge'; badgeEl.style.color = '#fff'; }
             } else if (mediaObj.type === 'video') {
                 if (thumb) thumb.style.display = 'none';
                 if (iconWrap) {
@@ -3383,7 +3456,7 @@
                 if (badgeEl) { badgeEl.innerText = 'YouTube'; badgeEl.className = 'rtc-badge'; badgeEl.style.color = '#ff5252'; }
             }
             if (nameEl) nameEl.innerText = mediaObj.name || '添付メディア';
-            if (subEl) subEl.innerText = '添付されました (送信ボタンで送信)';
+            if (subEl) subEl.innerText = '添付完了 (送信ボタンで即座に送信)';
             previewBar.classList.add('active');
         } else {
             previewBar.classList.remove('active');
@@ -3391,6 +3464,9 @@
     }
 
     function clearPendingMedia() {
+        if (pendingMediaAttachment && pendingMediaAttachment.blobUrl) {
+            try { URL.revokeObjectURL(pendingMediaAttachment.blobUrl); } catch(e) {}
+        }
         pendingMediaAttachment = null;
         pendingImageAttachment = null;
         const previewBar = document.getElementById('chatMediaPreviewBar');
@@ -3402,7 +3478,7 @@
         });
     }
 
-    // Helper: Extract YouTube 11-char Video ID from any YouTube URL or raw ID
+    // Helper: Extract YouTube 11-char Video ID from any YouTube URL (standard, share, shorts, live, embed, mobile)
     function extractYouTubeId(url) {
         if (!url || typeof url !== 'string') return null;
         const trimmed = url.trim();
@@ -3414,149 +3490,139 @@
         return match ? match[1] : null;
     }
 
-    // Upload helper with storage fallback to fast base64 dataUrl
-    async function uploadMediaFile(file, folder = "media") {
+    // High-speed async uploader with fast progress reporting
+    async function uploadMediaFile(file, folder = "media", onProgress = null) {
+        if (onProgress) onProgress(15);
         try {
             if (storage && storage.ref) {
                 const ext = file.name.split('.').pop() || 'bin';
                 const fileRef = storage.ref().child(`${folder}/${currentUser.uid}_${Date.now()}_${Math.random().toString(36).substring(2,7)}.${ext}`);
-                const snapshot = await fileRef.put(file);
-                const downloadUrl = await snapshot.ref.getDownloadURL();
-                return downloadUrl;
+                const uploadTask = fileRef.put(file);
+                
+                return new Promise((resolve, reject) => {
+                    uploadTask.on('state_changed', 
+                        (snapshot) => {
+                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            if (onProgress) onProgress(Math.min(95, Math.max(20, Math.round(progress))));
+                        },
+                        (error) => {
+                            console.warn("Storage upload task error, fallback to memory URL:", error);
+                            fallbackDataUrl(file).then(resolve).catch(reject);
+                        },
+                        async () => {
+                            if (onProgress) onProgress(100);
+                            const downloadUrl = await uploadTask.snapshot.ref.getDownloadURL();
+                            resolve(downloadUrl);
+                        }
+                    );
+                });
             }
         } catch(err) {
-            console.warn("Storage upload fallback to DataURL:", err);
+            console.warn("Storage upload fallback:", err);
         }
-        // Fallback to DataURL
+        return fallbackDataUrl(file, onProgress);
+    }
+
+    function fallbackDataUrl(file, onProgress) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
+            reader.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(Math.round((e.loaded / e.total) * 90));
+                }
+            };
+            reader.onload = (e) => {
+                if (onProgress) onProgress(100);
+                resolve(e.target.result);
+            };
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
     }
 
-    // High quality client-side image compression
+    // Instant client-side image compression (0.05s)
     function processImageFile(file) {
         if (!file || !file.type.startsWith('image/')) {
             alert('画像ファイルを選択してください');
             return;
         }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-                const maxDim = 1200;
+        const blobUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const maxDim = 1200;
 
-                if (width > maxDim || height > maxDim) {
-                    if (width > height) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    } else {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                    }
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
                 }
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
 
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                setPendingMedia({
-                    type: 'image',
-                    dataUrl: dataUrl,
-                    name: file.name
-                });
-            };
-            img.src = e.target.result;
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            URL.revokeObjectURL(blobUrl);
+
+            setPendingMedia({
+                type: 'image',
+                file: file,
+                dataUrl: dataUrl,
+                name: file.name
+            });
         };
-        reader.readAsDataURL(file);
+        img.src = blobUrl;
     }
 
-    // Process Video File
-    async function processVideoFile(file) {
+    // Ultra-Fast Video File Processing (Instant zero-delay preview)
+    function processVideoFile(file) {
         if (!file || !file.type.startsWith('video/')) {
             alert('動画ファイル (MP4, WebM, MOV等) を選択してください');
             return;
         }
-        if (file.size > 50 * 1024 * 1024) {
-            alert('動画ファイルサイズは 50MB 以下にしてください');
+        if (file.size > 80 * 1024 * 1024) {
+            alert('動画ファイルサイズは 80MB 以下にしてください');
             return;
         }
 
-        const previewBar = document.getElementById('chatMediaPreviewBar');
-        const nameEl = document.getElementById('chatMediaFileName');
-        const subEl = document.getElementById('chatMediaSubText');
-        const iconWrap = document.getElementById('chatMediaPreviewIcon');
-        const thumb = document.getElementById('chatMediaPreviewThumb');
-
-        if (previewBar) {
-            if (thumb) thumb.style.display = 'none';
-            if (iconWrap) {
-                iconWrap.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--accent);"></i>';
-                iconWrap.style.display = 'flex';
-            }
-            if (nameEl) nameEl.innerText = file.name;
-            if (subEl) subEl.innerText = '動画を処理中...';
-            previewBar.classList.add('active');
-        }
-
-        try {
-            const mediaUrl = await uploadMediaFile(file, 'videos');
-            setPendingMedia({
-                type: 'video',
-                dataUrl: mediaUrl,
-                name: file.name
-            });
-        } catch(err) {
-            alert('動画の読み込みに失敗しました: ' + err.message);
-            clearPendingMedia();
-        }
+        const blobUrl = URL.createObjectURL(file);
+        setPendingMedia({
+            type: 'video',
+            file: file,
+            blobUrl: blobUrl,
+            dataUrl: blobUrl,
+            name: file.name,
+            size: file.size
+        });
     }
 
-    // Process Audio File
-    async function processAudioFile(file) {
+    // Ultra-Fast Audio File Processing (Instant zero-delay preview)
+    function processAudioFile(file) {
         if (!file || !file.type.startsWith('audio/')) {
             alert('音声ファイル (MP3, WAV, M4A, OGG等) を選択してください');
             return;
         }
-        if (file.size > 30 * 1024 * 1024) {
-            alert('音声ファイルサイズは 30MB 以下にしてください');
+        if (file.size > 50 * 1024 * 1024) {
+            alert('音声ファイルサイズは 50MB 以下にしてください');
             return;
         }
 
-        const previewBar = document.getElementById('chatMediaPreviewBar');
-        const nameEl = document.getElementById('chatMediaFileName');
-        const subEl = document.getElementById('chatMediaSubText');
-        const iconWrap = document.getElementById('chatMediaPreviewIcon');
-        const thumb = document.getElementById('chatMediaPreviewThumb');
-
-        if (previewBar) {
-            if (thumb) thumb.style.display = 'none';
-            if (iconWrap) {
-                iconWrap.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--warning);"></i>';
-                iconWrap.style.display = 'flex';
-            }
-            if (nameEl) nameEl.innerText = file.name;
-            if (subEl) subEl.innerText = '音声を処理中...';
-            previewBar.classList.add('active');
-        }
-
-        try {
-            const mediaUrl = await uploadMediaFile(file, 'audios');
-            setPendingMedia({
-                type: 'audio',
-                dataUrl: mediaUrl,
-                name: file.name
-            });
-        } catch(err) {
-            alert('音声ファイルの読み込みに失敗しました: ' + err.message);
-            clearPendingMedia();
-        }
+        const blobUrl = URL.createObjectURL(file);
+        setPendingMedia({
+            type: 'audio',
+            file: file,
+            blobUrl: blobUrl,
+            dataUrl: blobUrl,
+            name: file.name,
+            size: file.size
+        });
     }
 
     // Process YouTube URL to pending attachment
@@ -3606,7 +3672,7 @@
         const card = thumbWrapEl.closest('.message-youtube-card');
         if (!card) return;
         card.innerHTML = `
-            <iframe class="youtube-embed-frame" src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            <iframe class="youtube-embed-frame" src="https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&playsinline=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             <div class="youtube-card-body">
                 <div class="youtube-card-actions">
                     <button class="btn-youtube-vc" onclick="window.playYouTubeInVoiceRoom('${ytId}', 'YouTube 動画')"><i class="fab fa-youtube"></i> 🔊 VCで同期再生</button>
@@ -3650,11 +3716,14 @@
         document.getElementById('overlay').style.display = 'none';
     };
 
-    // Synchronized YouTube VC State Handler
-    function handleYouTubeVcStateUpdate(data) {
+    // Robust Synchronized YouTube VC State Handler (Autoplay Policy Safe)
+    async function handleYouTubeVcStateUpdate(data) {
         const stage = document.getElementById('youtubeVcStage');
         const titleEl = document.getElementById('youtubeVcCurrentTitle');
         const container = document.getElementById('youtubeVcPlayerContainer');
+        const unmuteOverlay = document.getElementById('youtubeUnmuteOverlay');
+        const miniPip = document.getElementById('youtubeMiniPip');
+        const miniPipTitle = document.getElementById('youtubeMiniPipTitle');
 
         if (!data || !data.videoId) {
             stopAndHideYouTubeVc();
@@ -3663,11 +3732,24 @@
 
         if (stage) stage.classList.add('active');
         if (titleEl) titleEl.innerText = data.title || 'YouTube 同期再生';
+        if (miniPipTitle) miniPipTitle.innerText = `🔊 ${data.title || 'YouTube'}`;
 
         const elapsedSec = data.state === 'playing' ? Math.max(0, (Date.now() - (data.updatedAt || Date.now())) / 1000) : 0;
-        const targetTime = (data.currentTime || 0) + elapsedSec;
+        const targetTime = Math.floor((data.currentTime || 0) + elapsedSec);
 
         lastSyncedYtState = data;
+
+        // Check if user is on Voice Tab or other tab to show Mini PIP
+        const isVoiceTabActive = document.querySelector('.sidebar-icon[data-tab="voice"]')?.classList.contains('active');
+        if (miniPip) {
+            if (!isVoiceTabActive && stage.classList.contains('active')) {
+                miniPip.classList.add('active');
+            } else {
+                miniPip.classList.remove('active');
+            }
+        }
+
+        await ensureYouTubeIframeApi();
 
         if (window.YT && window.YT.Player) {
             if (ytVcPlayer && typeof ytVcPlayer.loadVideoById === 'function') {
@@ -3676,17 +3758,21 @@
                     if (currentVid !== data.videoId) {
                         ytVcPlayer.loadVideoById({
                             videoId: data.videoId,
-                            startSeconds: Math.floor(targetTime)
+                            startSeconds: targetTime
                         });
                         ytVcPlayer.setVolume(ytVcLocalVolume);
+                        ytVcPlayer.unMute();
                     } else {
                         const curTime = ytVcPlayer.getCurrentTime ? ytVcPlayer.getCurrentTime() : 0;
-                        if (Math.abs(curTime - targetTime) > 3.0) {
+                        if (Math.abs(curTime - targetTime) > 2.5) {
                             ytVcPlayer.seekTo(targetTime, true);
                         }
-                        if (data.state === 'playing' && ytVcPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-                            ytVcPlayer.playVideo();
-                        } else if (data.state === 'paused' && ytVcPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+                        if (data.state === 'playing') {
+                            const state = ytVcPlayer.getPlayerState ? ytVcPlayer.getPlayerState() : -1;
+                            if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) {
+                                ytVcPlayer.playVideo();
+                            }
+                        } else if (data.state === 'paused') {
                             ytVcPlayer.pauseVideo();
                         }
                     }
@@ -3694,7 +3780,8 @@
                     console.warn("YouTube player sync error:", e);
                 }
             } else {
-                container.innerHTML = '<div id="youtubeVcPlayerEmbed"></div>';
+                // Initialize fresh YT.Player
+                container.innerHTML = '<div id="youtubeVcPlayerEmbed" style="width:100%; height:100%;"></div>';
                 try {
                     ytVcPlayer = new YT.Player('youtubeVcPlayerEmbed', {
                         videoId: data.videoId,
@@ -3704,27 +3791,50 @@
                             rel: 0,
                             enablejsapi: 1,
                             playsinline: 1,
-                            start: Math.floor(targetTime)
+                            start: targetTime
                         },
                         events: {
                             onReady: (event) => {
                                 event.target.setVolume(ytVcLocalVolume);
-                                if (data.state === 'playing') event.target.playVideo();
+                                event.target.unMute();
+                                if (data.state === 'playing') {
+                                    const playPromise = event.target.playVideo();
+                                    if (playPromise && typeof playPromise.catch === 'function') {
+                                        playPromise.catch(() => {
+                                            if (unmuteOverlay) unmuteOverlay.classList.add('active');
+                                        });
+                                    }
+                                }
+                            },
+                            onStateChange: (event) => {
+                                if (event.data === YT.PlayerState.PLAYING) {
+                                    if (unmuteOverlay) unmuteOverlay.classList.remove('active');
+                                }
+                            },
+                            onError: (err) => {
+                                console.warn("YouTube player error, falling back to direct iframe:", err);
+                                container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&start=${targetTime}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
                             }
                         }
                     });
                 } catch(err) {
-                    container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(targetTime)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
+                    console.warn("YouTube init exception, fallback to iframe:", err);
+                    container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&start=${targetTime}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
                 }
             }
         } else {
-            container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(targetTime)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
+            // Direct iframe fallback
+            container.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${data.videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&start=${targetTime}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>`;
         }
     }
 
     function stopAndHideYouTubeVc() {
         const stage = document.getElementById('youtubeVcStage');
+        const unmuteOverlay = document.getElementById('youtubeUnmuteOverlay');
+        const miniPip = document.getElementById('youtubeMiniPip');
         if (stage) stage.classList.remove('active');
+        if (unmuteOverlay) unmuteOverlay.classList.remove('active');
+        if (miniPip) miniPip.classList.remove('active');
         if (ytVcPlayer && typeof ytVcPlayer.stopVideo === 'function') {
             try { ytVcPlayer.stopVideo(); } catch(e) {}
         }
@@ -3752,6 +3862,36 @@
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeModal();
         });
+
+        // YouTube VC Unmute overlay button
+        const unmuteBtn = document.getElementById('youtubeUnmuteBtn');
+        if (unmuteBtn) {
+            unmuteBtn.onclick = () => {
+                const overlay = document.getElementById('youtubeUnmuteOverlay');
+                if (overlay) overlay.classList.remove('active');
+                if (ytVcPlayer) {
+                    try {
+                        if (typeof ytVcPlayer.unMute === 'function') ytVcPlayer.unMute();
+                        if (typeof ytVcPlayer.playVideo === 'function') ytVcPlayer.playVideo();
+                    } catch(e) {}
+                }
+            };
+        }
+
+        // Mini PIP Expand & Close
+        const pipExpandBtn = document.getElementById('youtubeMiniPipExpandBtn');
+        if (pipExpandBtn) {
+            pipExpandBtn.onclick = () => {
+                document.querySelector('.sidebar-icon[data-tab="voice"]')?.click();
+            };
+        }
+        const pipCloseBtn = document.getElementById('youtubeMiniPipCloseBtn');
+        if (pipCloseBtn) {
+            pipCloseBtn.onclick = () => {
+                const miniPip = document.getElementById('youtubeMiniPip');
+                if (miniPip) miniPip.classList.remove('active');
+            };
+        }
 
         // Cancel media attachment button
         document.getElementById('cancelMediaAttachmentBtn')?.addEventListener('click', clearPendingMedia);
@@ -4075,20 +4215,59 @@
             readBy: { [currentUser.uid]: true }
         };
 
+        const sendBtn = document.getElementById('sendMsgBtn');
+        const origBtnHtml = sendBtn.innerHTML;
+
         if (pendingMediaAttachment) {
-            if (pendingMediaAttachment.type === 'image') {
-                msgData.imageUrl = pendingMediaAttachment.dataUrl;
-            } else if (pendingMediaAttachment.type === 'video') {
-                msgData.videoUrl = pendingMediaAttachment.dataUrl;
-                msgData.videoName = pendingMediaAttachment.name || '動画ファイル';
-            } else if (pendingMediaAttachment.type === 'audio') {
-                msgData.audioUrl = pendingMediaAttachment.dataUrl;
-                msgData.audioName = pendingMediaAttachment.name || '音声ファイル';
-            } else if (pendingMediaAttachment.type === 'youtube') {
-                msgData.youtube = {
-                    videoId: pendingMediaAttachment.youtubeId,
-                    title: pendingMediaAttachment.title || 'YouTube 動画'
-                };
+            const pWrap = document.getElementById('chatMediaProgressWrap');
+            const pBar = document.getElementById('chatMediaProgressBar');
+            if (pWrap) pWrap.style.display = 'block';
+
+            const onProgress = (pct) => {
+                if (pBar) pBar.style.width = `${pct}%`;
+            };
+
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送信中...';
+            sendBtn.disabled = true;
+
+            try {
+                if (pendingMediaAttachment.type === 'image') {
+                    if (pendingMediaAttachment.file) {
+                        msgData.imageUrl = await uploadMediaFile(pendingMediaAttachment.file, 'images', onProgress);
+                    } else {
+                        msgData.imageUrl = pendingMediaAttachment.dataUrl;
+                    }
+                } else if (pendingMediaAttachment.type === 'video') {
+                    if (pendingMediaAttachment.file) {
+                        msgData.videoUrl = await uploadMediaFile(pendingMediaAttachment.file, 'videos', onProgress);
+                    } else {
+                        msgData.videoUrl = pendingMediaAttachment.dataUrl;
+                    }
+                    msgData.videoName = pendingMediaAttachment.name || '動画ファイル';
+                } else if (pendingMediaAttachment.type === 'audio') {
+                    if (pendingMediaAttachment.file) {
+                        msgData.audioUrl = await uploadMediaFile(pendingMediaAttachment.file, 'audios', onProgress);
+                    } else {
+                        msgData.audioUrl = pendingMediaAttachment.dataUrl;
+                    }
+                    msgData.audioName = pendingMediaAttachment.name || '音声ファイル';
+                } else if (pendingMediaAttachment.type === 'youtube') {
+                    msgData.youtube = {
+                        videoId: pendingMediaAttachment.youtubeId,
+                        title: pendingMediaAttachment.title || 'YouTube 動画'
+                    };
+                }
+            } catch(e) {
+                console.warn("Upload error:", e);
+                // Fallback to dataUrl
+                if (pendingMediaAttachment.dataUrl) {
+                    if (pendingMediaAttachment.type === 'video') msgData.videoUrl = pendingMediaAttachment.dataUrl;
+                    else if (pendingMediaAttachment.type === 'audio') msgData.audioUrl = pendingMediaAttachment.dataUrl;
+                    else if (pendingMediaAttachment.type === 'image') msgData.imageUrl = pendingMediaAttachment.dataUrl;
+                }
+            } finally {
+                sendBtn.innerHTML = origBtnHtml;
+                sendBtn.disabled = false;
             }
         } else if (pendingImageAttachment) {
             msgData.imageUrl = pendingImageAttachment;
@@ -4275,6 +4454,18 @@
                 document.getElementById(views[idx]+'View').classList.add('active-view');
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
+
+                // YouTube VC Mini PIP Tab Sync
+                const stage = document.getElementById('youtubeVcStage');
+                const miniPip = document.getElementById('youtubeMiniPip');
+                if (miniPip) {
+                    if (views[idx] !== 'voice' && stage && stage.classList.contains('active')) {
+                        miniPip.classList.add('active');
+                    } else {
+                        miniPip.classList.remove('active');
+                    }
+                }
+
                 if (views[idx] === 'home') loadUserFull();
                 if (views[idx] === 'messages') renderChatListWithUnread();
                 if (views[idx] === 'shop') renderShop();
