@@ -7,6 +7,7 @@
     <meta name="description" content="WebRTC対応の超高音質リアルタイムボイスチャット、ボイスチェンジャー、画面共有、動画・音声送信＆YouTubeボイスチャット同期再生対応メッセージングアプリ">
     <meta property="og:title" content="Forcord - 超高音質WebRTCボイスチャット">
     <meta property="og:description" content="WebRTC対応の超高音質リアルタイムボイスチャット、ボイスチェンジャー、画面共有、動画・音声送信＆YouTubeボイスチャット同期再生対応メッセージングアプリ">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
@@ -3377,7 +3378,6 @@
     // ==========================================
     // --- Universal Media Attachment & YouTube Engine (Ultra-Fast & Zero-Fail) ---
     // ==========================================
-    let isYtApiReady = false;
     let ytApiLoadingPromise = null;
 
     function ensureYouTubeIframeApi() {
@@ -3404,11 +3404,6 @@
         });
         return ytApiLoadingPromise;
     }
-
-    // Ensure YT callback is hooked
-    window.onYouTubeIframeAPIReady = () => {
-        isYtApiReady = true;
-    };
 
     function setPendingMedia(mediaObj) {
         pendingMediaAttachment = mediaObj;
