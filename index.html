@@ -259,7 +259,8 @@
         .voice-mic-meter-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #23a559, #f0b90b, #ed4245); transition: width 0.05s ease-out; }
         
         .voice-controls-center { display: flex; align-items: center; gap: 12px; }
-        .voice-action-btn { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; background: var(--bg-card); color: white; border: 1px solid var(--border-color); transition: all 0.15s; position: relative; }
+        .voice-action-btn { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; background: var(--bg-card); color: white; border: 1px solid var(--border-color); transition: all 0.15s; position: relative; cursor: pointer; }
+        .voice-action-btn * { pointer-events: none; }
         .voice-action-btn:hover { background: var(--bg-hover); transform: scale(1.05); }
         .voice-action-btn.active-mic { background: var(--success); border-color: var(--success); }
         .voice-action-btn.muted-btn { background: var(--danger); border-color: var(--danger); }
@@ -1003,6 +1004,7 @@
     let micAnalyser = null;
     let micSourceNode = null;
     let micGainNode = null;
+    let fxProcessedMasterGain = null;
     let fxDestinationNode = null;
     let currentFxNodes = []; // holds active Web Audio effect nodes to disconnect on switch
     let noiseGateThreshold = 0.05; // 0 to 1
@@ -1172,9 +1174,21 @@
             micAnalyser.fftSize = 256;
             micAnalyser.smoothingTimeConstant = 0.3;
 
-            // MediaStream Destination for sending FX-processed audio over WebRTC
+            // Master GainNode for all processed FX audio
+            fxProcessedMasterGain = audioContext.createGain();
+            fxProcessedMasterGain.gain.setValueAtTime(1.0, audioContext.currentTime);
+
+            // MediaStream Destination for sending FX-processed audio over WebRTC to peers
             fxDestinationNode = audioContext.createMediaStreamDestination();
             processedAudioStream = fxDestinationNode.stream;
+            fxProcessedMasterGain.connect(fxDestinationNode);
+
+            // Self-Voice (Side-tone) & Mic Test local monitor node
+            selfVoiceMonitorNode = audioContext.createGain();
+            const shouldMonitor = (isSelfVoiceEnabled || isMicTesting);
+            selfVoiceMonitorNode.gain.setValueAtTime(shouldMonitor ? 1.0 : 0.0, audioContext.currentTime);
+            fxProcessedMasterGain.connect(selfVoiceMonitorNode);
+            selfVoiceMonitorNode.connect(audioContext.destination);
 
             micSourceNode.connect(micGainNode);
             micGainNode.connect(micAnalyser);
@@ -1193,7 +1207,7 @@
 
     // Real-time Voice Effect Processor (Normal / Reverb 響き / Breath 喘ぎ / Alien 宇宙人)
     function applyVoiceFxGraph(fxType) {
-        if (!audioContext || !micGainNode || !fxDestinationNode) return;
+        if (!audioContext || !micGainNode || !fxProcessedMasterGain) return;
 
         // Disconnect previous FX nodes
         currentFxNodes.forEach(node => {
@@ -1205,7 +1219,7 @@
         currentFxNodes = [];
 
         try {
-            micGainNode.disconnect(fxDestinationNode);
+            micGainNode.disconnect(fxProcessedMasterGain);
         } catch(e) {}
 
         selectedVoiceFx = fxType;
@@ -1233,7 +1247,7 @@
 
             // Routing
             micGainNode.connect(dryGain);
-            dryGain.connect(fxDestinationNode);
+            dryGain.connect(fxProcessedMasterGain);
 
             micGainNode.connect(delay1);
             delay1.connect(wetFilter);
@@ -1243,7 +1257,7 @@
             wetFilter.connect(delay2);
             delay2.connect(wetGain);
             wetFilter.connect(wetGain);
-            wetGain.connect(fxDestinationNode);
+            wetGain.connect(fxProcessedMasterGain);
 
             currentFxNodes.push(dryGain, delay1, delay2, feedbackGain, wetFilter, wetGain);
 
@@ -1282,7 +1296,7 @@
             chopGain.connect(breathHighpass);
             breathHighpass.connect(breathPeak);
             breathPeak.connect(breathGain);
-            breathGain.connect(fxDestinationNode);
+            breathGain.connect(fxProcessedMasterGain);
 
             currentFxNodes.push(chopGain, chopOsc, chopDepth, breathHighpass, breathPeak, breathGain);
 
@@ -1315,7 +1329,7 @@
             modGain.connect(highpass);
             highpass.connect(bandpass);
             bandpass.connect(alienGain);
-            alienGain.connect(fxDestinationNode);
+            alienGain.connect(fxProcessedMasterGain);
 
             currentFxNodes.push(carrierOsc, modGain, highpass, bandpass, alienGain);
 
@@ -1324,7 +1338,7 @@
             const directGain = audioContext.createGain();
             directGain.gain.setValueAtTime(1.0, audioContext.currentTime);
             micGainNode.connect(directGain);
-            directGain.connect(fxDestinationNode);
+            directGain.connect(fxProcessedMasterGain);
             currentFxNodes.push(directGain);
         }
 
@@ -1337,39 +1351,18 @@
             barSelect.value = fxType;
         }
 
-        // If Self Voice (自分の声) is active, route to speakers so user can hear their own voice
+        // Update Self Voice / Side-tone volume routing
         updateSelfVoiceRouting();
-
-        // If Mic Test Monitor is active, re-route to speakers for local auditioning
-        if (isMicTesting && micTestMonitorNode) {
-            try { micTestMonitorNode.disconnect(); } catch(e) {}
-            micTestMonitorNode = audioContext.createGain();
-            micTestMonitorNode.gain.setValueAtTime(0.9, audioContext.currentTime);
-            fxDestinationNode.connect(micTestMonitorNode);
-            micTestMonitorNode.connect(audioContext.destination);
-        }
     }
 
     // Helper to toggle & update Self Voice (自分の声モニタリング / サイドトーン)
     function updateSelfVoiceRouting() {
-        if (!audioContext || !fxDestinationNode) return;
-        if (isSelfVoiceEnabled) {
-            if (!selfVoiceMonitorNode) {
-                selfVoiceMonitorNode = audioContext.createGain();
-                selfVoiceMonitorNode.gain.setValueAtTime(1.0, audioContext.currentTime);
-            }
-            try { fxDestinationNode.disconnect(selfVoiceMonitorNode); } catch(e) {}
-            try { selfVoiceMonitorNode.disconnect(); } catch(e) {}
-            fxDestinationNode.connect(selfVoiceMonitorNode);
-            selfVoiceMonitorNode.connect(audioContext.destination);
-        } else {
-            if (selfVoiceMonitorNode) {
-                try {
-                    fxDestinationNode.disconnect(selfVoiceMonitorNode);
-                    selfVoiceMonitorNode.disconnect();
-                } catch(e) {}
-                selfVoiceMonitorNode = null;
-            }
+        if (!audioContext || !selfVoiceMonitorNode) return;
+        try {
+            const shouldHearSelf = (isSelfVoiceEnabled || isMicTesting);
+            selfVoiceMonitorNode.gain.setValueAtTime(shouldHearSelf ? 1.0 : 0.0, audioContext.currentTime);
+        } catch(e) {
+            console.warn("Self voice gain routing update:", e);
         }
     }
 
@@ -2633,7 +2626,11 @@
         const selfVoiceBtn = document.getElementById('toggleSelfVoiceBtn');
         if (selfVoiceBtn) {
             selfVoiceBtn.onclick = async () => {
-                await setupLocalAudioStream().catch(() => {});
+                try {
+                    await setupLocalAudioStream();
+                } catch(e) {
+                    console.warn("Could not start audio stream for self-voice:", e);
+                }
                 toggleSelfVoice();
             };
         }
@@ -2860,7 +2857,11 @@
         const settingsSelfVoiceBtn = document.getElementById('settingsSelfVoiceToggleBtn');
         if (settingsSelfVoiceBtn) {
             settingsSelfVoiceBtn.onclick = async () => {
-                await setupLocalAudioStream().catch(() => {});
+                try {
+                    await setupLocalAudioStream();
+                } catch(e) {
+                    console.warn("Could not start audio stream for self-voice:", e);
+                }
                 toggleSelfVoice();
             };
         }
@@ -2869,26 +2870,21 @@
         const testMicBtn = document.getElementById('testMicBtn');
         if (testMicBtn) {
             testMicBtn.onclick = async () => {
-                await setupLocalAudioStream();
+                try {
+                    await setupLocalAudioStream();
+                } catch(e) {
+                    console.warn("Could not start audio stream for mic test:", e);
+                }
                 isMicTesting = !isMicTesting;
                 if (isMicTesting) {
                     testMicBtn.className = 'btn-danger';
                     testMicBtn.innerHTML = '<i class="fas fa-stop-circle"></i> テスト停止 (試聴中)';
-                    if (audioContext && fxDestinationNode) {
-                        try { if (micTestMonitorNode) micTestMonitorNode.disconnect(); } catch(e) {}
-                        micTestMonitorNode = audioContext.createGain();
-                        micTestMonitorNode.gain.setValueAtTime(0.85, audioContext.currentTime);
-                        fxDestinationNode.connect(micTestMonitorNode);
-                        micTestMonitorNode.connect(audioContext.destination);
-                    }
+                    updateSelfVoiceRouting();
                     playTone(520, 0.1, 'sine', 0.15);
                 } else {
                     testMicBtn.className = 'btn-secondary';
                     testMicBtn.innerHTML = '<i class="fas fa-vial"></i> マイクテスト開始';
-                    if (micTestMonitorNode) {
-                        try { micTestMonitorNode.disconnect(); } catch(e) {}
-                        micTestMonitorNode = null;
-                    }
+                    updateSelfVoiceRouting();
                     playTone(330, 0.1, 'sine', 0.15);
                 }
             };
