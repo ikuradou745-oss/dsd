@@ -522,6 +522,9 @@
                             <button id="toggleRtcMicBtn" class="voice-action-btn" title="マイクのミュート切替 (M)">
                                 <i class="fas fa-microphone"></i>
                             </button>
+                            <button id="toggleSelfVoiceBtn" class="voice-action-btn" title="自分の声: OFF (ONにすると喋った声が相手と自分に聞こえます)">
+                                <i class="fas fa-headset"></i>
+                            </button>
                             <button id="toggleDeafenBtn" class="voice-action-btn" title="スピーカーミュート (Deafen)">
                                 <i class="fas fa-headphones"></i>
                             </button>
@@ -703,6 +706,14 @@
                         <label style="font-size:0.9rem; font-weight:600;">マイク入力感度 (ノイズゲートしきい値): <span id="noiseGateDisplay">10%</span></label>
                         <input type="range" id="noiseGateSlider" min="1" max="50" step="1" value="10">
                         <div class="info-text">周囲の雑音やキーボード音を自動でカットする入力感度を設定します。</div>
+                    </div>
+
+                    <div style="margin-bottom:16px;">
+                        <label style="font-size:0.9rem; font-weight:600;">自分の声 (サイドトーン・自分の声を聞く):</label>
+                        <div style="display:flex; gap:12px; align-items:center; margin-top:8px;">
+                            <button id="settingsSelfVoiceToggleBtn" class="btn-secondary"><i class="fas fa-headset"></i> 自分の声: OFF (通常)</button>
+                        </div>
+                        <div class="info-text">ONにすると、自分がマイクで喋った声（加工エフェクト含む）が相手だけでなく自分自身のイヤホン・スピーカーにもリアルタイムに聞こえるようになります。</div>
                     </div>
 
                     <div style="margin-bottom:16px;">
@@ -992,6 +1003,8 @@
     let currentFxNodes = []; // holds active Web Audio effect nodes to disconnect on switch
     let noiseGateThreshold = 0.05; // 0 to 1
     let selectedVoiceFx = 'normal'; // 'normal', 'reverb', 'breath', 'alien'
+    let isSelfVoiceEnabled = false; // 自分の声 (サイドトーン・自分の声を自分にも聞こえるようにする機能)
+    let selfVoiceMonitorNode = null; // GainNode for routing processed voice to audioContext.destination
     let isMicTesting = false;
     let micTestMonitorNode = null;
     let isRtcMicMuted = false;
@@ -1320,6 +1333,9 @@
             barSelect.value = fxType;
         }
 
+        // If Self Voice (自分の声) is active, route to speakers so user can hear their own voice
+        updateSelfVoiceRouting();
+
         // If Mic Test Monitor is active, re-route to speakers for local auditioning
         if (isMicTesting && micTestMonitorNode) {
             try { micTestMonitorNode.disconnect(); } catch(e) {}
@@ -1327,6 +1343,70 @@
             micTestMonitorNode.gain.setValueAtTime(0.9, audioContext.currentTime);
             fxDestinationNode.connect(micTestMonitorNode);
             micTestMonitorNode.connect(audioContext.destination);
+        }
+    }
+
+    // Helper to toggle & update Self Voice (自分の声モニタリング / サイドトーン)
+    function updateSelfVoiceRouting() {
+        if (!audioContext || !fxDestinationNode) return;
+        if (isSelfVoiceEnabled) {
+            if (!selfVoiceMonitorNode) {
+                selfVoiceMonitorNode = audioContext.createGain();
+                selfVoiceMonitorNode.gain.setValueAtTime(1.0, audioContext.currentTime);
+            }
+            try { fxDestinationNode.disconnect(selfVoiceMonitorNode); } catch(e) {}
+            try { selfVoiceMonitorNode.disconnect(); } catch(e) {}
+            fxDestinationNode.connect(selfVoiceMonitorNode);
+            selfVoiceMonitorNode.connect(audioContext.destination);
+        } else {
+            if (selfVoiceMonitorNode) {
+                try {
+                    fxDestinationNode.disconnect(selfVoiceMonitorNode);
+                    selfVoiceMonitorNode.disconnect();
+                } catch(e) {}
+                selfVoiceMonitorNode = null;
+            }
+        }
+    }
+
+    function toggleSelfVoice() {
+        isSelfVoiceEnabled = !isSelfVoiceEnabled;
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+        updateSelfVoiceRouting();
+
+        // Update UI states
+        const barBtn = document.getElementById('toggleSelfVoiceBtn');
+        if (barBtn) {
+            if (isSelfVoiceEnabled) {
+                barBtn.classList.add('active-toggle');
+                barBtn.title = "自分の声: ON (自分の声が相手と自分に聞こえます)";
+                barBtn.style.color = '#57f287';
+                barBtn.style.borderColor = '#57f287';
+            } else {
+                barBtn.classList.remove('active-toggle');
+                barBtn.title = "自分の声: OFF (相手のみに聞こえます)";
+                barBtn.style.color = 'white';
+                barBtn.style.borderColor = 'var(--border-color)';
+            }
+        }
+
+        const settingsBtn = document.getElementById('settingsSelfVoiceToggleBtn');
+        if (settingsBtn) {
+            if (isSelfVoiceEnabled) {
+                settingsBtn.className = 'btn-success';
+                settingsBtn.innerHTML = '<i class="fas fa-headset"></i> 自分の声: ON (自分にも聞こえる)';
+            } else {
+                settingsBtn.className = 'btn-secondary';
+                settingsBtn.innerHTML = '<i class="fas fa-headset"></i> 自分の声: OFF (通常)';
+            }
+        }
+
+        if (isSelfVoiceEnabled) {
+            playTone(660, 0.1, 'sine', 0.15);
+        } else {
+            playTone(330, 0.1, 'sine', 0.15);
         }
     }
 
@@ -2529,6 +2609,15 @@
             }
         };
 
+        // Self-Voice (自分の声) Monitoring Toggle Button in VC Bar
+        const selfVoiceBtn = document.getElementById('toggleSelfVoiceBtn');
+        if (selfVoiceBtn) {
+            selfVoiceBtn.onclick = async () => {
+                await setupLocalAudioStream().catch(() => {});
+                toggleSelfVoice();
+            };
+        }
+
         // Deafen Button (Mute incoming speakers)
         document.getElementById('toggleDeafenBtn').onclick = () => {
             isDeafened = !isDeafened;
@@ -2746,6 +2835,15 @@
             noiseGateThreshold = val / 100;
             document.getElementById('noiseGateDisplay').innerText = `${val}%`;
         };
+
+        // Settings Self-Voice (自分の声) Toggle Button
+        const settingsSelfVoiceBtn = document.getElementById('settingsSelfVoiceToggleBtn');
+        if (settingsSelfVoiceBtn) {
+            settingsSelfVoiceBtn.onclick = async () => {
+                await setupLocalAudioStream().catch(() => {});
+                toggleSelfVoice();
+            };
+        }
 
         // Mic Test & Self-Monitoring Button
         const testMicBtn = document.getElementById('testMicBtn');
