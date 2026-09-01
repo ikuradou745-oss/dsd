@@ -259,12 +259,15 @@
         .voice-mic-meter-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #23a559, #f0b90b, #ed4245); transition: width 0.05s ease-out; }
         
         .voice-controls-center { display: flex; align-items: center; gap: 12px; }
-        .voice-action-btn { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; background: var(--bg-card); color: white; border: 1px solid var(--border-color); transition: all 0.15s; }
+        .voice-action-btn { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; background: var(--bg-card); color: white; border: 1px solid var(--border-color); transition: all 0.15s; position: relative; }
         .voice-action-btn:hover { background: var(--bg-hover); transform: scale(1.05); }
         .voice-action-btn.active-mic { background: var(--success); border-color: var(--success); }
         .voice-action-btn.muted-btn { background: var(--danger); border-color: var(--danger); }
         .voice-action-btn.deafened-btn { background: #e03131; border-color: #e03131; }
         .voice-action-btn.active-toggle { background: var(--accent); border-color: var(--accent); }
+        .voice-action-btn.self-voice-active { background: linear-gradient(135deg, #23a559, #5865f2); border-color: #57f287; box-shadow: 0 0 16px rgba(87, 242, 135, 0.45); color: #fff !important; }
+        .voice-action-btn.self-voice-active .btn-status-badge { background: #57f287; color: #000; }
+        .btn-status-badge { position: absolute; bottom: -4px; right: -4px; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 6px; background: #4f545c; color: #fff; line-height: 1; border: 1px solid var(--bg-darker); text-transform: uppercase; }
         
         .voice-controls-right { display: flex; align-items: center; gap: 12px; }
         .voice-quality-select { background: var(--bg-card); color: white; border: 1px solid var(--border-color); border-radius: 16px; padding: 8px 12px; font-size: 0.85rem; outline: none; cursor: pointer; }
@@ -522,8 +525,9 @@
                             <button id="toggleRtcMicBtn" class="voice-action-btn" title="マイクのミュート切替 (M)">
                                 <i class="fas fa-microphone"></i>
                             </button>
-                            <button id="toggleSelfVoiceBtn" class="voice-action-btn" title="自分の声: OFF (ONにすると喋った声が相手と自分に聞こえます)">
+                            <button id="toggleSelfVoiceBtn" class="voice-action-btn" title="自分の声 (サイドトーン): OFF - 喋った声は相手のみに聞こえます">
                                 <i class="fas fa-headset"></i>
+                                <span class="btn-status-badge" id="selfVoiceBadge">OFF</span>
                             </button>
                             <button id="toggleDeafenBtn" class="voice-action-btn" title="スピーカーミュート (Deafen)">
                                 <i class="fas fa-headphones"></i>
@@ -1378,17 +1382,24 @@
 
         // Update UI states
         const barBtn = document.getElementById('toggleSelfVoiceBtn');
+        const badge = document.getElementById('selfVoiceBadge');
         if (barBtn) {
             if (isSelfVoiceEnabled) {
-                barBtn.classList.add('active-toggle');
-                barBtn.title = "自分の声: ON (自分の声が相手と自分に聞こえます)";
-                barBtn.style.color = '#57f287';
-                barBtn.style.borderColor = '#57f287';
+                barBtn.className = 'voice-action-btn self-voice-active';
+                barBtn.title = "自分の声 (サイドトーン): ON (マイクで喋った声が自分にも聞こえています)";
+                if (badge) {
+                    badge.innerText = 'ON';
+                    badge.style.background = '#57f287';
+                    badge.style.color = '#000';
+                }
             } else {
-                barBtn.classList.remove('active-toggle');
-                barBtn.title = "自分の声: OFF (相手のみに聞こえます)";
-                barBtn.style.color = 'white';
-                barBtn.style.borderColor = 'var(--border-color)';
+                barBtn.className = 'voice-action-btn';
+                barBtn.title = "自分の声 (サイドトーン): OFF - 喋った声は相手のみに聞こえます";
+                if (badge) {
+                    badge.innerText = 'OFF';
+                    badge.style.background = '#4f545c';
+                    badge.style.color = '#fff';
+                }
             }
         }
 
@@ -1400,6 +1411,14 @@
             } else {
                 settingsBtn.className = 'btn-secondary';
                 settingsBtn.innerHTML = '<i class="fas fa-headset"></i> 自分の声: OFF (通常)';
+            }
+        }
+
+        // Self-voice status display in participant card if present
+        if (currentUser) {
+            const selfStatusElem = document.getElementById(`self_voice_indicator_${currentUser.uid}`);
+            if (selfStatusElem) {
+                selfStatusElem.style.display = isSelfVoiceEnabled ? 'inline-block' : 'none';
             }
         }
 
@@ -2339,8 +2358,9 @@
                     ${escapeHtml(data.name || 'ユーザー')}
                     ${isMe ? '<span class="voice-user-badge">あなた</span>' : ''}
                 </div>
-                <div class="voice-card-status">
+                <div class="voice-card-status" style="display:flex; flex-direction:column; gap:4px; align-items:center;">
                     <span id="mic_status_${uid}">${data.muted ? '<i class="fas fa-microphone-slash" style="color:var(--danger)"></i> ミュート中' : '<i class="fas fa-microphone" style="color:var(--success)"></i> マイクON'}</span>
+                    ${isMe ? `<span id="self_voice_indicator_${uid}" style="font-size:0.75rem; color:#57f287; display:${isSelfVoiceEnabled ? 'inline-block' : 'none'};"><i class="fas fa-headset"></i> 自分の声モニタ中</span>` : ''}
                 </div>
                 ${!isMe ? `
                 <div class="voice-user-controls">
