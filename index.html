@@ -1028,6 +1028,67 @@
     let masterVoiceVolume = 1.0; // 0.0 to 5.0
     let meterAnimationId = null;
     let signalingRef = null;
+    let backgroundKeepAliveAudio = null;
+    let voiceWakeLock = null;
+
+    // Background Audio & WakeLock Manager for Mobile / Tablet background playback
+    function startBackgroundKeepAlive() {
+        try {
+            // 1. Silent Loop HTML5 Audio to prevent mobile OS / WebKit from throttling audio thread when backgrounded
+            if (!backgroundKeepAliveAudio) {
+                backgroundKeepAliveAudio = document.createElement('audio');
+                backgroundKeepAliveAudio.id = 'bg_vc_keepalive_audio';
+                backgroundKeepAliveAudio.loop = true;
+                backgroundKeepAliveAudio.playsInline = true;
+                backgroundKeepAliveAudio.autoplay = true;
+                // Generate a tiny silent wav data URI
+                backgroundKeepAliveAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+                document.body.appendChild(backgroundKeepAliveAudio);
+            }
+            backgroundKeepAliveAudio.play().catch(() => {});
+
+            // 2. MediaSession API integration for OS lock screen / background audio priority
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: currentVoiceRoomName || 'ボイスチャット通話中',
+                    artist: 'ボイスチャンネル',
+                    album: 'リアルタイム通話'
+                });
+                navigator.mediaSession.playbackState = 'playing';
+            }
+
+            // 3. Screen Wake Lock (Keep screen / background alive where supported)
+            if ('wakeLock' in navigator && !voiceWakeLock) {
+                navigator.wakeLock.request('screen').then(lock => {
+                    voiceWakeLock = lock;
+                    voiceWakeLock.addEventListener('release', () => {
+                        voiceWakeLock = null;
+                    });
+                }).catch(() => {});
+            }
+        } catch(e) {
+            console.warn("Background keep-alive init:", e);
+        }
+    }
+
+    function stopBackgroundKeepAlive() {
+        try {
+            if (backgroundKeepAliveAudio) {
+                backgroundKeepAliveAudio.pause();
+                try { backgroundKeepAliveAudio.remove(); } catch(e) {}
+                backgroundKeepAliveAudio = null;
+            }
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'none';
+            }
+            if (voiceWakeLock) {
+                voiceWakeLock.release().catch(() => {});
+                voiceWakeLock = null;
+            }
+        } catch(e) {
+            console.warn("Background keep-alive stop:", e);
+        }
+    }
 
     // Web Audio Sound Synthesizer for UI & Soundboard
     function playTone(freq, duration, type = 'sine', gainVal = 0.15) {
@@ -1517,6 +1578,9 @@
 
         currentVoiceRoomId = roomId;
         currentVoiceRoomName = roomName;
+
+        // Keep background audio active & prevent mobile OS from freezing VC
+        startBackgroundKeepAlive();
 
         document.getElementById('activeVoiceRoomName').innerText = roomName;
         document.getElementById('rtcConnectionBadge').className = 'rtc-badge connecting';
@@ -2091,6 +2155,7 @@
 
         currentVoiceRoomId = null;
         currentVoiceRoomName = "";
+        stopBackgroundKeepAlive();
 
         const stage = document.getElementById('screenShareStage');
         if (stage) stage.classList.remove('active');
@@ -2581,14 +2646,42 @@
             if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume().catch(() => {});
             }
+            if (backgroundKeepAliveAudio && backgroundKeepAliveAudio.paused && currentVoiceRoomId) {
+                backgroundKeepAliveAudio.play().catch(() => {});
+            }
             Object.values(remoteAudioElements).forEach(audio => {
-                if (audio && audio.paused) {
+                if (audio && audio.paused && !isDeafened) {
                     audio.play().catch(() => {});
                 }
             });
         };
         window.addEventListener('click', unlockAudio);
-        window.addEventListener('touchstart', unlockAudio);
+        window.addEventListener('touchstart', unlockAudio, { passive: true });
+
+        // Auto-resume audio when returning from another app or switching tabs
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume().catch(() => {});
+                }
+                if (currentVoiceRoomId) {
+                    startBackgroundKeepAlive();
+                }
+                Object.values(remoteAudioElements).forEach(audio => {
+                    if (audio && audio.paused && !isDeafened) {
+                        audio.play().catch(() => {});
+                    }
+                });
+            }
+        });
+        window.addEventListener('focus', () => {
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+            if (currentVoiceRoomId) {
+                startBackgroundKeepAlive();
+            }
+        });
 
         // Keyboard Shortcut: Press M to mute/unmute
         window.addEventListener('keydown', (e) => {
