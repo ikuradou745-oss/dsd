@@ -868,6 +868,7 @@
                         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:12px;">
                             <span style="font-weight:700; font-size:0.95rem; color:var(--accent);"><i class="fas fa-sliders-h"></i> 自由調整ボイスコントロール (リアルタイム反映)</span>
                             <div style="display:flex; gap:8px;">
+                                <button id="openCustomVoiceFromSettingsBtn" class="btn-secondary" style="padding:4px 10px; font-size:0.75rem;"><i class="fas fa-expand"></i> ポップアップで調整</button>
                                 <button id="resetCustomVoiceBtn" class="btn-secondary" style="padding:4px 10px; font-size:0.75rem;"><i class="fas fa-undo"></i> 初期値に戻す</button>
                             </div>
                         </div>
@@ -1183,7 +1184,7 @@
 <script>
     // --- Firebase Initialization ---
     const firebaseConfig = { 
-        apiKey: (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) || "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
+        apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
         authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com", 
         databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", 
         projectId: "iikotowaruikoto-d5aa7", 
@@ -3580,22 +3581,24 @@
             }
         };
 
-        // Noise Suppression Toggle
-        document.getElementById('noiseSuppressionToggleBtn').onclick = async () => {
-            const btn = document.getElementById('noiseSuppressionToggleBtn');
-            btn.classList.toggle('active-toggle');
-            if (localAudioStream) {
-                localAudioStream.getTracks().forEach(t => t.stop());
-                localAudioStream = null;
-                await setupLocalAudioStream();
-                // Replace track in peer connections
-                const newTrack = localAudioStream.getAudioTracks()[0];
-                Object.values(peerConnections).forEach(pc => {
-                    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
-                    if (sender) sender.replaceTrack(newTrack);
-                });
-            }
-        };
+        // Noise Suppression Toggle (if element exists)
+        const noiseSuppBtn = document.getElementById('noiseSuppressionToggleBtn');
+        if (noiseSuppBtn) {
+            noiseSuppBtn.onclick = async () => {
+                noiseSuppBtn.classList.toggle('active-toggle');
+                if (localAudioStream) {
+                    localAudioStream.getTracks().forEach(t => t.stop());
+                    localAudioStream = null;
+                    await setupLocalAudioStream();
+                    // Replace track in peer connections
+                    const newTrack = localAudioStream.getAudioTracks()[0];
+                    Object.values(peerConnections).forEach(pc => {
+                        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+                        if (sender) sender.replaceTrack(newTrack);
+                    });
+                }
+            };
+        }
 
         // Screen Share & Material Selection Modal Trigger
         // Screen Share Button Trigger
@@ -3850,21 +3853,21 @@
 
         // --- 1. Loud Notification Alert Settings & Test (爆音通知 ON/OFF) ---
         const loudToggle = document.getElementById('loudAlertToggleCheckbox');
-        const loudStatusText = document.getElementById('loudAlertStatusText');
+        const loudStatusText = document.getElementById('loudAlertToggleText') || document.getElementById('loudAlertStatusText');
         const testLoudBtn = document.getElementById('testLoudAlertBtn');
 
         if (loudToggle) {
             loudToggle.checked = isLoudAlertEnabled;
             if (loudStatusText) {
-                loudStatusText.innerText = isLoudAlertEnabled ? 'ON (大音量アラートを鳴らす)' : 'OFF (ミュート/サイレント)';
-                loudStatusText.style.color = isLoudAlertEnabled ? 'var(--accent)' : 'var(--text-muted)';
+                loudStatusText.innerText = isLoudAlertEnabled ? 'ON (鳴らす)' : 'OFF (ミュート)';
+                loudStatusText.style.color = isLoudAlertEnabled ? '#57f287' : 'var(--text-muted)';
             }
             loudToggle.onchange = (e) => {
                 isLoudAlertEnabled = e.target.checked;
                 localStorage.setItem('forcord_loud_alert_enabled', isLoudAlertEnabled.toString());
                 if (loudStatusText) {
-                    loudStatusText.innerText = isLoudAlertEnabled ? 'ON (大音量アラートを鳴らす)' : 'OFF (ミュート/サイレント)';
-                    loudStatusText.style.color = isLoudAlertEnabled ? 'var(--accent)' : 'var(--text-muted)';
+                    loudStatusText.innerText = isLoudAlertEnabled ? 'ON (鳴らす)' : 'OFF (ミュート)';
+                    loudStatusText.style.color = isLoudAlertEnabled ? '#57f287' : 'var(--text-muted)';
                 }
                 playTone(isLoudAlertEnabled ? 700 : 350, 0.08, 'sine', 0.15);
             };
@@ -3884,6 +3887,18 @@
             const barNoiseSelect = document.getElementById('barNoiseCutSelect');
             if (barNoiseSelect && parseInt(barNoiseSelect.value) !== lvl) {
                 barNoiseSelect.value = lvl.toString();
+            }
+            const currentDisplay = document.getElementById('currentNoiseCutDisplay');
+            if (currentDisplay) {
+                const labels = {
+                    0: '0% (OFF)',
+                    25: '25% (軽快)',
+                    50: '50% (標準)',
+                    75: '75% (強力)',
+                    100: '100% (極限 ⚠️重い)'
+                };
+                currentDisplay.innerText = labels[lvl] || `${lvl}%`;
+                currentDisplay.style.color = lvl === 100 ? '#ff4757' : (lvl > 0 ? '#57f287' : 'var(--text-muted)');
             }
             const warnBox = document.getElementById('heavyNoiseCutWarning');
             if (warnBox) {
@@ -3918,13 +3933,25 @@
         // --- 3. Custom Voice FX Parameters & Sliders (10 granular controls) ---
         setupCustomVoiceSliders();
 
-        // Custom Voice Modal Open/Close
+        // Toggle custom voice panel button in settings
+        const toggleCustomPanelBtn = document.getElementById('toggleCustomVoicePanelBtn');
+        if (toggleCustomPanelBtn) {
+            toggleCustomPanelBtn.onclick = () => {
+                const panel = document.getElementById('customVoicePanel');
+                if (panel) {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            };
+        }
+
+        // Custom Voice Modal Open/Close & Reset
         const customVoiceModal = document.getElementById('customVoiceModal');
-        const openCustomFromBar = document.getElementById('barOpenCustomVoiceModalBtn');
+        const openCustomFromBar = document.getElementById('openCustomVoiceModalBtn') || document.getElementById('barOpenCustomVoiceModalBtn');
         const openCustomFromSettings = document.getElementById('openCustomVoiceFromSettingsBtn');
         const closeCustomModal = document.getElementById('closeCustomVoiceModalBtn');
         const modalDoneBtn = document.getElementById('modalDoneVoiceBtn');
         const modalResetBtn = document.getElementById('modalResetVoiceBtn');
+        const resetSettingsBtn = document.getElementById('resetCustomVoiceBtn');
         const overlay = document.getElementById('overlay');
 
         const openVoiceModal = () => {
@@ -3946,12 +3973,12 @@
         if (closeCustomModal) closeCustomModal.onclick = closeVoiceModal;
         if (modalDoneBtn) modalDoneBtn.onclick = closeVoiceModal;
 
-        if (modalResetBtn) {
-            modalResetBtn.onclick = () => {
-                applyVoiceFxGraph('normal');
-                playTone(400, 0.1, 'sine', 0.15);
-            };
-        }
+        const resetAllCustomFx = () => {
+            applyVoiceFxGraph('normal');
+            playTone(400, 0.1, 'sine', 0.15);
+        };
+        if (modalResetBtn) modalResetBtn.onclick = resetAllCustomFx;
+        if (resetSettingsBtn) resetSettingsBtn.onclick = resetAllCustomFx;
     }
 
     // Synchronize UI sliders and badges with customVoiceParams
@@ -3974,9 +4001,9 @@
             const val = p[key];
             const textVal = (prefix && val > 0 ? prefix : '') + val + unit;
 
-            // Settings panel elements
+            // Settings panel elements (support both customVal_ and val_ IDs)
             const slider = document.getElementById(`slider_${key}`);
-            const badge = document.getElementById(`val_${key}`);
+            const badge = document.getElementById(`customVal_${key}`) || document.getElementById(`val_${key}`);
             if (slider && parseFloat(slider.value) !== val) slider.value = val;
             if (badge) badge.innerText = textVal;
 
