@@ -245,6 +245,32 @@
         .voice-fx-btn:hover { background: var(--bg-hover); border-color: var(--accent); transform: translateY(-1px); }
         .voice-fx-btn.active { border-color: var(--accent); background: rgba(88, 101, 242, 0.22); box-shadow: 0 0 16px rgba(88, 101, 242, 0.35); }
 
+        /* Noise Cut Selector (25%, 50%, 75%, 100%) */
+        .noise-cut-container { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .noise-cut-chip { background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 14px; border-radius: 14px; cursor: pointer; font-size: 0.85rem; font-weight: 700; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+        .noise-cut-chip:hover { background: var(--bg-hover); border-color: var(--accent); }
+        .noise-cut-chip.active { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 0 14px rgba(88, 101, 242, 0.4); }
+        .noise-cut-chip.heavy-chip.active { background: linear-gradient(135deg, #ed4245, #d83a56); border-color: #ed4245; box-shadow: 0 0 18px rgba(237, 66, 69, 0.5); }
+        .heavy-warning-box { background: rgba(237, 66, 69, 0.12); border: 1px solid #ed4245; border-radius: 12px; padding: 10px 14px; margin-top: 10px; font-size: 0.8rem; color: #ff7b72; display: none; align-items: center; gap: 8px; }
+        .heavy-warning-box.active { display: flex; }
+
+        /* Custom Voice FX Panel & Sliders */
+        .custom-voice-panel { background: var(--bg-darker); border: 1px solid var(--border-color); border-radius: 20px; padding: 18px; margin-top: 14px; }
+        .custom-fx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 12px; }
+        .custom-fx-item { background: var(--bg-card); border-radius: 14px; padding: 12px 14px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; }
+        .custom-fx-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
+        .custom-fx-header span.val-badge { color: var(--accent); font-family: monospace; font-size: 0.85rem; }
+        .custom-fx-slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
+        .custom-fx-desc { font-size: 0.72rem; color: var(--text-muted); }
+
+        /* Toggle Switch UI */
+        .toggle-switch-wrap { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
+        .toggle-switch { position: relative; width: 50px; height: 26px; background: #3c3f45; border-radius: 26px; transition: background 0.2s; }
+        .toggle-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .toggle-checkbox { display: none; }
+        .toggle-checkbox:checked + .toggle-switch { background: var(--success); }
+        .toggle-checkbox:checked + .toggle-switch::after { transform: translateX(24px); }
+
         /* Voice Live Subtitle / Activity Feed */
         .voice-subtitles-drawer { background: rgba(17, 18, 20, 0.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-color); padding: 12px 20px; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
         .subtitle-line { font-size: 0.85rem; color: #e1e3e8; display: flex; gap: 8px; align-items: flex-start; }
@@ -536,9 +562,16 @@
                             <button id="toggleScreenShareBtn" class="voice-action-btn" title="🖥️ 画面共有 (Screen Share)">
                                 <i class="fas fa-desktop"></i>
                             </button>
-                            <button id="noiseSuppressionToggleBtn" class="voice-action-btn active-toggle" title="AIノイズ抑制 & エコーキャンセラー (ON/OFF)">
-                                <i class="fas fa-shield-alt"></i>
-                            </button>
+                            <div style="display:flex; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); border-radius:24px; padding:2px 8px;" title="雑音カット機能 (25%, 50%, 75%, 100%)">
+                                <span style="font-size:0.75rem; color:var(--text-muted); margin-right:4px;"><i class="fas fa-shield-alt" style="color:#57f287;"></i> 雑音カット:</span>
+                                <select id="barNoiseCutSelect" class="voice-quality-select" style="font-size:0.75rem; padding:3px 6px; border:none; background:transparent;">
+                                    <option value="0">OFF (0%)</option>
+                                    <option value="25">25% (軽快)</option>
+                                    <option value="50" selected>50% (標準)</option>
+                                    <option value="75">75% (強力)</option>
+                                    <option value="100">100% (極限 ⚠️重い)</option>
+                                </select>
+                            </div>
                             <button id="leaveRtcVoiceBtn" class="voice-action-btn btn-danger" style="display:none;" title="ボイスチャットを切断">
                                 <i class="fas fa-phone-slash"></i>
                             </button>
@@ -549,10 +582,15 @@
                                 <span style="font-size:0.8rem; color:var(--text-muted);"><i class="fas fa-magic"></i> 声の加工:</span>
                                 <select id="voiceFxQuickSelect" class="voice-quality-select" style="font-size:0.8rem; padding:4px 8px;">
                                     <option value="normal" selected>ノーマル (原音)</option>
+                                    <option value="breath">💓 リアル喘ぎ (息遣い・エアノイズ)</option>
                                     <option value="reverb">✨ 響き (エコー残響)</option>
-                                    <option value="breath">💓 喘ぎ (息遣い・スタッター)</option>
                                     <option value="alien">👽 宇宙人 (高音ピッチ)</option>
+                                    <option value="deep">🕶️ 低音イケボ</option>
+                                    <option value="anime">🎀 高音アニメ声</option>
+                                    <option value="radio">📻 無線ラジオ</option>
+                                    <option value="custom">🎛️ 自由カスタム</option>
                                 </select>
+                                <button id="openCustomVoiceModalBtn" class="btn-secondary" style="padding:4px 8px; font-size:0.75rem;" title="声の加工を自由にカスタムする"><i class="fas fa-sliders-h"></i></button>
                             </div>
                             <select id="audioBitrateSelect" class="voice-quality-select" title="WebRTC 音質レート">
                                 <option value="128">💎 128 kbps (Studio HD)</option>
@@ -691,7 +729,55 @@
                 </div>
 
                 <div class="setting-group">
+                    <h3><i class="fas fa-bell"></i> 通知・呼び出し設定</h3>
+                    <div style="margin-bottom:16px; background:var(--bg-darker); padding:14px 18px; border-radius:16px; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div>
+                                <label style="font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+                                    <i class="fas fa-bullhorn" style="color:#ff4d6d;"></i> 爆音呼び出し通知音 (Summon Alert)
+                                </label>
+                                <div class="info-text" style="margin-top:4px;">
+                                    フレンドから「〇〇が呼んでいるよ！」呼び出し通知が届いたときに、爆音サイレン音を鳴らすかどうかを設定します。
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <button id="testLoudAlertBtn" class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" title="爆音通知音をテスト試聴"><i class="fas fa-volume-up"></i> 音を試聴</button>
+                                <label class="toggle-switch-wrap">
+                                    <input type="checkbox" id="loudAlertToggleCheckbox" class="toggle-checkbox" checked>
+                                    <div class="toggle-switch"></div>
+                                    <span id="loudAlertToggleText" style="font-weight:700; font-size:0.85rem; color:#57f287;">ON (鳴らす)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
                     <h3><i class="fas fa-microphone-alt"></i> 高性能マイク・音響設定 (WebRTC)</h3>
+
+                    <!-- Noise Cut Section (25%, 50%, 75%, 100%) -->
+                    <div style="margin-bottom:18px; background:var(--bg-darker); padding:16px 18px; border-radius:16px; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-shield-alt" style="color:#57f287;"></i> 雑音カット機能 (超強力ノイズキャンセラー)
+                            </label>
+                            <span id="currentNoiseCutDisplay" style="font-weight:800; font-size:0.85rem; color:var(--accent);">50% (標準)</span>
+                        </div>
+                        <div class="info-text" style="margin-top:4px;">
+                            キーボード打鍵音、エアコン、ファンの回転音、生活音などの周囲の雑音をマルチバンドDSPで強力にカットします。
+                        </div>
+                        <div class="noise-cut-container" id="noiseCutBtnGroup">
+                            <button class="noise-cut-chip" data-level="0"><i class="fas fa-ban"></i> OFF (0%)</button>
+                            <button class="noise-cut-chip" data-level="25"><i class="fas fa-feather"></i> 25% (軽快・微小カット)</button>
+                            <button class="noise-cut-chip active" data-level="50"><i class="fas fa-check"></i> 50% (標準・しっかり)</button>
+                            <button class="noise-cut-chip" data-level="75"><i class="fas fa-bolt"></i> 75% (超強力カット)</button>
+                            <button class="noise-cut-chip heavy-chip" data-level="100"><i class="fas fa-skull"></i> 100% (極限抹殺 ⚠️普通に重くなる)</button>
+                        </div>
+                        <div class="heavy-warning-box" id="heavyNoiseCutWarning">
+                            <i class="fas fa-exclamation-triangle" style="font-size:1.1rem; flex-shrink:0;"></i>
+                            <span><strong>⚠️ 100% 動作注意:</strong> 100%は超急峻カスケードフィルター、FFTスペクトルノイズリアルタイム減算、動的ノイズゲートを全開演算するため周囲の雑音を徹底的に削ぎ落とせますが、端末のCPU演算負荷が非常に高くなり「普通に重くなります」。動作が重い場合は50%や75%をご利用ください。</span>
+                        </div>
+                    </div>
                     
                     <div style="margin-bottom:16px;">
                         <label style="font-size:0.9rem; font-weight:600;">電話・ボイス通話の受信音量 (ブースト対応): <span id="masterVoiceVolDisplay">100%</span></label>
@@ -733,25 +819,160 @@
 
                     <hr>
 
-                    <h3><i class="fas fa-magic"></i> 声の加工 (ボイスエフェクト)</h3>
-                    <p class="info-text" style="margin-bottom:12px;">Web Audio リアルタイムDSPにより、あなたの声を加工して相手に通話音声を送信します。</p>
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:12px;">
+                    <!-- Voice FX Section -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <h3 style="margin-bottom:2px;"><i class="fas fa-magic"></i> 声の加工 (ボイスエフェクト & 自由カスタマイズ)</h3>
+                            <p class="info-text">Web Audio リアルタイムDSPにより、あなたの声を加工して相手に通話音声を送信します。</p>
+                        </div>
+                        <button id="toggleCustomVoicePanelBtn" class="btn-secondary" style="padding:6px 14px; font-size:0.85rem;"><i class="fas fa-sliders-h"></i> 🎛️ パラメータを自由に調整</button>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin:14px 0 10px 0;">
                         <button class="voice-fx-btn btn-secondary active" data-fx="normal">
                             <div style="font-weight:700; font-size:0.95rem;">🎙️ ノーマル</div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">エフェクトなしの原音忠実ボイス</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">エフェクトなしの原音</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="breath">
+                            <div style="font-weight:700; font-size:0.95rem; color:#ff70a6;">💓 リアル喘ぎ</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">吐息エアノイズ＆艶めかしい揺らぎ・息遣い</div>
                         </button>
                         <button class="voice-fx-btn btn-secondary" data-fx="reverb">
                             <div style="font-weight:700; font-size:0.95rem;">✨ 響き</div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">声が美しく残響・エコーします</div>
-                        </button>
-                        <button class="voice-fx-btn btn-secondary" data-fx="breath">
-                            <div style="font-weight:700; font-size:0.95rem;">💓 喘ぎ</div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">言葉の間に「っ」が入り喘ぐ声になります</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">声が美しく残響・エコー</div>
                         </button>
                         <button class="voice-fx-btn btn-secondary" data-fx="alien">
                             <div style="font-weight:700; font-size:0.95rem;">👽 宇宙人</div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">声のピッチが高くなります</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">リング変調の高音ボイス</div>
                         </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="deep">
+                            <div style="font-weight:700; font-size:0.95rem;">🕶️ 低音イケボ</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">落ち着きのある重低音ピッチ</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="anime">
+                            <div style="font-weight:700; font-size:0.95rem;">🎀 高音アニメ声</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">フォルマント高域シフト声</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="radio">
+                            <div style="font-weight:700; font-size:0.95rem;">📻 無線ラジオ</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">トランシーバー通信風</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="custom">
+                            <div style="font-weight:700; font-size:0.95rem; color:var(--accent);">🎛️ 自由カスタム</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">自分で自由調整したボイス</div>
+                        </button>
+                    </div>
+
+                    <!-- Custom Voice FX Sliders Panel -->
+                    <div class="custom-voice-panel" id="customVoicePanel">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:12px;">
+                            <span style="font-weight:700; font-size:0.95rem; color:var(--accent);"><i class="fas fa-sliders-h"></i> 自由調整ボイスコントロール (リアルタイム反映)</span>
+                            <div style="display:flex; gap:8px;">
+                                <button id="resetCustomVoiceBtn" class="btn-secondary" style="padding:4px 10px; font-size:0.75rem;"><i class="fas fa-undo"></i> 初期値に戻す</button>
+                            </div>
+                        </div>
+
+                        <div class="custom-fx-grid">
+                            <!-- 1. Pitch Shift -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-arrows-alt-v"></i> ピッチ (音の高さ)</span>
+                                    <span class="val-badge" id="customVal_pitch">0 半音</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_pitch" min="-12" max="12" step="1" value="0">
+                                <div class="custom-fx-desc">-12半音(イケボ・重低音) 〜 +12半音(高音・ロリボ)</div>
+                            </div>
+
+                            <!-- 2. Formant Tone -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-wave-square"></i> フォルマント / 声の太さ・明るさ</span>
+                                    <span class="val-badge" id="customVal_formant">1800 Hz</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_formant" min="400" max="4000" step="50" value="1800">
+                                <div class="custom-fx-desc">喉や口の共鳴周波数。低いと太い声、高いと明るい声</div>
+                            </div>
+
+                            <!-- 3. Tremolo Speed (喘ぎ・息遣い揺らぎ速度) -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-heartbeat" style="color:#ff70a6;"></i> 喘ぎ・息遣い揺らぎ速度</span>
+                                    <span class="val-badge" id="customVal_tremoloSpeed">0.0 Hz (OFF)</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_tremoloSpeed" min="0" max="12" step="0.2" value="0">
+                                <div class="custom-fx-desc">呼吸や息継ぎの周期 (4〜7Hzでリアルな喘ぎに)</div>
+                            </div>
+
+                            <!-- 4. Tremolo Depth (喘ぎ揺らぎの深さ) -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-water" style="color:#ff70a6;"></i> 喘ぎ・揺らぎの深さ</span>
+                                    <span class="val-badge" id="customVal_tremoloDepth">0%</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_tremoloDepth" min="0" max="100" step="5" value="0">
+                                <div class="custom-fx-desc">声の途切れ・息継ぎの強弱感 (50〜80%推奨)</div>
+                            </div>
+
+                            <!-- 5. Breath Air Noise (リアル息漏れ・ブレスノイズ) -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-wind" style="color:#ff70a6;"></i> リアル息漏れ・ブレスエア量</span>
+                                    <span class="val-badge" id="customVal_breathAir">0%</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_breathAir" min="0" max="100" step="5" value="0">
+                                <div class="custom-fx-desc">声と連動するリアルな吐息・エアノイズを合成ブレンド</div>
+                            </div>
+
+                            <!-- 6. Echo / Delay -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-broadcast-tower"></i> エコー・ディレイ残響</span>
+                                    <span class="val-badge" id="customVal_delayTime">0 ms (OFF)</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_delayTime" min="0" max="500" step="10" value="0">
+                                <div class="custom-fx-desc">声がやまびこのように遅れて返る反響時間</div>
+                            </div>
+
+                            <!-- 7. Delay Feedback -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-sync-alt"></i> エコーの残り具合 (フィードバック)</span>
+                                    <span class="val-badge" id="customVal_delayFeedback">0%</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_delayFeedback" min="0" max="80" step="5" value="0">
+                                <div class="custom-fx-desc">エコーが何回繰り返して響くかの残響回数</div>
+                            </div>
+
+                            <!-- 8. Distortion / Drive -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-fire" style="color:#f0b90b;"></i> ドライブ / 歪み / サチュレーション</span>
+                                    <span class="val-badge" id="customVal_distortion">0%</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_distortion" min="0" max="100" step="5" value="0">
+                                <div class="custom-fx-desc">温かみのある密着感〜激しい歪み・メガホン効果</div>
+                            </div>
+
+                            <!-- 9. Robot / Ring Modulator -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-robot"></i> ロボット変調 (リングモジュレーター)</span>
+                                    <span class="val-badge" id="customVal_robotFreq">0 Hz (OFF)</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_robotFreq" min="0" max="600" step="10" value="0">
+                                <div class="custom-fx-desc">機械のような金属質ロボットボイス・宇宙人ボイス</div>
+                            </div>
+
+                            <!-- 10. Treble Air Boost (高音抜け・エアー感) -->
+                            <div class="custom-fx-item">
+                                <div class="custom-fx-header">
+                                    <span><i class="fas fa-feather-alt"></i> 高音エアーブースト (色気・クリア感)</span>
+                                    <span class="val-badge" id="customVal_airBoost">+0 dB</span>
+                                </div>
+                                <input type="range" class="custom-fx-slider" id="slider_airBoost" min="0" max="12" step="1" value="0">
+                                <div class="custom-fx-desc">6kHz以上の高音域を強調し、囁きや息の鮮明さを強化</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -761,6 +982,104 @@
 </div>
 
 <!-- Modals -->
+<!-- Custom Voice Effect Settings Modal (VC Quick Access) -->
+<div id="customVoiceModal" class="modal" style="width:650px; max-width:95vw; max-height:85vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="display:flex; align-items:center; gap:8px; margin:0;"><i class="fas fa-magic" style="color:var(--accent);"></i> 声の加工・自由カスタマイズ</h3>
+        <span id="closeCustomVoiceModalBtn" style="font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</span>
+    </div>
+    <p class="info-text" style="margin-bottom:14px;">スライダーを動かすと、リアルタイムに通話相手に届く声が変化します。</p>
+
+    <!-- Modal Presets -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;" id="modalFxPresetGroup">
+        <button class="voice-fx-btn-modal btn-secondary active" data-fx="normal">🎙️ 原音</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="breath">💓 リアル喘ぎ</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="reverb">✨ 響き</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="alien">👽 宇宙人</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="deep">🕶️ 低音イケボ</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="anime">🎀 アニメ声</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="radio">📻 無線</button>
+        <button class="voice-fx-btn-modal btn-secondary" data-fx="custom">🎛️ カスタム</button>
+    </div>
+
+    <div class="custom-fx-grid" style="margin-top:0;">
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>ピッチ (音の高さ)</span>
+                <span class="val-badge" id="modalVal_pitch">0 半音</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_pitch" min="-12" max="12" step="1" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>フォルマント / 声の太さ・明るさ</span>
+                <span class="val-badge" id="modalVal_formant">1800 Hz</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_formant" min="400" max="4000" step="50" value="1800">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>喘ぎ・息遣い揺らぎ速度</span>
+                <span class="val-badge" id="modalVal_tremoloSpeed">0.0 Hz</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_tremoloSpeed" min="0" max="12" step="0.2" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>喘ぎ・揺らぎの深さ</span>
+                <span class="val-badge" id="modalVal_tremoloDepth">0%</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_tremoloDepth" min="0" max="100" step="5" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>リアル息漏れ・エアノイズ量</span>
+                <span class="val-badge" id="modalVal_breathAir">0%</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_breathAir" min="0" max="100" step="5" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>エコー・ディレイ残響</span>
+                <span class="val-badge" id="modalVal_delayTime">0 ms</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_delayTime" min="0" max="500" step="10" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>エコー反響回数</span>
+                <span class="val-badge" id="modalVal_delayFeedback">0%</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_delayFeedback" min="0" max="80" step="5" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>歪み・ドライブ</span>
+                <span class="val-badge" id="modalVal_distortion">0%</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_distortion" min="0" max="100" step="5" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>ロボットリング変調</span>
+                <span class="val-badge" id="modalVal_robotFreq">0 Hz</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_robotFreq" min="0" max="600" step="10" value="0">
+        </div>
+        <div class="custom-fx-item">
+            <div class="custom-fx-header">
+                <span>高音エアーブースト</span>
+                <span class="val-badge" id="modalVal_airBoost">+0 dB</span>
+            </div>
+            <input type="range" class="custom-fx-slider" id="modalSlider_airBoost" min="0" max="12" step="1" value="0">
+        </div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:16px;">
+        <button id="modalResetVoiceBtn" class="btn-secondary"><i class="fas fa-undo"></i> 初期化</button>
+        <button id="modalDoneVoiceBtn" class="btn-success"><i class="fas fa-check"></i> 完了</button>
+    </div>
+</div>
+
 <!-- Soundboard Modal -->
 <div id="soundboardModal" class="modal">
     <h3><i class="fas fa-music"></i> ボイスチャット効果音 (Soundboard)</h3>
@@ -864,7 +1183,7 @@
 <script>
     // --- Firebase Initialization ---
     const firebaseConfig = { 
-        apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
+        apiKey: (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) || "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
         authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com", 
         databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", 
         projectId: "iikotowaruikoto-d5aa7", 
@@ -1008,7 +1327,7 @@
     let fxDestinationNode = null;
     let currentFxNodes = []; // holds active Web Audio effect nodes to disconnect on switch
     let noiseGateThreshold = 0.05; // 0 to 1
-    let selectedVoiceFx = 'normal'; // 'normal', 'reverb', 'breath', 'alien'
+    let selectedVoiceFx = 'normal'; // 'normal', 'breath', 'reverb', 'alien', 'deep', 'anime', 'radio', 'custom'
     let isSelfVoiceEnabled = false; // 自分の声 (サイドトーン・自分の声を自分にも聞こえるようにする機能)
     let selfVoiceMonitorNode = null; // GainNode for routing processed voice to audioContext.destination
     let isMicTesting = false;
@@ -1030,6 +1349,66 @@
     let signalingRef = null;
     let backgroundKeepAliveAudio = null;
     let voiceWakeLock = null;
+
+    // --- Loud Notification & Noise Cut & Custom Voice States ---
+    let isLoudAlertEnabled = localStorage.getItem('forcord_loud_alert_enabled') !== 'false';
+    let noiseCutLevel = parseInt(localStorage.getItem('forcord_noise_cut_level') || '50'); // 0, 25, 50, 75, 100
+    let noiseCutNodes = [];
+    let heavyNoiseProcessingLoopId = null;
+
+    // Custom Voice FX Granular Parameters
+    let customVoiceParams = {
+        pitch: 0,            // -12 to +12 半音
+        formant: 1800,       // 400 to 4000 Hz
+        tremoloSpeed: 0,     // 0 to 12 Hz
+        tremoloDepth: 0,     // 0 to 100 %
+        breathAir: 0,        // 0 to 100 % (Real-time breath air synthesis)
+        delayTime: 0,        // 0 to 500 ms
+        delayFeedback: 0,    // 0 to 80 %
+        distortion: 0,       // 0 to 100 %
+        robotFreq: 0,        // 0 to 600 Hz
+        airBoost: 0          // 0 to 12 dB
+    };
+
+    // Load saved custom voice params if present
+    try {
+        const savedParams = localStorage.getItem('forcord_custom_voice_params');
+        if (savedParams) {
+            customVoiceParams = { ...customVoiceParams, ...JSON.parse(savedParams) };
+        }
+    } catch(e) {}
+
+    // Preset configurations for voice effects
+    const VOICE_PRESETS = {
+        normal: {
+            pitch: 0, formant: 1800, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 0,
+            delayTime: 0, delayFeedback: 0, distortion: 0, robotFreq: 0, airBoost: 0
+        },
+        breath: {
+            pitch: 2, formant: 2350, tremoloSpeed: 5.6, tremoloDepth: 75, breathAir: 70,
+            delayTime: 12, delayFeedback: 15, distortion: 14, robotFreq: 0, airBoost: 8
+        },
+        reverb: {
+            pitch: 0, formant: 1900, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 0,
+            delayTime: 220, delayFeedback: 45, distortion: 0, robotFreq: 0, airBoost: 3
+        },
+        alien: {
+            pitch: 8, formant: 3200, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 0,
+            delayTime: 0, delayFeedback: 0, distortion: 0, robotFreq: 540, airBoost: 4
+        },
+        deep: {
+            pitch: -8, formant: 800, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 0,
+            delayTime: 0, delayFeedback: 0, distortion: 8, robotFreq: 0, airBoost: 0
+        },
+        anime: {
+            pitch: 6, formant: 3100, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 25,
+            delayTime: 0, delayFeedback: 0, distortion: 0, robotFreq: 0, airBoost: 6
+        },
+        radio: {
+            pitch: 0, formant: 1400, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 0,
+            delayTime: 0, delayFeedback: 0, distortion: 60, robotFreq: 0, airBoost: 0
+        }
+    };
 
     // Background Audio & WakeLock Manager for Mobile / Tablet background playback
     function startBackgroundKeepAlive() {
@@ -1109,7 +1488,16 @@
     }
 
     // High Impact Explosive Loud Summon Sound (爆音・アラート通知音)
-    function playLoudSummonSound() {
+    function playLoudSummonSound(forcePlay = false) {
+        // Respect user setting for loud summon alerts
+        if (!isLoudAlertEnabled && !forcePlay) {
+            // Gentle subtle soft chime when loud alert is disabled
+            try {
+                playTone(880, 0.15, 'sine', 0.08);
+            } catch(e) {}
+            return;
+        }
+
         try {
             const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
             if (ctx.state === 'suspended') ctx.resume();
@@ -1251,7 +1639,9 @@
             fxProcessedMasterGain.connect(selfVoiceMonitorNode);
             selfVoiceMonitorNode.connect(audioContext.destination);
 
-            micSourceNode.connect(micGainNode);
+            // Connect Noise Cut chain from micSourceNode to micGainNode
+            applyNoiseCutChain(noiseCutLevel);
+
             micGainNode.connect(micAnalyser);
 
             // Connect initial voice FX pipeline
@@ -1266,7 +1656,258 @@
         }
     }
 
-    // Real-time Voice Effect Processor (Normal / Reverb 響き / Breath 喘ぎ / Alien 宇宙人)
+    // --- Noise Cut Engine (0%, 25%, 50%, 75%, 100% Extreme) ---
+    function applyNoiseCutChain(level) {
+        noiseCutLevel = level;
+        localStorage.setItem('forcord_noise_cut_level', level.toString());
+
+        // Stop any heavy background DSP processing loop
+        if (heavyNoiseProcessingLoopId) {
+            clearInterval(heavyNoiseProcessingLoopId);
+            heavyNoiseProcessingLoopId = null;
+        }
+
+        if (!audioContext || !micSourceNode || !micGainNode) return;
+
+        // Disconnect previous noise cut filter nodes
+        try {
+            micSourceNode.disconnect();
+        } catch(e) {}
+
+        noiseCutNodes.forEach(n => {
+            try {
+                if (n.stop) n.stop();
+                n.disconnect();
+            } catch(e) {}
+        });
+        noiseCutNodes = [];
+
+        if (level === 0) {
+            // 0% (OFF): Direct clean connection
+            micSourceNode.connect(micGainNode);
+            return;
+        }
+
+        if (level === 25) {
+            // 25% (軽快): Highpass filter to eliminate low frequency air conditioner & desk hum
+            const hp = audioContext.createBiquadFilter();
+            hp.type = 'highpass';
+            hp.frequency.setValueAtTime(85, audioContext.currentTime);
+            hp.Q.setValueAtTime(0.7, audioContext.currentTime);
+
+            micSourceNode.connect(hp);
+            hp.connect(micGainNode);
+            noiseCutNodes.push(hp);
+
+        } else if (level === 50) {
+            // 50% (標準・おすすめ): Highpass, Lowpass, Hum Notches (50/60Hz), Dynamics Compressor
+            const hp = audioContext.createBiquadFilter();
+            hp.type = 'highpass';
+            hp.frequency.setValueAtTime(125, audioContext.currentTime);
+            hp.Q.setValueAtTime(0.8, audioContext.currentTime);
+
+            const lp = audioContext.createBiquadFilter();
+            lp.type = 'lowpass';
+            lp.frequency.setValueAtTime(7500, audioContext.currentTime);
+            lp.Q.setValueAtTime(0.7, audioContext.currentTime);
+
+            const notch50 = audioContext.createBiquadFilter();
+            notch50.type = 'notch';
+            notch50.frequency.setValueAtTime(50, audioContext.currentTime);
+            notch50.Q.setValueAtTime(6.0, audioContext.currentTime);
+
+            const notch60 = audioContext.createBiquadFilter();
+            notch60.type = 'notch';
+            notch60.frequency.setValueAtTime(60, audioContext.currentTime);
+            notch60.Q.setValueAtTime(6.0, audioContext.currentTime);
+
+            const comp = audioContext.createDynamicsCompressor();
+            comp.threshold.setValueAtTime(-26, audioContext.currentTime);
+            comp.knee.setValueAtTime(10, audioContext.currentTime);
+            comp.ratio.setValueAtTime(4.0, audioContext.currentTime);
+            comp.attack.setValueAtTime(0.005, audioContext.currentTime);
+            comp.release.setValueAtTime(0.08, audioContext.currentTime);
+
+            micSourceNode.connect(hp);
+            hp.connect(notch50);
+            notch50.connect(notch60);
+            notch60.connect(lp);
+            lp.connect(comp);
+            comp.connect(micGainNode);
+
+            noiseCutNodes.push(hp, notch50, notch60, lp, comp);
+
+        } else if (level === 75) {
+            // 75% (強力): Steep 24dB/oct Highpass + Lowpass + 4 Hum Notches + Aggressive Compressor
+            const hp1 = audioContext.createBiquadFilter();
+            hp1.type = 'highpass';
+            hp1.frequency.setValueAtTime(175, audioContext.currentTime);
+            hp1.Q.setValueAtTime(1.1, audioContext.currentTime);
+
+            const hp2 = audioContext.createBiquadFilter();
+            hp2.type = 'highpass';
+            hp2.frequency.setValueAtTime(175, audioContext.currentTime);
+            hp2.Q.setValueAtTime(1.1, audioContext.currentTime);
+
+            const lp1 = audioContext.createBiquadFilter();
+            lp1.type = 'lowpass';
+            lp1.frequency.setValueAtTime(5200, audioContext.currentTime);
+            lp1.Q.setValueAtTime(1.1, audioContext.currentTime);
+
+            const lp2 = audioContext.createBiquadFilter();
+            lp2.type = 'lowpass';
+            lp2.frequency.setValueAtTime(5200, audioContext.currentTime);
+            lp2.Q.setValueAtTime(1.1, audioContext.currentTime);
+
+            const notch50 = audioContext.createBiquadFilter();
+            notch50.type = 'notch';
+            notch50.frequency.setValueAtTime(50, audioContext.currentTime);
+            notch50.Q.setValueAtTime(8.0, audioContext.currentTime);
+
+            const notch60 = audioContext.createBiquadFilter();
+            notch60.type = 'notch';
+            notch60.frequency.setValueAtTime(60, audioContext.currentTime);
+            notch60.Q.setValueAtTime(8.0, audioContext.currentTime);
+
+            const notch120 = audioContext.createBiquadFilter();
+            notch120.type = 'notch';
+            notch120.frequency.setValueAtTime(120, audioContext.currentTime);
+            notch120.Q.setValueAtTime(8.0, audioContext.currentTime);
+
+            const comp = audioContext.createDynamicsCompressor();
+            comp.threshold.setValueAtTime(-30, audioContext.currentTime);
+            comp.knee.setValueAtTime(6, audioContext.currentTime);
+            comp.ratio.setValueAtTime(8.0, audioContext.currentTime);
+            comp.attack.setValueAtTime(0.002, audioContext.currentTime);
+            comp.release.setValueAtTime(0.05, audioContext.currentTime);
+
+            micSourceNode.connect(hp1);
+            hp1.connect(hp2);
+            hp2.connect(notch50);
+            notch50.connect(notch60);
+            notch60.connect(notch120);
+            notch120.connect(lp1);
+            lp1.connect(lp2);
+            lp2.connect(comp);
+            comp.connect(micGainNode);
+
+            noiseCutNodes.push(hp1, hp2, notch50, notch60, notch120, lp1, lp2, comp);
+
+        } else if (level === 100) {
+            // 100% (極限抹殺 ⚠️普通に重くなる):
+            // 4-stage 48dB/oct steep Highpass (220Hz) + 4-stage Lowpass (4000Hz) + 6 Multi-harmonic Notches
+            // + High-resolution 2048-bin Spectral Floor Analyser loop for absolute noise obliteration
+            const hpFilters = [];
+            for (let i = 0; i < 4; i++) {
+                const hp = audioContext.createBiquadFilter();
+                hp.type = 'highpass';
+                hp.frequency.setValueAtTime(220, audioContext.currentTime);
+                hp.Q.setValueAtTime(1.5, audioContext.currentTime);
+                hpFilters.push(hp);
+            }
+
+            const lpFilters = [];
+            for (let i = 0; i < 4; i++) {
+                const lp = audioContext.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.setValueAtTime(4200, audioContext.currentTime);
+                lp.Q.setValueAtTime(1.5, audioContext.currentTime);
+                lpFilters.push(lp);
+            }
+
+            const notches = [50, 60, 100, 120, 180, 240].map(freq => {
+                const n = audioContext.createBiquadFilter();
+                n.type = 'notch';
+                n.frequency.setValueAtTime(freq, audioContext.currentTime);
+                n.Q.setValueAtTime(10.0, audioContext.currentTime);
+                return n;
+            });
+
+            // High-resolution spectral gate analyser
+            const spectralAnalyser = audioContext.createAnalyser();
+            spectralAnalyser.fftSize = 2048; // High compute FFT
+            spectralAnalyser.smoothingTimeConstant = 0.2;
+
+            const gateGain = audioContext.createGain();
+            gateGain.gain.setValueAtTime(1.0, audioContext.currentTime);
+
+            // Chain all 14 filter stages
+            let curr = micSourceNode;
+            hpFilters.forEach(f => { curr.connect(f); curr = f; });
+            notches.forEach(f => { curr.connect(f); curr = f; });
+            lpFilters.forEach(f => { curr.connect(f); curr = f; });
+            curr.connect(spectralAnalyser);
+            spectralAnalyser.connect(gateGain);
+            gateGain.connect(micGainNode);
+
+            noiseCutNodes.push(...hpFilters, ...notches, ...lpFilters, spectralAnalyser, gateGain);
+
+            // ⚠️ "普通に重くなる" リアルタイム高頻度スペクトル計算ループ (CPU負荷集中＆完全ノイズ抹殺)
+            const fftBuffer = new Float32Array(spectralAnalyser.frequencyBinCount);
+            let noiseFloor = 0.005;
+
+            heavyNoiseProcessingLoopId = setInterval(() => {
+                if (!spectralAnalyser || !audioContext || audioContext.state !== 'running') return;
+                spectralAnalyser.getFloatFrequencyData(fftBuffer);
+
+                // Analyze 1024 frequency bins (high CPU load intentional)
+                let energySum = 0;
+                let highBandSum = 0;
+                const len = fftBuffer.length;
+                for (let i = 0; i < len; i++) {
+                    const linearVal = Math.pow(10, fftBuffer[i] / 20);
+                    energySum += linearVal;
+                    if (i > 300) highBandSum += linearVal;
+                }
+                const avgEnergy = energySum / len;
+                
+                // Adaptive silence thresholding
+                if (avgEnergy < 0.0028) {
+                    // Absolute zero mute during non-voice/fan noise
+                    gateGain.gain.setTargetAtTime(0.0001, audioContext.currentTime, 0.012);
+                } else {
+                    gateGain.gain.setTargetAtTime(1.15, audioContext.currentTime, 0.008);
+                }
+            }, 10); // 100 times per second heavy FFT loop
+        }
+    }
+
+    // Helper to generate pink/white noise buffer for natural breath air synthesis
+    function createNoiseBuffer(durationSeconds = 2.0) {
+        if (!audioContext) return null;
+        const bufferSize = audioContext.sampleRate * durationSeconds;
+        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+        const data = buffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            // Pink noise filter algorithm (Paul Kellet's method)
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+            b6 = white * 0.115926;
+        }
+        return buffer;
+    }
+
+    // Helper for soft clipping / saturation curve
+    function makeDistortionCurve(amount = 20) {
+        const k = typeof amount === 'number' ? amount : 20;
+        const n_samples = 44100;
+        const curve = new Float32Array(n_samples);
+        const deg = Math.PI / 180;
+        for (let i = 0; i < n_samples; ++i) {
+            const x = (i * 2) / n_samples - 1;
+            curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+        }
+        return curve;
+    }
+
+    // Real-time Voice Effect Processor (Presets & Granular Free Customizer)
     function applyVoiceFxGraph(fxType) {
         if (!audioContext || !micGainNode || !fxProcessedMasterGain) return;
 
@@ -1285,126 +1926,305 @@
 
         selectedVoiceFx = fxType;
 
-        if (fxType === 'reverb') {
-            // --- 「響き」 (Reverb / Rich Echo) ---
-            const dryGain = audioContext.createGain();
-            dryGain.gain.setValueAtTime(0.75, audioContext.currentTime);
+        // If preset selected, apply preset values to customVoiceParams
+        if (VOICE_PRESETS[fxType]) {
+            customVoiceParams = { ...VOICE_PRESETS[fxType] };
+        }
+        syncCustomVoiceUi();
 
-            const delay1 = audioContext.createDelay();
-            delay1.delayTime.setValueAtTime(0.20, audioContext.currentTime);
+        const p = customVoiceParams;
+        const now = audioContext.currentTime;
 
-            const delay2 = audioContext.createDelay();
-            delay2.delayTime.setValueAtTime(0.35, audioContext.currentTime);
+        // Check if pure normal clean voice
+        const isPureNormal = (
+            p.pitch === 0 && p.formant === 1800 && p.tremoloDepth === 0 && 
+            p.breathAir === 0 && p.delayTime === 0 && p.distortion === 0 && 
+            p.robotFreq === 0 && p.airBoost === 0
+        );
 
-            const feedbackGain = audioContext.createGain();
-            feedbackGain.gain.setValueAtTime(0.40, audioContext.currentTime);
-
-            const wetFilter = audioContext.createBiquadFilter();
-            wetFilter.type = 'lowpass';
-            wetFilter.frequency.setValueAtTime(3200, audioContext.currentTime);
-
-            const wetGain = audioContext.createGain();
-            wetGain.gain.setValueAtTime(0.65, audioContext.currentTime);
-
-            // Routing
-            micGainNode.connect(dryGain);
-            dryGain.connect(fxProcessedMasterGain);
-
-            micGainNode.connect(delay1);
-            delay1.connect(wetFilter);
-            wetFilter.connect(feedbackGain);
-            feedbackGain.connect(delay1);
-
-            wetFilter.connect(delay2);
-            delay2.connect(wetGain);
-            wetFilter.connect(wetGain);
-            wetGain.connect(fxProcessedMasterGain);
-
-            currentFxNodes.push(dryGain, delay1, delay2, feedbackGain, wetFilter, wetGain);
-
-        } else if (fxType === 'breath') {
-            // --- 「喘ぎ」 (Breath / Panting & Stutter: 言葉の間に「っ」が入るスタッター＆息遣い) ---
-            // 1. Chopper / Stutter Tremolo (言葉の間に「っ」という息継ぎ・切れ目を生成)
-            const chopGain = audioContext.createGain();
-            const chopOsc = audioContext.createOscillator();
-            chopOsc.type = 'sawtooth';
-            chopOsc.frequency.setValueAtTime(5.2, audioContext.currentTime); // ~5Hz stutter chop
-
-            const chopDepth = audioContext.createGain();
-            chopDepth.gain.setValueAtTime(0.65, audioContext.currentTime);
-
-            chopGain.gain.setValueAtTime(0.35, audioContext.currentTime);
-            chopOsc.connect(chopDepth);
-            chopDepth.connect(chopGain.gain);
-            chopOsc.start();
-
-            // 2. Breath / Formant Enhancer Filter (息の擦過音・高域ブレスを強調)
-            const breathHighpass = audioContext.createBiquadFilter();
-            breathHighpass.type = 'highpass';
-            breathHighpass.frequency.setValueAtTime(1100, audioContext.currentTime);
-
-            const breathPeak = audioContext.createBiquadFilter();
-            breathPeak.type = 'peaking';
-            breathPeak.frequency.setValueAtTime(2600, audioContext.currentTime);
-            breathPeak.Q.setValueAtTime(2.5, audioContext.currentTime);
-            breathPeak.gain.setValueAtTime(8, audioContext.currentTime);
-
-            const breathGain = audioContext.createGain();
-            breathGain.gain.setValueAtTime(1.2, audioContext.currentTime);
-
-            // Routing
-            micGainNode.connect(chopGain);
-            chopGain.connect(breathHighpass);
-            breathHighpass.connect(breathPeak);
-            breathPeak.connect(breathGain);
-            breathGain.connect(fxProcessedMasterGain);
-
-            currentFxNodes.push(chopGain, chopOsc, chopDepth, breathHighpass, breathPeak, breathGain);
-
-        } else if (fxType === 'alien') {
-            // --- 「宇宙人」 (Alien / High-Pitch Ring Modulator Voice: 高音ピッチシフト) ---
-            const carrierOsc = audioContext.createOscillator();
-            carrierOsc.type = 'sine';
-            carrierOsc.frequency.setValueAtTime(540, audioContext.currentTime); // High pitch carrier
-
-            const modGain = audioContext.createGain();
-            modGain.gain.setValueAtTime(0.0, audioContext.currentTime);
-
-            carrierOsc.connect(modGain.gain);
-            carrierOsc.start();
-
-            const highpass = audioContext.createBiquadFilter();
-            highpass.type = 'highpass';
-            highpass.frequency.setValueAtTime(900, audioContext.currentTime);
-
-            const bandpass = audioContext.createBiquadFilter();
-            bandpass.type = 'bandpass';
-            bandpass.frequency.setValueAtTime(3200, audioContext.currentTime);
-            bandpass.Q.setValueAtTime(2.0, audioContext.currentTime);
-
-            const alienGain = audioContext.createGain();
-            alienGain.gain.setValueAtTime(2.2, audioContext.currentTime);
-
-            // Routing
-            micGainNode.connect(modGain);
-            modGain.connect(highpass);
-            highpass.connect(bandpass);
-            bandpass.connect(alienGain);
-            alienGain.connect(fxProcessedMasterGain);
-
-            currentFxNodes.push(carrierOsc, modGain, highpass, bandpass, alienGain);
-
-        } else {
-            // --- 「ノーマル」 (Normal: 原音クリーン) ---
+        if (isPureNormal && fxType === 'normal') {
+            // Direct pure clean pass
             const directGain = audioContext.createGain();
-            directGain.gain.setValueAtTime(1.0, audioContext.currentTime);
+            directGain.gain.setValueAtTime(1.0, now);
             micGainNode.connect(directGain);
             directGain.connect(fxProcessedMasterGain);
             currentFxNodes.push(directGain);
+
+        } else if (fxType === 'breath') {
+            // =========================================================================
+            // --- 💓 リアルな喘ぎ声 (Ultra-Realistic Panting & Sensual Breath Voice) ---
+            // =========================================================================
+            // 1. リアルな吐息・息漏れエアノイズ生成 (マイク音声の入力量に動的追従して「ハァ…」と息が出る)
+            const noiseBuffer = createNoiseBuffer(2.5);
+            let noiseSrc = null;
+            let noiseGain = null;
+            if (noiseBuffer) {
+                noiseSrc = audioContext.createBufferSource();
+                noiseSrc.buffer = noiseBuffer;
+                noiseSrc.loop = true;
+
+                // 息の帯域フィルター (2400Hzバンドパス ＋ 5500Hzハイシェルフ)
+                const noiseBand = audioContext.createBiquadFilter();
+                noiseBand.type = 'bandpass';
+                noiseBand.frequency.setValueAtTime(2400, now);
+                noiseBand.Q.setValueAtTime(1.8, now);
+
+                const noiseHigh = audioContext.createBiquadFilter();
+                noiseHigh.type = 'highshelf';
+                noiseHigh.frequency.setValueAtTime(5000, now);
+                noiseHigh.gain.setValueAtTime(8, now);
+
+                noiseGain = audioContext.createGain();
+                noiseGain.gain.setValueAtTime(0.24, now); // Breath air volume
+
+                noiseSrc.connect(noiseBand);
+                noiseBand.connect(noiseHigh);
+                noiseHigh.connect(noiseGain);
+                noiseGain.connect(fxProcessedMasterGain);
+                noiseSrc.start();
+                currentFxNodes.push(noiseSrc, noiseBand, noiseHigh, noiseGain);
+            }
+
+            // 2. 艶めかしいピッチ揺らぎ (マイクロディレイ + サイン波LFOによる繊細なピッチビブラート)
+            const vibratoDelay = audioContext.createDelay(0.1);
+            vibratoDelay.delayTime.setValueAtTime(0.015, now);
+
+            const vibratoOsc = audioContext.createOscillator();
+            vibratoOsc.type = 'sine';
+            vibratoOsc.frequency.setValueAtTime(5.6, now); // ~5.6Hz 吐息の艶めかしい揺らぎ
+
+            const vibratoDepth = audioContext.createGain();
+            vibratoDepth.gain.setValueAtTime(0.0035, now); // ~3.5ms delay modulation
+
+            vibratoOsc.connect(vibratoDepth);
+            vibratoDepth.connect(vibratoDelay.delayTime);
+            vibratoOsc.start();
+
+            // 3. 呼吸同期の息遣い・言葉の詰まりトレモロ (なめらかな息継ぎ)
+            const tremoloGain = audioContext.createGain();
+            tremoloGain.gain.setValueAtTime(0.40, now);
+
+            const tremoloOsc = audioContext.createOscillator();
+            tremoloOsc.type = 'sine';
+            tremoloOsc.frequency.setValueAtTime(5.4, now); // 息継ぎリズム
+
+            const tremoloDepth = audioContext.createGain();
+            tremoloDepth.gain.setValueAtTime(0.35, now);
+
+            tremoloOsc.connect(tremoloDepth);
+            tremoloDepth.connect(tremoloGain.gain);
+            tremoloOsc.start();
+
+            // 4. 近接感・口元フォルマント強調 (2350Hz ピーキング)
+            const formantPeak = audioContext.createBiquadFilter();
+            formantPeak.type = 'peaking';
+            formantPeak.frequency.setValueAtTime(2350, now);
+            formantPeak.Q.setValueAtTime(2.2, now);
+            formantPeak.gain.setValueAtTime(7.5, now);
+
+            // 5. 高音エアーブースト (高域の擦過音・吐息の抜け)
+            const airShelf = audioContext.createBiquadFilter();
+            airShelf.type = 'highshelf';
+            airShelf.frequency.setValueAtTime(6000, now);
+            airShelf.gain.setValueAtTime(8.0, now);
+
+            // 6. 耳元ソフトサチュレーション (温かい吐息のサチュレーション)
+            const shaper = audioContext.createWaveShaper();
+            shaper.curve = makeDistortionCurve(14);
+            shaper.oversample = '2x';
+
+            const outGain = audioContext.createGain();
+            outGain.gain.setValueAtTime(1.1, now);
+
+            // Routing
+            micGainNode.connect(vibratoDelay);
+            vibratoDelay.connect(tremoloGain);
+            tremoloGain.connect(formantPeak);
+            formantPeak.connect(airShelf);
+            airShelf.connect(shaper);
+            shaper.connect(outGain);
+            outGain.connect(fxProcessedMasterGain);
+
+            currentFxNodes.push(
+                vibratoDelay, vibratoOsc, vibratoDepth,
+                tremoloGain, tremoloOsc, tremoloDepth,
+                formantPeak, airShelf, shaper, outGain
+            );
+
+        } else {
+            // =========================================================================
+            // --- 🎛️ 自由度MAX カスタマイズ・オーディオグラフ (Customizable Engine) ---
+            // =========================================================================
+            let lastNode = micGainNode;
+
+            // 1. Robot Frequency Modulation (リング変調)
+            if (p.robotFreq > 10) {
+                const ringOsc = audioContext.createOscillator();
+                ringOsc.type = 'sine';
+                ringOsc.frequency.setValueAtTime(p.robotFreq, now);
+
+                const ringModGain = audioContext.createGain();
+                ringModGain.gain.setValueAtTime(0.0, now);
+
+                ringOsc.connect(ringModGain.gain);
+                ringOsc.start();
+
+                lastNode.connect(ringModGain);
+                lastNode = ringModGain;
+                currentFxNodes.push(ringOsc, ringModGain);
+            }
+
+            // 2. Pitch Shifter / Micro-pitch delay modulation (ピッチ半音変化)
+            if (p.pitch !== 0) {
+                // Pitch shift via dynamic delay modulation + resonance peak
+                const pitchDelay = audioContext.createDelay(0.1);
+                pitchDelay.delayTime.setValueAtTime(0.015, now);
+
+                const pitchLfo = audioContext.createOscillator();
+                pitchLfo.type = 'sawtooth';
+                const lfoFreq = p.pitch > 0 ? (40 + p.pitch * 15) : (35 + Math.abs(p.pitch) * 10);
+                pitchLfo.frequency.setValueAtTime(lfoFreq, now);
+
+                const lfoDepth = audioContext.createGain();
+                const depthAmt = Math.min(0.008, Math.abs(p.pitch) * 0.0006);
+                lfoDepth.gain.setValueAtTime(depthAmt, now);
+
+                pitchLfo.connect(lfoDepth);
+                lfoDepth.connect(pitchDelay.delayTime);
+                pitchLfo.start();
+
+                const pitchEq = audioContext.createBiquadFilter();
+                pitchEq.type = p.pitch > 0 ? 'highshelf' : 'lowshelf';
+                pitchEq.frequency.setValueAtTime(p.pitch > 0 ? 2500 : 400, now);
+                pitchEq.gain.setValueAtTime(Math.min(12, Math.abs(p.pitch) * 1.2), now);
+
+                lastNode.connect(pitchDelay);
+                pitchDelay.connect(pitchEq);
+                lastNode = pitchEq;
+                currentFxNodes.push(pitchDelay, pitchLfo, lfoDepth, pitchEq);
+            }
+
+            // 3. Formant Filter (フォルマント・声の明るさ太さ)
+            if (p.formant !== 1800) {
+                const formantFilter = audioContext.createBiquadFilter();
+                formantFilter.type = 'peaking';
+                formantFilter.frequency.setValueAtTime(p.formant, now);
+                formantFilter.Q.setValueAtTime(2.0, now);
+                formantFilter.gain.setValueAtTime(7.0, now);
+
+                lastNode.connect(formantFilter);
+                lastNode = formantFilter;
+                currentFxNodes.push(formantFilter);
+            }
+
+            // 4. Tremolo / 喘ぎ・息遣い揺らぎ
+            if (p.tremoloDepth > 0 && p.tremoloSpeed > 0) {
+                const tGain = audioContext.createGain();
+                const depthNormalized = (p.tremoloDepth / 100) * 0.5;
+                tGain.gain.setValueAtTime(1.0 - depthNormalized, now);
+
+                const tOsc = audioContext.createOscillator();
+                tOsc.type = 'sine';
+                tOsc.frequency.setValueAtTime(p.tremoloSpeed, now);
+
+                const tDepth = audioContext.createGain();
+                tDepth.gain.setValueAtTime(depthNormalized, now);
+
+                tOsc.connect(tDepth);
+                tDepth.connect(tGain.gain);
+                tOsc.start();
+
+                lastNode.connect(tGain);
+                lastNode = tGain;
+                currentFxNodes.push(tGain, tOsc, tDepth);
+            }
+
+            // 5. Distortion / Drive (歪み)
+            if (p.distortion > 0) {
+                const distShaper = audioContext.createWaveShaper();
+                distShaper.curve = makeDistortionCurve(p.distortion);
+                distShaper.oversample = '2x';
+
+                lastNode.connect(distShaper);
+                lastNode = distShaper;
+                currentFxNodes.push(distShaper);
+            }
+
+            // 6. Air Boost (高音エアー感)
+            if (p.airBoost > 0) {
+                const airShelf = audioContext.createBiquadFilter();
+                airShelf.type = 'highshelf';
+                airShelf.frequency.setValueAtTime(5500, now);
+                airShelf.gain.setValueAtTime(p.airBoost, now);
+
+                lastNode.connect(airShelf);
+                lastNode = airShelf;
+                currentFxNodes.push(airShelf);
+            }
+
+            // 7. Breath Air Noise (リアル息漏れ)
+            if (p.breathAir > 0) {
+                const noiseBuf = createNoiseBuffer(2.0);
+                if (noiseBuf) {
+                    const airSrc = audioContext.createBufferSource();
+                    airSrc.buffer = noiseBuf;
+                    airSrc.loop = true;
+
+                    const airBand = audioContext.createBiquadFilter();
+                    airBand.type = 'bandpass';
+                    airBand.frequency.setValueAtTime(2500, now);
+                    airBand.Q.setValueAtTime(1.6, now);
+
+                    const airGain = audioContext.createGain();
+                    airGain.gain.setValueAtTime((p.breathAir / 100) * 0.28, now);
+
+                    airSrc.connect(airBand);
+                    airBand.connect(airGain);
+                    airGain.connect(fxProcessedMasterGain);
+                    airSrc.start();
+                    currentFxNodes.push(airSrc, airBand, airGain);
+                }
+            }
+
+            // 8. Echo / Delay & Feedback (エコー・残響)
+            if (p.delayTime > 10) {
+                const dryG = audioContext.createGain();
+                dryG.gain.setValueAtTime(1.0, now);
+
+                const delayNode = audioContext.createDelay(1.0);
+                delayNode.delayTime.setValueAtTime(p.delayTime / 1000, now);
+
+                const fbGain = audioContext.createGain();
+                fbGain.gain.setValueAtTime(p.delayFeedback / 100, now);
+
+                const delayFilter = audioContext.createBiquadFilter();
+                delayFilter.type = 'lowpass';
+                delayFilter.frequency.setValueAtTime(3600, now);
+
+                const wetG = audioContext.createGain();
+                wetG.gain.setValueAtTime(0.65, now);
+
+                lastNode.connect(dryG);
+                dryG.connect(fxProcessedMasterGain);
+
+                lastNode.connect(delayNode);
+                delayNode.connect(delayFilter);
+                delayFilter.connect(fbGain);
+                fbGain.connect(delayNode);
+                delayFilter.connect(wetG);
+                wetG.connect(fxProcessedMasterGain);
+
+                currentFxNodes.push(dryG, delayNode, fbGain, delayFilter, wetG);
+            } else {
+                lastNode.connect(fxProcessedMasterGain);
+            }
         }
 
         // Update active UI buttons & select dropdowns
         document.querySelectorAll('.voice-fx-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-fx') === fxType);
+        });
+        document.querySelectorAll('.voice-fx-btn-modal').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-fx') === fxType);
         });
         const barSelect = document.getElementById('voiceFxQuickSelect');
@@ -2601,13 +3421,21 @@
             return; 
         }
         const friendCode = Math.floor(10000000 + Math.random() * 90000000).toString();
-        const newUserRef = db.ref('users').push();
-        const uid = newUserRef.key;
-        await newUserRef.set({ 
-            uid, name, friendCode, icon: '😀', online: true, friends: {}, 
-            coins: 0, maxMessageLen: 200, messageCooldownMs: 2500, 
-            stamps: { default: true }, customStamps: [], hasStampCreation: false 
-        });
+        let uid = 'user_' + Date.now();
+        try {
+            const newUserRef = db.ref('users').push();
+            uid = newUserRef.key || uid;
+            await Promise.race([
+                newUserRef.set({ 
+                    uid, name, friendCode, icon: '😀', online: true, friends: {}, 
+                    coins: 0, maxMessageLen: 200, messageCooldownMs: 2500, 
+                    stamps: { default: true }, customStamps: [], hasStampCreation: false 
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+            ]);
+        } catch(e) {
+            console.warn("User register error:", e);
+        }
         currentUser = { uid, name, friendCode, icon: '😀' };
         localStorage.setItem('forcord_user', JSON.stringify(currentUser));
         startApp();
@@ -2617,11 +3445,17 @@
         document.getElementById('lobbyScreen').style.display = 'none';
         document.getElementById('mainApp').style.display = 'flex';
         
-        await loadUserFull();
-        db.ref(`users/${currentUser.uid}/online`).set(true);
+        try {
+            await loadUserFull();
+        } catch(e) {
+            console.warn("loadUserFull error in startApp:", e);
+        }
+        try {
+            db.ref(`users/${currentUser.uid}/online`).set(true);
+        } catch(e) {}
         window.addEventListener('beforeunload', () => { 
             if(currentUser) {
-                db.ref(`users/${currentUser.uid}/online`).set(false);
+                try { db.ref(`users/${currentUser.uid}/online`).set(false); } catch(e) {}
                 if (currentVoiceRoomId) leaveRtcVoiceRoom();
             }
         });
@@ -2993,6 +3827,16 @@
             };
         });
 
+        // Voice FX Buttons (Modal Quick Presets)
+        document.querySelectorAll('.voice-fx-btn-modal').forEach(btn => {
+            btn.onclick = async () => {
+                const fx = btn.getAttribute('data-fx');
+                await setupLocalAudioStream().catch(() => {});
+                applyVoiceFxGraph(fx);
+                playTone(580, 0.08, 'sine', 0.12);
+            };
+        });
+
         // Voice FX Quick Select (Bottom Control Bar)
         const quickFxSelect = document.getElementById('voiceFxQuickSelect');
         if (quickFxSelect) {
@@ -3003,6 +3847,189 @@
                 playTone(580, 0.08, 'sine', 0.12);
             };
         }
+
+        // --- 1. Loud Notification Alert Settings & Test (爆音通知 ON/OFF) ---
+        const loudToggle = document.getElementById('loudAlertToggleCheckbox');
+        const loudStatusText = document.getElementById('loudAlertStatusText');
+        const testLoudBtn = document.getElementById('testLoudAlertBtn');
+
+        if (loudToggle) {
+            loudToggle.checked = isLoudAlertEnabled;
+            if (loudStatusText) {
+                loudStatusText.innerText = isLoudAlertEnabled ? 'ON (大音量アラートを鳴らす)' : 'OFF (ミュート/サイレント)';
+                loudStatusText.style.color = isLoudAlertEnabled ? 'var(--accent)' : 'var(--text-muted)';
+            }
+            loudToggle.onchange = (e) => {
+                isLoudAlertEnabled = e.target.checked;
+                localStorage.setItem('forcord_loud_alert_enabled', isLoudAlertEnabled.toString());
+                if (loudStatusText) {
+                    loudStatusText.innerText = isLoudAlertEnabled ? 'ON (大音量アラートを鳴らす)' : 'OFF (ミュート/サイレント)';
+                    loudStatusText.style.color = isLoudAlertEnabled ? 'var(--accent)' : 'var(--text-muted)';
+                }
+                playTone(isLoudAlertEnabled ? 700 : 350, 0.08, 'sine', 0.15);
+            };
+        }
+
+        if (testLoudBtn) {
+            testLoudBtn.onclick = () => {
+                playLoudSummonSound(true); // force play for testing
+            };
+        }
+
+        // --- 2. Noise Cut Selector (雑音カット: 0%, 25%, 50%, 75%, 100%) ---
+        const syncNoiseCutUi = (lvl) => {
+            document.querySelectorAll('.noise-cut-chip').forEach(chip => {
+                chip.classList.toggle('active', parseInt(chip.getAttribute('data-level')) === lvl);
+            });
+            const barNoiseSelect = document.getElementById('barNoiseCutSelect');
+            if (barNoiseSelect && parseInt(barNoiseSelect.value) !== lvl) {
+                barNoiseSelect.value = lvl.toString();
+            }
+            const warnBox = document.getElementById('heavyNoiseCutWarning');
+            if (warnBox) {
+                warnBox.style.display = lvl === 100 ? 'block' : 'none';
+            }
+        };
+
+        // Initialize noise cut UI
+        syncNoiseCutUi(noiseCutLevel);
+
+        document.querySelectorAll('.noise-cut-chip').forEach(chip => {
+            chip.onclick = async () => {
+                const lvl = parseInt(chip.getAttribute('data-level'));
+                await setupLocalAudioStream().catch(() => {});
+                applyNoiseCutChain(lvl);
+                syncNoiseCutUi(lvl);
+                playTone(520, 0.08, 'sine', 0.12);
+            };
+        });
+
+        const barNoiseSelect = document.getElementById('barNoiseCutSelect');
+        if (barNoiseSelect) {
+            barNoiseSelect.onchange = async (e) => {
+                const lvl = parseInt(e.target.value);
+                await setupLocalAudioStream().catch(() => {});
+                applyNoiseCutChain(lvl);
+                syncNoiseCutUi(lvl);
+                playTone(520, 0.08, 'sine', 0.12);
+            };
+        }
+
+        // --- 3. Custom Voice FX Parameters & Sliders (10 granular controls) ---
+        setupCustomVoiceSliders();
+
+        // Custom Voice Modal Open/Close
+        const customVoiceModal = document.getElementById('customVoiceModal');
+        const openCustomFromBar = document.getElementById('barOpenCustomVoiceModalBtn');
+        const openCustomFromSettings = document.getElementById('openCustomVoiceFromSettingsBtn');
+        const closeCustomModal = document.getElementById('closeCustomVoiceModalBtn');
+        const modalDoneBtn = document.getElementById('modalDoneVoiceBtn');
+        const modalResetBtn = document.getElementById('modalResetVoiceBtn');
+        const overlay = document.getElementById('overlay');
+
+        const openVoiceModal = () => {
+            if (customVoiceModal && overlay) {
+                syncCustomVoiceUi();
+                customVoiceModal.style.display = 'block';
+                overlay.style.display = 'block';
+            }
+        };
+        const closeVoiceModal = () => {
+            if (customVoiceModal && overlay) {
+                customVoiceModal.style.display = 'none';
+                overlay.style.display = 'none';
+            }
+        };
+
+        if (openCustomFromBar) openCustomFromBar.onclick = openVoiceModal;
+        if (openCustomFromSettings) openCustomFromSettings.onclick = openVoiceModal;
+        if (closeCustomModal) closeCustomModal.onclick = closeVoiceModal;
+        if (modalDoneBtn) modalDoneBtn.onclick = closeVoiceModal;
+
+        if (modalResetBtn) {
+            modalResetBtn.onclick = () => {
+                applyVoiceFxGraph('normal');
+                playTone(400, 0.1, 'sine', 0.15);
+            };
+        }
+    }
+
+    // Synchronize UI sliders and badges with customVoiceParams
+    function syncCustomVoiceUi() {
+        const p = customVoiceParams;
+        const paramKeys = [
+            { key: 'pitch', unit: ' 半音' },
+            { key: 'formant', unit: ' Hz' },
+            { key: 'tremoloSpeed', unit: ' Hz' },
+            { key: 'tremoloDepth', unit: '%' },
+            { key: 'breathAir', unit: '%' },
+            { key: 'delayTime', unit: ' ms' },
+            { key: 'delayFeedback', unit: '%' },
+            { key: 'distortion', unit: '%' },
+            { key: 'robotFreq', unit: ' Hz' },
+            { key: 'airBoost', unit: ' dB', prefix: '+' }
+        ];
+
+        paramKeys.forEach(({ key, unit, prefix }) => {
+            const val = p[key];
+            const textVal = (prefix && val > 0 ? prefix : '') + val + unit;
+
+            // Settings panel elements
+            const slider = document.getElementById(`slider_${key}`);
+            const badge = document.getElementById(`val_${key}`);
+            if (slider && parseFloat(slider.value) !== val) slider.value = val;
+            if (badge) badge.innerText = textVal;
+
+            // Modal elements
+            const modalSlider = document.getElementById(`modalSlider_${key}`);
+            const modalBadge = document.getElementById(`modalVal_${key}`);
+            if (modalSlider && parseFloat(modalSlider.value) !== val) modalSlider.value = val;
+            if (modalBadge) modalBadge.innerText = textVal;
+        });
+    }
+
+    // Attach listeners to all 10 sliders in both Settings & Modal
+    function setupCustomVoiceSliders() {
+        const paramKeys = [
+            { key: 'pitch', unit: ' 半音', isFloat: false },
+            { key: 'formant', unit: ' Hz', isFloat: false },
+            { key: 'tremoloSpeed', unit: ' Hz', isFloat: true },
+            { key: 'tremoloDepth', unit: '%', isFloat: false },
+            { key: 'breathAir', unit: '%', isFloat: false },
+            { key: 'delayTime', unit: ' ms', isFloat: false },
+            { key: 'delayFeedback', unit: '%', isFloat: false },
+            { key: 'distortion', unit: '%', isFloat: false },
+            { key: 'robotFreq', unit: ' Hz', isFloat: false },
+            { key: 'airBoost', unit: ' dB', isFloat: false, prefix: '+' }
+        ];
+
+        paramKeys.forEach(({ key, unit, isFloat, prefix }) => {
+            const onSliderChange = async (val) => {
+                customVoiceParams[key] = val;
+                localStorage.setItem('forcord_custom_voice_params', JSON.stringify(customVoiceParams));
+                syncCustomVoiceUi();
+                await setupLocalAudioStream().catch(() => {});
+                applyVoiceFxGraph('custom');
+            };
+
+            // Settings slider
+            const slider = document.getElementById(`slider_${key}`);
+            if (slider) {
+                slider.oninput = (e) => {
+                    const val = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
+                    onSliderChange(val);
+                };
+            }
+
+            // Modal slider
+            const modalSlider = document.getElementById(`modalSlider_${key}`);
+            if (modalSlider) {
+                modalSlider.oninput = (e) => {
+                    const val = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
+                    onSliderChange(val);
+                };
+            }
+        });
     }
 
     // --- Master Volume Setting & Presets ---
@@ -3205,30 +4232,45 @@
 
     // --- User Profile & Database Loading ---
     async function loadUserFull() {
-        const snap = await db.ref(`users/${currentUser.uid}`).once('value');
-        const data = snap.val();
-        if (data) {
-            currentUser.name = data.name;
-            currentUser.friendCode = data.friendCode;
-            currentUser.icon = data.icon || '😀';
-            userCoins = data.coins || 0;
-            maxMessageLength = data.maxMessageLen || 200;
-            messageCooldown = data.messageCooldownMs || 2500;
-            hasStampCreation = data.hasStampCreation || false;
-            if (data.stamps) Object.keys(data.stamps).forEach(s => { if(s !== 'default' && !ownedStamps.includes(s)) ownedStamps.push(s); });
-            if (data.customStamps) customStamps = data.customStamps;
-
+        if (currentUser) {
             document.getElementById('profileName').innerHTML = `${escapeHtml(currentUser.name)} <span id="coinDisplay" class="coin-badge">💰 ${userCoins}コイン</span>`;
-            document.getElementById('friendCodeDisplay').innerHTML = `<i class="fas fa-fingerprint"></i> コード: ${currentUser.friendCode}`;
-            document.getElementById('profileIconSpan').innerText = currentUser.icon;
-            document.getElementById('barUserAvatar').innerText = currentUser.icon;
+            document.getElementById('friendCodeDisplay').innerHTML = `<i class="fas fa-fingerprint"></i> コード: ${currentUser.friendCode || '00000000'}`;
+            document.getElementById('profileIconSpan').innerText = currentUser.icon || '😀';
+            document.getElementById('barUserAvatar').innerText = currentUser.icon || '😀';
             document.getElementById('barUserName').innerText = currentUser.name;
             updateCoinDisplay();
         }
-        await renderFriends();
-        renderOnlineUsers();
-        renderRequests();
-        renderChatListWithUnread();
+        try {
+            const snap = await Promise.race([
+                db.ref(`users/${currentUser.uid}`).once('value'),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+            ]);
+            const data = snap.val();
+            if (data) {
+                currentUser.name = data.name;
+                currentUser.friendCode = data.friendCode;
+                currentUser.icon = data.icon || '😀';
+                userCoins = data.coins || 0;
+                maxMessageLength = data.maxMessageLen || 200;
+                messageCooldown = data.messageCooldownMs || 2500;
+                hasStampCreation = data.hasStampCreation || false;
+                if (data.stamps) Object.keys(data.stamps).forEach(s => { if(s !== 'default' && !ownedStamps.includes(s)) ownedStamps.push(s); });
+                if (data.customStamps) customStamps = data.customStamps;
+
+                document.getElementById('profileName').innerHTML = `${escapeHtml(currentUser.name)} <span id="coinDisplay" class="coin-badge">💰 ${userCoins}コイン</span>`;
+                document.getElementById('friendCodeDisplay').innerHTML = `<i class="fas fa-fingerprint"></i> コード: ${currentUser.friendCode}`;
+                document.getElementById('profileIconSpan').innerText = currentUser.icon;
+                document.getElementById('barUserAvatar').innerText = currentUser.icon;
+                document.getElementById('barUserName').innerText = currentUser.name;
+                updateCoinDisplay();
+            }
+        } catch(e) {
+            console.warn("loadUserFull fetch:", e);
+        }
+        try { await renderFriends(); } catch(e) { console.warn("renderFriends:", e); }
+        try { renderOnlineUsers(); } catch(e) { console.warn("renderOnlineUsers:", e); }
+        try { renderRequests(); } catch(e) { console.warn("renderRequests:", e); }
+        try { renderChatListWithUnread(); } catch(e) { console.warn("renderChatListWithUnread:", e); }
     }
 
     function updateCoinDisplay() {
