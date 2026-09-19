@@ -271,6 +271,13 @@
         .toggle-checkbox:checked + .toggle-switch { background: var(--success); }
         .toggle-checkbox:checked + .toggle-switch::after { transform: translateX(24px); }
 
+        /* Proximity Voice Focus & Audio Pass-Through Styles */
+        .proximity-status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; background: rgba(35, 165, 89, 0.15); color: #57f287; border: 1px solid rgba(35, 165, 89, 0.3); }
+        .proximity-status-badge.off { background: rgba(142, 146, 151, 0.15); color: #8e9297; border-color: rgba(142, 146, 151, 0.25); }
+        .pass-through-btn { background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px 18px; border-radius: 14px; font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .pass-through-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+        .pass-through-btn.active { background: rgba(87, 242, 135, 0.18); border-color: #57f287; color: #57f287; box-shadow: 0 0 16px rgba(87, 242, 135, 0.35); }
+
         /* Voice Live Subtitle / Activity Feed */
         .voice-subtitles-drawer { background: rgba(17, 18, 20, 0.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-color); padding: 12px 20px; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
         .subtitle-line { font-size: 0.85rem; color: #e1e3e8; display: flex; gap: 8px; align-items: flex-start; }
@@ -562,7 +569,17 @@
                             <button id="toggleScreenShareBtn" class="voice-action-btn" title="🖥️ 画面共有 (Screen Share)">
                                 <i class="fas fa-desktop"></i>
                             </button>
-                            <div style="display:flex; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); border-radius:24px; padding:2px 8px;" title="雑音カット機能 (25%, 50%, 75%, 100%)">
+                            <!-- マイク近接音声フォーカス (マイクが近い音を重視して拾う) -->
+                            <button id="barProximityFocusBtn" class="voice-action-btn" title="🎯 マイク近接音声フォーカス: マイクに近い音を重視し、遠くの雑音・反響を自動カット">
+                                <i class="fas fa-crosshairs"></i>
+                                <span class="btn-status-badge" id="barProximityBadge">近接OFF</span>
+                            </button>
+                            <!-- ブラウザ標準ノイズ除去フィルタ状態 (noiseSuppression: true) -->
+                            <button id="barBrowserSuppBtn" class="voice-action-btn" title="🛡️ ブラウザ標準ノイズ除去 (Chromium/WebKit内蔵アルゴリズム)">
+                                <i class="fas fa-shield-virus" style="color:#57f287;"></i>
+                                <span class="btn-status-badge" id="barBrowserSuppBadge" style="background:rgba(35,165,89,0.25); color:#57f287;">AIノイズ</span>
+                            </button>
+                            <div style="display:flex; align-items:center; background:var(--bg-card); border:1px solid var(--border-color); border-radius:24px; padding:2px 8px;" title="雑音カット機能 (0%, 25%, 50%, 75%, 100%)">
                                 <span style="font-size:0.75rem; color:var(--text-muted); margin-right:4px;"><i class="fas fa-shield-alt" style="color:#57f287;"></i> 雑音カット:</span>
                                 <select id="barNoiseCutSelect" class="voice-quality-select" style="font-size:0.75rem; padding:3px 6px; border:none; background:transparent;">
                                     <option value="0">OFF (0%)</option>
@@ -755,16 +772,57 @@
                 <div class="setting-group">
                     <h3><i class="fas fa-microphone-alt"></i> 高性能マイク・音響設定 (WebRTC)</h3>
 
-                    <!-- Noise Cut Section (25%, 50%, 75%, 100%) -->
+                    <!-- 1. Browser Native Noise Suppression & Echo Cancellation (noiseSuppression: true) -->
                     <div style="margin-bottom:18px; background:var(--bg-darker); padding:16px 18px; border-radius:16px; border:1px solid var(--border-color);">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <label style="font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:8px;">
-                                <i class="fas fa-shield-alt" style="color:#57f287;"></i> 雑音カット機能 (超強力ノイズキャンセラー)
+                                <i class="fas fa-shield-virus" style="color:#57f287;"></i> ブラウザ標準 高度ノイズ除去 (noiseSuppression: true)
+                            </label>
+                            <label class="toggle-switch-wrap">
+                                <input type="checkbox" id="browserNoiseSuppressionToggle" class="toggle-checkbox" checked>
+                                <span class="toggle-switch"></span>
+                                <span id="browserNoiseSuppressionText" style="font-weight:700; font-size:0.85rem; color:#57f287;">ON (有効)</span>
+                            </label>
+                        </div>
+                        <div class="info-text" style="margin-top:6px; line-height:1.5;">
+                            <strong>ブラウザ標準の強力なフィルタを使用:</strong> <code>noiseSuppression: true</code> を指定することで、ブラウザ（ChromiumやWebKitなど）に内蔵されている最高水準のエコーキャンセラーおよび高度なWebRTCノイズ除去アルゴリズムを直接呼び出し、環境雑音をハードウェア/ブラウザレベルで消去します。
+                        </div>
+                    </div>
+
+                    <!-- 2. Proximity Voice Focus (マイクが近い音を重視して拾う設定) -->
+                    <div style="margin-bottom:18px; background:var(--bg-darker); padding:16px 18px; border-radius:16px; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-crosshairs" style="color:#58a6ff;"></i> マイク近接音声フォーカス (マイクが近い音を最優先で拾う)
+                            </label>
+                            <label class="toggle-switch-wrap">
+                                <input type="checkbox" id="proximityFocusToggle" class="toggle-checkbox">
+                                <span class="toggle-switch"></span>
+                                <span id="proximityFocusToggleText" style="font-weight:700; font-size:0.85rem; color:var(--text-muted);">OFF</span>
+                            </label>
+                        </div>
+                        <div class="info-text" style="margin-top:6px; line-height:1.5;">
+                            <strong>近接効果（Proximity Effect）による雑音排除:</strong> マイクの至近距離（口元）から発した直接音を最優先で検出し、マイクから離れた位置の打鍵音、室内の反響音（部屋鳴り）、同室の生活音、遠くの騒音を急激に減衰させます。
+                        </div>
+                        <div id="proximitySensitivityWrap" style="margin-top:12px; display:none;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+                                <span style="font-weight:600; color:var(--text-muted);">近接フォーカス感度 (口元の近さ重視度):</span>
+                                <span id="proximitySensitivityDisplay" style="font-weight:800; color:#58a6ff;">75% (推奨)</span>
+                            </div>
+                            <input type="range" id="proximitySensitivitySlider" min="20" max="100" step="5" value="75" style="margin-top:6px; accent-color:#58a6ff; width:100%;">
+                        </div>
+                    </div>
+
+                    <!-- 3. Noise Cut Section (25%, 50%, 75%, 100%) -->
+                    <div style="margin-bottom:18px; background:var(--bg-darker); padding:16px 18px; border-radius:16px; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-shield-alt" style="color:#57f287;"></i> マルチバンド雑音カット (DSPノイズリダクション)
                             </label>
                             <span id="currentNoiseCutDisplay" style="font-weight:800; font-size:0.85rem; color:var(--accent);">50% (標準)</span>
                         </div>
                         <div class="info-text" style="margin-top:4px;">
-                            キーボード打鍵音、エアコン、ファンの回転音、生活音などの周囲の雑音をマルチバンドDSPで強力にカットします。
+                            エアコンやファンの回転音、低周波の振動音、打鍵音を多段DSPフィルターで強力にカットします。
                         </div>
                         <div class="noise-cut-container" id="noiseCutBtnGroup">
                             <button class="noise-cut-chip" data-level="0"><i class="fas fa-ban"></i> OFF (0%)</button>
@@ -776,6 +834,23 @@
                         <div class="heavy-warning-box" id="heavyNoiseCutWarning">
                             <i class="fas fa-exclamation-triangle" style="font-size:1.1rem; flex-shrink:0;"></i>
                             <span><strong>⚠️ 100% 動作注意:</strong> 100%は超急峻カスケードフィルター、FFTスペクトルノイズリアルタイム減算、動的ノイズゲートを全開演算するため周囲の雑音を徹底的に削ぎ落とせますが、端末のCPU演算負荷が非常に高くなり「普通に重くなります」。動作が重い場合は50%や75%をご利用ください。</span>
+                        </div>
+                    </div>
+
+                    <!-- 4. Web Audio API Pass-Through Monitor (destination) -->
+                    <div style="margin-bottom:18px; background:var(--bg-darker); padding:16px 18px; border-radius:16px; border:1px solid var(--border-color);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div>
+                                <label style="font-size:0.95rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+                                    <i class="fas fa-headphones" style="color:var(--accent);"></i> Web Audio API スピーカー試聴 (AudioContext → destination)
+                                </label>
+                                <div class="info-text" style="margin-top:4px;">
+                                    取り込んだ綺麗な音声を AudioContext を通してスピーカー（destination）へリアルタイムに流し、消去された雑音とマイクの音質を即座に確認できます。
+                                </div>
+                            </div>
+                            <button id="testAudioPassThroughBtn" class="pass-through-btn">
+                                <i class="fas fa-volume-up"></i> <span>🎧 スピーカーでリアルタイム試聴: OFF</span>
+                            </button>
                         </div>
                     </div>
                     
@@ -1353,6 +1428,11 @@
 
     // --- Loud Notification & Noise Cut & Custom Voice States ---
     let isLoudAlertEnabled = localStorage.getItem('forcord_loud_alert_enabled') !== 'false';
+    let isBrowserNoiseSuppression = localStorage.getItem('forcord_browser_noise_suppression') !== 'false'; // noiseSuppression: true
+    let isProximityFocus = localStorage.getItem('forcord_proximity_focus') === 'true'; // マイク近接音声フォーカス
+    let proximitySensitivity = parseInt(localStorage.getItem('forcord_proximity_sensitivity') || '75', 10); // 20 to 100%
+    let proximityFocusNodes = [];
+    let isAudioPassThroughTesting = false; // AudioContext -> destination live pass-through
     let noiseCutLevel = parseInt(localStorage.getItem('forcord_noise_cut_level') || '50'); // 0, 25, 50, 75, 100
     let noiseCutNodes = [];
     let heavyNoiseProcessingLoopId = null;
@@ -1591,13 +1671,19 @@
     async function setupLocalAudioStream() {
         if (localAudioStream && processedAudioStream) return localAudioStream;
 
-        const useNoiseSuppression = document.getElementById('noiseSuppressionToggleBtn')?.classList.contains('active-toggle');
-
+        // ブラウザ標準の強力なフィルタ (noiseSuppression: true, echoCancellation: true) を指定
         const constraints = {
             audio: {
-                echoCancellation: useNoiseSuppression !== false,
-                noiseSuppression: useNoiseSuppression !== false,
-                autoGainControl: true
+                echoCancellation: { ideal: true },
+                noiseSuppression: { ideal: isBrowserNoiseSuppression },
+                autoGainControl: { ideal: !isProximityFocus }, // 近接フォーカス時は遠距離音の自動増幅を防ぐ
+                // Chromium / WebKit 固有のWebRTC高度ノイズ除去・エコー抑制フラグ
+                googEchoCancellation: { ideal: true },
+                googAutoGainControl: { ideal: !isProximityFocus },
+                googNoiseSuppression: { ideal: isBrowserNoiseSuppression },
+                googHighpassFilter: { ideal: true },
+                googTypingNoiseDetection: { ideal: true },
+                googAudioMirroring: { ideal: false }
             },
             video: false
         };
@@ -1606,11 +1692,18 @@
             try {
                 localAudioStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch(primaryErr) {
-                console.warn("Primary mic constraints failed, attempting fallback:", primaryErr);
-                localAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                console.warn("Primary mic constraints failed, attempting standard fallback:", primaryErr);
+                localAudioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: isBrowserNoiseSuppression,
+                        autoGainControl: !isProximityFocus
+                    },
+                    video: false
+                });
             }
             
-            // Setup Web Audio Context for visualizer & live voice FX filters
+            // Web Audio API Context for live DSP processing, visualizer & FX pipeline
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
@@ -1633,15 +1726,16 @@
             processedAudioStream = fxDestinationNode.stream;
             fxProcessedMasterGain.connect(fxDestinationNode);
 
-            // Self-Voice (Side-tone) & Mic Test local monitor node
+            // Web Audio API によるルーティング:
+            // 取り込んだ綺麗な音声を AudioContext を通してスピーカー（destination）へリアルタイムに流す
             selfVoiceMonitorNode = audioContext.createGain();
-            const shouldMonitor = (isSelfVoiceEnabled || isMicTesting);
+            const shouldMonitor = (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting);
             selfVoiceMonitorNode.gain.setValueAtTime(shouldMonitor ? 1.0 : 0.0, audioContext.currentTime);
             fxProcessedMasterGain.connect(selfVoiceMonitorNode);
             selfVoiceMonitorNode.connect(audioContext.destination);
 
-            // Connect Noise Cut chain from micSourceNode to micGainNode
-            applyNoiseCutChain(noiseCutLevel);
+            // Connect Proximity Voice Focus & Noise Cut chain from micSourceNode to micGainNode
+            reconnectAudioInputChain();
 
             micGainNode.connect(micAnalyser);
 
@@ -1657,10 +1751,9 @@
         }
     }
 
-    // --- Noise Cut Engine (0%, 25%, 50%, 75%, 100% Extreme) ---
-    function applyNoiseCutChain(level) {
-        noiseCutLevel = level;
-        localStorage.setItem('forcord_noise_cut_level', level.toString());
+    // --- Audio Pipeline Reconnection (Proximity Focus + Noise Cut) ---
+    function reconnectAudioInputChain() {
+        if (!audioContext || !micSourceNode || !micGainNode) return;
 
         // Stop any heavy background DSP processing loop
         if (heavyNoiseProcessingLoopId) {
@@ -1668,24 +1761,74 @@
             heavyNoiseProcessingLoopId = null;
         }
 
-        if (!audioContext || !micSourceNode || !micGainNode) return;
-
-        // Disconnect previous noise cut filter nodes
+        // Disconnect previous filter nodes
         try {
             micSourceNode.disconnect();
         } catch(e) {}
 
+        proximityFocusNodes.forEach(n => {
+            try { if (n.stop) n.stop(); n.disconnect(); } catch(e) {}
+        });
+        proximityFocusNodes = [];
+
         noiseCutNodes.forEach(n => {
-            try {
-                if (n.stop) n.stop();
-                n.disconnect();
-            } catch(e) {}
+            try { if (n.stop) n.stop(); n.disconnect(); } catch(e) {}
         });
         noiseCutNodes = [];
 
+        let curr = micSourceNode;
+
+        // =========================================================================
+        // 🎯 1. マイク近接音声フォーカス (マイクが近い音を最優先で拾う DSP)
+        // =========================================================================
+        if (isProximityFocus) {
+            const sens = Math.max(0.2, Math.min(1.0, proximitySensitivity / 100)); // 0.2 to 1.0
+
+            // (A) 不要振動・ゴソゴソ音カット (115Hz Highpass)
+            const proxHp = audioContext.createBiquadFilter();
+            proxHp.type = 'highpass';
+            proxHp.frequency.setValueAtTime(115, audioContext.currentTime);
+            proxHp.Q.setValueAtTime(0.85, audioContext.currentTime);
+
+            // (B) 遠距離音・室内反射ディップ (480Hz 前後の部屋鳴り・遠距離反響を低減)
+            const proxRoomDip = audioContext.createBiquadFilter();
+            proxRoomDip.type = 'peaking';
+            proxRoomDip.frequency.setValueAtTime(480, audioContext.currentTime);
+            proxRoomDip.Q.setValueAtTime(1.8, audioContext.currentTime);
+            proxRoomDip.gain.setValueAtTime(-3.5 * sens, audioContext.currentTime);
+
+            // (C) 口元至近距離の直接音・子音明瞭度ブースト (2800Hz プレゼンス)
+            const proxPresence = audioContext.createBiquadFilter();
+            proxPresence.type = 'peaking';
+            proxPresence.frequency.setValueAtTime(2800, audioContext.currentTime);
+            proxPresence.Q.setValueAtTime(1.5, audioContext.currentTime);
+            proxPresence.gain.setValueAtTime(3.8 * sens, audioContext.currentTime);
+
+            // (D) 近接ダイナミックエキスパンダー: マイク直近の声は100%通し、遠くの生活音・打鍵音を急峻に抑制
+            const proxComp = audioContext.createDynamicsCompressor();
+            proxComp.threshold.setValueAtTime(-34 + (1 - sens) * 12, audioContext.currentTime);
+            proxComp.knee.setValueAtTime(8, audioContext.currentTime);
+            proxComp.ratio.setValueAtTime(5.5, audioContext.currentTime);
+            proxComp.attack.setValueAtTime(0.003, audioContext.currentTime);
+            proxComp.release.setValueAtTime(0.06, audioContext.currentTime);
+
+            curr.connect(proxHp);
+            proxHp.connect(proxRoomDip);
+            proxRoomDip.connect(proxPresence);
+            proxPresence.connect(proxComp);
+            curr = proxComp;
+
+            proximityFocusNodes.push(proxHp, proxRoomDip, proxPresence, proxComp);
+        }
+
+        // =========================================================================
+        // 🛡️ 2. マルチバンド雑音カット (0%, 25%, 50%, 75%, 100%)
+        // =========================================================================
+        const level = noiseCutLevel;
+
         if (level === 0) {
-            // 0% (OFF): Direct clean connection
-            micSourceNode.connect(micGainNode);
+            // 0% (OFF): Direct connection to micGainNode
+            curr.connect(micGainNode);
             return;
         }
 
@@ -1696,7 +1839,7 @@
             hp.frequency.setValueAtTime(85, audioContext.currentTime);
             hp.Q.setValueAtTime(0.7, audioContext.currentTime);
 
-            micSourceNode.connect(hp);
+            curr.connect(hp);
             hp.connect(micGainNode);
             noiseCutNodes.push(hp);
 
@@ -1729,7 +1872,7 @@
             comp.attack.setValueAtTime(0.005, audioContext.currentTime);
             comp.release.setValueAtTime(0.08, audioContext.currentTime);
 
-            micSourceNode.connect(hp);
+            curr.connect(hp);
             hp.connect(notch50);
             notch50.connect(notch60);
             notch60.connect(lp);
@@ -1782,7 +1925,7 @@
             comp.attack.setValueAtTime(0.002, audioContext.currentTime);
             comp.release.setValueAtTime(0.05, audioContext.currentTime);
 
-            micSourceNode.connect(hp1);
+            curr.connect(hp1);
             hp1.connect(hp2);
             hp2.connect(notch50);
             notch50.connect(notch60);
@@ -1843,12 +1986,11 @@
             gateGain.gain.setValueAtTime(1.0, audioContext.currentTime);
 
             // Connect filters
-            let curr = micSourceNode;
             curr.connect(hp1);
             hp1.connect(hp2);
-            curr = hp2;
-            notches.forEach(n => { curr.connect(n); curr = n; });
-            curr.connect(lp1);
+            let subCurr = hp2;
+            notches.forEach(n => { subCurr.connect(n); subCurr = n; });
+            subCurr.connect(lp1);
             lp1.connect(lp2);
             lp2.connect(comp);
             comp.connect(spectralAnalyser);
@@ -1858,7 +2000,6 @@
             noiseCutNodes.push(hp1, hp2, ...notches, lp1, lp2, comp, spectralAnalyser, gateGain);
 
             // ⚠️ 2048点高頻度リアルタイム演算ループ (毎秒100回高密度FFTスペクトル解析)
-            // 音声フォルマント帯域（250Hz〜3500Hz）を精密判定し、声がある時は確実に100%通し、雑音時のみ減衰
             const fftBuffer = new Float32Array(spectralAnalyser.frequencyBinCount);
             const sampleRate = audioContext.sampleRate;
             const binWidth = sampleRate / spectralAnalyser.fftSize;
@@ -1884,22 +2025,99 @@
                     }
                 }
 
-                // Dynamic background noise floor adaptation
                 currentNoiseFloor = currentNoiseFloor * 0.98 + (totalEnergy / len) * 0.02;
-
-                // Voice presence detection
                 const voiceRatio = totalEnergy > 0 ? (voiceEnergy / totalEnergy) : 0;
                 const hasVoice = (voiceEnergy > currentNoiseFloor * 2.2 && voiceRatio > 0.32) || (voiceEnergy > 0.0005);
 
                 if (hasVoice) {
-                    smoothedGate = smoothedGate * 0.4 + 1.05 * 0.6; // Open smoothly for clear voice
+                    smoothedGate = smoothedGate * 0.4 + 1.05 * 0.6;
                 } else {
-                    smoothedGate = smoothedGate * 0.85 + 0.04 * 0.15; // Attenuate ambient noise down to -28dB
+                    smoothedGate = smoothedGate * 0.85 + 0.04 * 0.15;
                 }
 
                 gateGain.gain.setTargetAtTime(smoothedGate, audioContext.currentTime, 0.008);
             }, 10);
         }
+    }
+
+    // --- Noise Cut Switcher API ---
+    function applyNoiseCutChain(level) {
+        noiseCutLevel = level;
+        localStorage.setItem('forcord_noise_cut_level', level.toString());
+        reconnectAudioInputChain();
+    }
+
+    // --- Proximity Voice Focus API ---
+    async function setProximityFocus(enabled, sensitivity = null) {
+        isProximityFocus = enabled;
+        localStorage.setItem('forcord_proximity_focus', enabled ? 'true' : 'false');
+        if (sensitivity !== null) {
+            proximitySensitivity = sensitivity;
+            localStorage.setItem('forcord_proximity_sensitivity', sensitivity.toString());
+        }
+
+        // Apply track constraints dynamically to browser
+        if (localAudioStream) {
+            const track = localAudioStream.getAudioTracks()[0];
+            if (track && track.applyConstraints) {
+                try {
+                    await track.applyConstraints({
+                        echoCancellation: true,
+                        noiseSuppression: isBrowserNoiseSuppression,
+                        autoGainControl: !isProximityFocus
+                    });
+                } catch(e) {
+                    console.warn("Could not apply proximity constraints to track:", e);
+                }
+            }
+        }
+
+        reconnectAudioInputChain();
+    }
+
+    // --- Browser Noise Suppression API (noiseSuppression: true) ---
+    async function setBrowserNoiseSuppression(enabled) {
+        isBrowserNoiseSuppression = enabled;
+        localStorage.setItem('forcord_browser_noise_suppression', enabled ? 'true' : 'false');
+
+        if (localAudioStream) {
+            const track = localAudioStream.getAudioTracks()[0];
+            if (track && track.applyConstraints) {
+                try {
+                    await track.applyConstraints({
+                        echoCancellation: true,
+                        noiseSuppression: isBrowserNoiseSuppression,
+                        autoGainControl: !isProximityFocus
+                    });
+                } catch(e) {
+                    console.warn("Could not apply noiseSuppression to track, restarting stream:", e);
+                    // Fallback: restart stream
+                    localAudioStream.getTracks().forEach(t => t.stop());
+                    localAudioStream = null;
+                    await setupLocalAudioStream();
+                    if (fxDestinationNode && fxDestinationNode.stream) {
+                        const newTrack = fxDestinationNode.stream.getAudioTracks()[0];
+                        Object.values(peerConnections).forEach(pc => {
+                            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+                            if (sender && newTrack) sender.replaceTrack(newTrack);
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Real-Time Audio Pass-Through (AudioContext -> destination) ---
+    async function toggleAudioPassThrough() {
+        isAudioPassThroughTesting = !isAudioPassThroughTesting;
+        if (isAudioPassThroughTesting) {
+            await setupLocalAudioStream().catch(() => {});
+        }
+        if (selfVoiceMonitorNode && audioContext) {
+            const shouldMonitor = (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting);
+            selfVoiceMonitorNode.gain.setValueAtTime(shouldMonitor ? 1.0 : 0.0, audioContext.currentTime);
+        }
+        return isAudioPassThroughTesting;
     }
 
     // Helper to generate pink/white noise buffer for natural breath air synthesis
@@ -3926,7 +4144,121 @@
             };
         }
 
-        // --- 3. Custom Voice FX Parameters & Sliders (10 granular controls) ---
+        // --- 3. Browser Noise Suppression (noiseSuppression: true) UI & Event Handlers ---
+        const browserSuppToggle = document.getElementById('browserNoiseSuppressionToggle');
+        const browserSuppText = document.getElementById('browserNoiseSuppressionText');
+        const barBrowserSuppBtn = document.getElementById('barBrowserSuppBtn');
+        const barBrowserSuppBadge = document.getElementById('barBrowserSuppBadge');
+
+        const syncBrowserSuppUi = (enabled) => {
+            if (browserSuppToggle) browserSuppToggle.checked = enabled;
+            if (browserSuppText) {
+                browserSuppText.innerText = enabled ? 'ON (有効)' : 'OFF (無効)';
+                browserSuppText.style.color = enabled ? '#57f287' : 'var(--text-muted)';
+            }
+            if (barBrowserSuppBadge) {
+                barBrowserSuppBadge.innerText = enabled ? 'AIノイズ' : 'OFF';
+                barBrowserSuppBadge.style.color = enabled ? '#57f287' : 'var(--text-muted)';
+                barBrowserSuppBadge.style.background = enabled ? 'rgba(35,165,89,0.25)' : 'rgba(100,100,100,0.25)';
+            }
+        };
+        syncBrowserSuppUi(isBrowserNoiseSuppression);
+
+        if (browserSuppToggle) {
+            browserSuppToggle.onchange = async (e) => {
+                const enabled = e.target.checked;
+                await setBrowserNoiseSuppression(enabled);
+                syncBrowserSuppUi(enabled);
+                playTone(enabled ? 640 : 380, 0.08, 'sine', 0.12);
+            };
+        }
+
+        if (barBrowserSuppBtn) {
+            barBrowserSuppBtn.onclick = async () => {
+                const newState = !isBrowserNoiseSuppression;
+                await setBrowserNoiseSuppression(newState);
+                syncBrowserSuppUi(newState);
+                playTone(newState ? 640 : 380, 0.08, 'sine', 0.12);
+            };
+        }
+
+        // --- 4. Proximity Voice Focus (マイクが近い音を重視して拾う) UI & Event Handlers ---
+        const proxToggle = document.getElementById('proximityFocusToggle');
+        const proxText = document.getElementById('proximityFocusToggleText');
+        const proxSensWrap = document.getElementById('proximitySensitivityWrap');
+        const proxSensSlider = document.getElementById('proximitySensitivitySlider');
+        const proxSensDisplay = document.getElementById('proximitySensitivityDisplay');
+        const barProximityBtn = document.getElementById('barProximityFocusBtn');
+        const barProximityBadge = document.getElementById('barProximityBadge');
+
+        const syncProximityFocusUi = (enabled, sens = proximitySensitivity) => {
+            if (proxToggle) proxToggle.checked = enabled;
+            if (proxText) {
+                proxText.innerText = enabled ? 'ON (有効)' : 'OFF';
+                proxText.style.color = enabled ? '#58a6ff' : 'var(--text-muted)';
+            }
+            if (proxSensWrap) {
+                proxSensWrap.style.display = enabled ? 'block' : 'none';
+            }
+            if (proxSensSlider) {
+                proxSensSlider.value = sens.toString();
+            }
+            if (proxSensDisplay) {
+                proxSensDisplay.innerText = `${sens}% (口元直近優先)`;
+            }
+            if (barProximityBtn) {
+                barProximityBtn.classList.toggle('active', enabled);
+            }
+            if (barProximityBadge) {
+                barProximityBadge.innerText = enabled ? '近接ON' : '近接OFF';
+                barProximityBadge.style.color = enabled ? '#58a6ff' : '#8e9297';
+                barProximityBadge.style.background = enabled ? 'rgba(88,166,255,0.22)' : '#4b5563';
+            }
+        };
+        syncProximityFocusUi(isProximityFocus, proximitySensitivity);
+
+        if (proxToggle) {
+            proxToggle.onchange = async (e) => {
+                const enabled = e.target.checked;
+                await setupLocalAudioStream().catch(() => {});
+                await setProximityFocus(enabled);
+                syncProximityFocusUi(enabled);
+                playTone(enabled ? 700 : 350, 0.08, 'sine', 0.14);
+            };
+        }
+
+        if (proxSensSlider) {
+            proxSensSlider.oninput = (e) => {
+                const val = parseInt(e.target.value, 10);
+                setProximityFocus(isProximityFocus, val);
+                if (proxSensDisplay) proxSensDisplay.innerText = `${val}% (口元直近優先)`;
+            };
+        }
+
+        if (barProximityBtn) {
+            barProximityBtn.onclick = async () => {
+                const newState = !isProximityFocus;
+                await setupLocalAudioStream().catch(() => {});
+                await setProximityFocus(newState);
+                syncProximityFocusUi(newState);
+                playTone(newState ? 700 : 350, 0.08, 'sine', 0.14);
+            };
+        }
+
+        // --- 5. Web Audio API Destination Real-Time Pass-Through Testing ---
+        const testPassThroughBtn = document.getElementById('testAudioPassThroughBtn');
+        if (testPassThroughBtn) {
+            testPassThroughBtn.onclick = async () => {
+                const isTesting = await toggleAudioPassThrough();
+                testPassThroughBtn.classList.toggle('active', isTesting);
+                testPassThroughBtn.innerHTML = isTesting ?
+                    '<i class="fas fa-volume-up" style="color:#57f287;"></i> <span>🎧 スピーカーで試聴中: ON (停止)</span>' :
+                    '<i class="fas fa-volume-up"></i> <span>🎧 スピーカーでリアルタイム試聴: OFF</span>';
+                playTone(isTesting ? 660 : 330, 0.1, 'sine', 0.12);
+            };
+        }
+
+        // --- 6. Custom Voice FX Parameters & Sliders (10 granular controls) ---
         setupCustomVoiceSliders();
 
         // Toggle custom voice panel button in settings
