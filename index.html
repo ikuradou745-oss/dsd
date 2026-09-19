@@ -1386,8 +1386,8 @@
             delayTime: 0, delayFeedback: 0, distortion: 0, robotFreq: 0, airBoost: 0
         },
         breath: {
-            pitch: 2, formant: 2350, tremoloSpeed: 5.6, tremoloDepth: 75, breathAir: 70,
-            delayTime: 12, delayFeedback: 15, distortion: 14, robotFreq: 0, airBoost: 8
+            pitch: 1, formant: 2300, tremoloSpeed: 5.2, tremoloDepth: 60, breathAir: 80,
+            delayTime: 0, delayFeedback: 0, distortion: 0, robotFreq: 0, airBoost: 7
         },
         reverb: {
             pitch: 0, formant: 1900, tremoloSpeed: 0, tremoloDepth: 0, breathAir: 0,
@@ -1796,80 +1796,109 @@
 
         } else if (level === 100) {
             // 100% (極限抹殺 ⚠️普通に重くなる):
-            // 4-stage 48dB/oct steep Highpass (220Hz) + 4-stage Lowpass (4000Hz) + 6 Multi-harmonic Notches
-            // + High-resolution 2048-bin Spectral Floor Analyser loop for absolute noise obliteration
-            const hpFilters = [];
-            for (let i = 0; i < 4; i++) {
-                const hp = audioContext.createBiquadFilter();
-                hp.type = 'highpass';
-                hp.frequency.setValueAtTime(220, audioContext.currentTime);
-                hp.Q.setValueAtTime(1.5, audioContext.currentTime);
-                hpFilters.push(hp);
-            }
+            // 人間の声の基本周波数を大切に残しつつ、生活音・エアコン・ファン・打鍵音を極限カット
+            // 2段急峻Highpass (95Hz) + 6段電源ハムノッチ + 2段急峻Lowpass (7200Hz) + コンプレッサー
+            // + 2048点FFT高解像度・適応型インテリジェント音声ゲート（高CPU負荷・声はクリアに通す）
+            const hp1 = audioContext.createBiquadFilter();
+            hp1.type = 'highpass';
+            hp1.frequency.setValueAtTime(95, audioContext.currentTime);
+            hp1.Q.setValueAtTime(0.9, audioContext.currentTime);
 
-            const lpFilters = [];
-            for (let i = 0; i < 4; i++) {
-                const lp = audioContext.createBiquadFilter();
-                lp.type = 'lowpass';
-                lp.frequency.setValueAtTime(4200, audioContext.currentTime);
-                lp.Q.setValueAtTime(1.5, audioContext.currentTime);
-                lpFilters.push(lp);
-            }
+            const hp2 = audioContext.createBiquadFilter();
+            hp2.type = 'highpass';
+            hp2.frequency.setValueAtTime(95, audioContext.currentTime);
+            hp2.Q.setValueAtTime(0.9, audioContext.currentTime);
+
+            const lp1 = audioContext.createBiquadFilter();
+            lp1.type = 'lowpass';
+            lp1.frequency.setValueAtTime(7200, audioContext.currentTime);
+            lp1.Q.setValueAtTime(0.8, audioContext.currentTime);
+
+            const lp2 = audioContext.createBiquadFilter();
+            lp2.type = 'lowpass';
+            lp2.frequency.setValueAtTime(7200, audioContext.currentTime);
+            lp2.Q.setValueAtTime(0.8, audioContext.currentTime);
 
             const notches = [50, 60, 100, 120, 180, 240].map(freq => {
                 const n = audioContext.createBiquadFilter();
                 n.type = 'notch';
                 n.frequency.setValueAtTime(freq, audioContext.currentTime);
-                n.Q.setValueAtTime(10.0, audioContext.currentTime);
+                n.Q.setValueAtTime(8.0, audioContext.currentTime);
                 return n;
             });
 
-            // High-resolution spectral gate analyser
+            const comp = audioContext.createDynamicsCompressor();
+            comp.threshold.setValueAtTime(-26, audioContext.currentTime);
+            comp.knee.setValueAtTime(8, audioContext.currentTime);
+            comp.ratio.setValueAtTime(5.0, audioContext.currentTime);
+            comp.attack.setValueAtTime(0.003, audioContext.currentTime);
+            comp.release.setValueAtTime(0.06, audioContext.currentTime);
+
+            // 2048-point High Resolution FFT Analyser
             const spectralAnalyser = audioContext.createAnalyser();
-            spectralAnalyser.fftSize = 2048; // High compute FFT
-            spectralAnalyser.smoothingTimeConstant = 0.2;
+            spectralAnalyser.fftSize = 2048;
+            spectralAnalyser.smoothingTimeConstant = 0.15;
 
             const gateGain = audioContext.createGain();
             gateGain.gain.setValueAtTime(1.0, audioContext.currentTime);
 
-            // Chain all 14 filter stages
+            // Connect filters
             let curr = micSourceNode;
-            hpFilters.forEach(f => { curr.connect(f); curr = f; });
-            notches.forEach(f => { curr.connect(f); curr = f; });
-            lpFilters.forEach(f => { curr.connect(f); curr = f; });
-            curr.connect(spectralAnalyser);
+            curr.connect(hp1);
+            hp1.connect(hp2);
+            curr = hp2;
+            notches.forEach(n => { curr.connect(n); curr = n; });
+            curr.connect(lp1);
+            lp1.connect(lp2);
+            lp2.connect(comp);
+            comp.connect(spectralAnalyser);
             spectralAnalyser.connect(gateGain);
             gateGain.connect(micGainNode);
 
-            noiseCutNodes.push(...hpFilters, ...notches, ...lpFilters, spectralAnalyser, gateGain);
+            noiseCutNodes.push(hp1, hp2, ...notches, lp1, lp2, comp, spectralAnalyser, gateGain);
 
-            // ⚠️ "普通に重くなる" リアルタイム高頻度スペクトル計算ループ (CPU負荷集中＆完全ノイズ抹殺)
+            // ⚠️ 2048点高頻度リアルタイム演算ループ (毎秒100回高密度FFTスペクトル解析)
+            // 音声フォルマント帯域（250Hz〜3500Hz）を精密判定し、声がある時は確実に100%通し、雑音時のみ減衰
             const fftBuffer = new Float32Array(spectralAnalyser.frequencyBinCount);
-            let noiseFloor = 0.005;
+            const sampleRate = audioContext.sampleRate;
+            const binWidth = sampleRate / spectralAnalyser.fftSize;
+            const voiceMinBin = Math.max(1, Math.floor(250 / binWidth));
+            const voiceMaxBin = Math.min(fftBuffer.length - 1, Math.floor(3500 / binWidth));
+
+            let smoothedGate = 1.0;
+            let currentNoiseFloor = 0.00005;
 
             heavyNoiseProcessingLoopId = setInterval(() => {
                 if (!spectralAnalyser || !audioContext || audioContext.state !== 'running') return;
                 spectralAnalyser.getFloatFrequencyData(fftBuffer);
 
-                // Analyze 1024 frequency bins (high CPU load intentional)
-                let energySum = 0;
-                let highBandSum = 0;
+                let voiceEnergy = 0;
+                let totalEnergy = 0;
                 const len = fftBuffer.length;
+
                 for (let i = 0; i < len; i++) {
-                    const linearVal = Math.pow(10, fftBuffer[i] / 20);
-                    energySum += linearVal;
-                    if (i > 300) highBandSum += linearVal;
+                    const linear = Math.pow(10, fftBuffer[i] / 20);
+                    totalEnergy += linear;
+                    if (i >= voiceMinBin && i <= voiceMaxBin) {
+                        voiceEnergy += linear;
+                    }
                 }
-                const avgEnergy = energySum / len;
-                
-                // Adaptive silence thresholding
-                if (avgEnergy < 0.0028) {
-                    // Absolute zero mute during non-voice/fan noise
-                    gateGain.gain.setTargetAtTime(0.0001, audioContext.currentTime, 0.012);
+
+                // Dynamic background noise floor adaptation
+                currentNoiseFloor = currentNoiseFloor * 0.98 + (totalEnergy / len) * 0.02;
+
+                // Voice presence detection
+                const voiceRatio = totalEnergy > 0 ? (voiceEnergy / totalEnergy) : 0;
+                const hasVoice = (voiceEnergy > currentNoiseFloor * 2.2 && voiceRatio > 0.32) || (voiceEnergy > 0.0005);
+
+                if (hasVoice) {
+                    smoothedGate = smoothedGate * 0.4 + 1.05 * 0.6; // Open smoothly for clear voice
                 } else {
-                    gateGain.gain.setTargetAtTime(1.15, audioContext.currentTime, 0.008);
+                    smoothedGate = smoothedGate * 0.85 + 0.04 * 0.15; // Attenuate ambient noise down to -28dB
                 }
-            }, 10); // 100 times per second heavy FFT loop
+
+                gateGain.gain.setTargetAtTime(smoothedGate, audioContext.currentTime, 0.008);
+            }, 10);
         }
     }
 
@@ -1953,91 +1982,62 @@
 
         } else if (fxType === 'breath') {
             // =========================================================================
-            // --- 💓 リアルな喘ぎ声 (Ultra-Realistic Panting & Sensual Breath Voice) ---
+            // --- 💓 リアルな喘ぎ声 (Ultra-Realistic Panting: 声だけを高品位に加工) ---
             // =========================================================================
-            // 1. リアルな吐息・息漏れエアノイズ生成 (マイク音声の入力量に動的追従して「ハァ…」と息が出る)
-            const noiseBuffer = createNoiseBuffer(2.5);
-            let noiseSrc = null;
-            let noiseGain = null;
-            if (noiseBuffer) {
-                noiseSrc = audioContext.createBufferSource();
-                noiseSrc.buffer = noiseBuffer;
-                noiseSrc.loop = true;
+            // 外部のホワイトノイズ注入は完全廃止し、マイク入力の声そのものだけを艶めかしく加工
 
-                // 息の帯域フィルター (2400Hzバンドパス ＋ 5500Hzハイシェルフ)
-                const noiseBand = audioContext.createBiquadFilter();
-                noiseBand.type = 'bandpass';
-                noiseBand.frequency.setValueAtTime(2400, now);
-                noiseBand.Q.setValueAtTime(1.8, now);
-
-                const noiseHigh = audioContext.createBiquadFilter();
-                noiseHigh.type = 'highshelf';
-                noiseHigh.frequency.setValueAtTime(5000, now);
-                noiseHigh.gain.setValueAtTime(8, now);
-
-                noiseGain = audioContext.createGain();
-                noiseGain.gain.setValueAtTime(0.24, now); // Breath air volume
-
-                noiseSrc.connect(noiseBand);
-                noiseBand.connect(noiseHigh);
-                noiseHigh.connect(noiseGain);
-                noiseGain.connect(fxProcessedMasterGain);
-                noiseSrc.start();
-                currentFxNodes.push(noiseSrc, noiseBand, noiseHigh, noiseGain);
-            }
-
-            // 2. 艶めかしいピッチ揺らぎ (マイクロディレイ + サイン波LFOによる繊細なピッチビブラート)
+            // 1. 艶めかしいピッチ揺らぎ (サイン波LFOによる滑らかなピッチビブラート: ノイズ・クリックゼロ)
             const vibratoDelay = audioContext.createDelay(0.1);
             vibratoDelay.delayTime.setValueAtTime(0.015, now);
 
             const vibratoOsc = audioContext.createOscillator();
             vibratoOsc.type = 'sine';
-            vibratoOsc.frequency.setValueAtTime(5.6, now); // ~5.6Hz 吐息の艶めかしい揺らぎ
+            vibratoOsc.frequency.setValueAtTime(5.2, now); // 5.2Hz 息遣いの艶やかなピッチ揺らぎ
 
             const vibratoDepth = audioContext.createGain();
-            vibratoDepth.gain.setValueAtTime(0.0035, now); // ~3.5ms delay modulation
+            vibratoDepth.gain.setValueAtTime(0.0018, now); // 1.8ms 滑らかなビブラート
 
             vibratoOsc.connect(vibratoDepth);
             vibratoDepth.connect(vibratoDelay.delayTime);
             vibratoOsc.start();
 
-            // 3. 呼吸同期の息遣い・言葉の詰まりトレモロ (なめらかな息継ぎ)
+            // 2. 呼吸同期の息継ぎ・吐息トレモロ (自然な息遣いの強弱)
             const tremoloGain = audioContext.createGain();
-            tremoloGain.gain.setValueAtTime(0.40, now);
+            tremoloGain.gain.setValueAtTime(0.72, now);
 
             const tremoloOsc = audioContext.createOscillator();
             tremoloOsc.type = 'sine';
-            tremoloOsc.frequency.setValueAtTime(5.4, now); // 息継ぎリズム
+            tremoloOsc.frequency.setValueAtTime(4.8, now); // 息継ぎ周期
 
             const tremoloDepth = audioContext.createGain();
-            tremoloDepth.gain.setValueAtTime(0.35, now);
+            tremoloDepth.gain.setValueAtTime(0.26, now);
 
             tremoloOsc.connect(tremoloDepth);
             tremoloDepth.connect(tremoloGain.gain);
             tremoloOsc.start();
 
-            // 4. 近接感・口元フォルマント強調 (2350Hz ピーキング)
+            // 3. 口元・喉元の近接フォルマント (2250Hz ピーキング)
             const formantPeak = audioContext.createBiquadFilter();
             formantPeak.type = 'peaking';
-            formantPeak.frequency.setValueAtTime(2350, now);
-            formantPeak.Q.setValueAtTime(2.2, now);
-            formantPeak.gain.setValueAtTime(7.5, now);
+            formantPeak.frequency.setValueAtTime(2250, now);
+            formantPeak.Q.setValueAtTime(1.8, now);
+            formantPeak.gain.setValueAtTime(6.0, now);
 
-            // 5. 高音エアーブースト (高域の擦過音・吐息の抜け)
+            // 4. 本人の息遣い・ブレス成分エンハンサー (5500Hz ハイシェルフ: 声の吐息だけをクリアに増幅)
             const airShelf = audioContext.createBiquadFilter();
             airShelf.type = 'highshelf';
-            airShelf.frequency.setValueAtTime(6000, now);
-            airShelf.gain.setValueAtTime(8.0, now);
+            airShelf.frequency.setValueAtTime(5500, now);
+            airShelf.gain.setValueAtTime(7.0, now);
 
-            // 6. 耳元ソフトサチュレーション (温かい吐息のサチュレーション)
+            // 5. 耳元囁きウォームサチュレーション (温かい倍音付加・歪みノイズゼロ)
             const shaper = audioContext.createWaveShaper();
-            shaper.curve = makeDistortionCurve(14);
+            shaper.curve = makeDistortionCurve(6);
             shaper.oversample = '2x';
 
             const outGain = audioContext.createGain();
-            outGain.gain.setValueAtTime(1.1, now);
+            outGain.gain.setValueAtTime(1.05, now);
 
-            // Routing
+            // Clean Routing: micGainNode -> vibratoDelay -> tremoloGain -> formantPeak -> airShelf -> shaper -> outGain -> fxProcessedMasterGain
             micGainNode.connect(vibratoDelay);
             vibratoDelay.connect(tremoloGain);
             tremoloGain.connect(formantPeak);
@@ -2075,29 +2075,30 @@
                 currentFxNodes.push(ringOsc, ringModGain);
             }
 
-            // 2. Pitch Shifter / Micro-pitch delay modulation (ピッチ半音変化)
+            // 2. Pitch Shifter (ノイズやクリック音の一切ないサイン波変調＋フォルマント)
             if (p.pitch !== 0) {
-                // Pitch shift via dynamic delay modulation + resonance peak
                 const pitchDelay = audioContext.createDelay(0.1);
                 pitchDelay.delayTime.setValueAtTime(0.015, now);
 
+                // ノイズの元となる鋸歯状波(sawtooth)を廃止し、滑らかな正弦波(sine)でピッチ変調
                 const pitchLfo = audioContext.createOscillator();
-                pitchLfo.type = 'sawtooth';
-                const lfoFreq = p.pitch > 0 ? (40 + p.pitch * 15) : (35 + Math.abs(p.pitch) * 10);
+                pitchLfo.type = 'sine';
+                const lfoFreq = p.pitch > 0 ? (6.0 + p.pitch * 0.8) : (5.0 + Math.abs(p.pitch) * 0.6);
                 pitchLfo.frequency.setValueAtTime(lfoFreq, now);
 
                 const lfoDepth = audioContext.createGain();
-                const depthAmt = Math.min(0.008, Math.abs(p.pitch) * 0.0006);
+                const depthAmt = Math.min(0.0035, Math.abs(p.pitch) * 0.0003);
                 lfoDepth.gain.setValueAtTime(depthAmt, now);
 
                 pitchLfo.connect(lfoDepth);
                 lfoDepth.connect(pitchDelay.delayTime);
                 pitchLfo.start();
 
+                // フォルマント・レゾナンスによる自然なピッチ感（女声高音 / 男声低音）
                 const pitchEq = audioContext.createBiquadFilter();
                 pitchEq.type = p.pitch > 0 ? 'highshelf' : 'lowshelf';
-                pitchEq.frequency.setValueAtTime(p.pitch > 0 ? 2500 : 400, now);
-                pitchEq.gain.setValueAtTime(Math.min(12, Math.abs(p.pitch) * 1.2), now);
+                pitchEq.frequency.setValueAtTime(p.pitch > 0 ? 2400 : 380, now);
+                pitchEq.gain.setValueAtTime(Math.min(8.5, Math.abs(p.pitch) * 0.85), now);
 
                 lastNode.connect(pitchDelay);
                 pitchDelay.connect(pitchEq);
@@ -2105,23 +2106,23 @@
                 currentFxNodes.push(pitchDelay, pitchLfo, lfoDepth, pitchEq);
             }
 
-            // 3. Formant Filter (フォルマント・声の明るさ太さ)
+            // 3. Formant Filter (フォルマント・声の太さ・明るさ)
             if (p.formant !== 1800) {
                 const formantFilter = audioContext.createBiquadFilter();
                 formantFilter.type = 'peaking';
                 formantFilter.frequency.setValueAtTime(p.formant, now);
-                formantFilter.Q.setValueAtTime(2.0, now);
-                formantFilter.gain.setValueAtTime(7.0, now);
+                formantFilter.Q.setValueAtTime(1.8, now);
+                formantFilter.gain.setValueAtTime(6.0, now);
 
                 lastNode.connect(formantFilter);
                 lastNode = formantFilter;
                 currentFxNodes.push(formantFilter);
             }
 
-            // 4. Tremolo / 喘ぎ・息遣い揺らぎ
+            // 4. Tremolo / 喘ぎ・息遣い揺らぎ (滑らかなサイン波トレモロ)
             if (p.tremoloDepth > 0 && p.tremoloSpeed > 0) {
                 const tGain = audioContext.createGain();
-                const depthNormalized = (p.tremoloDepth / 100) * 0.5;
+                const depthNormalized = (p.tremoloDepth / 100) * 0.45;
                 tGain.gain.setValueAtTime(1.0 - depthNormalized, now);
 
                 const tOsc = audioContext.createOscillator();
@@ -2140,10 +2141,10 @@
                 currentFxNodes.push(tGain, tOsc, tDepth);
             }
 
-            // 5. Distortion / Drive (歪み)
+            // 5. Distortion / Drive (声のソフトサチュレーション)
             if (p.distortion > 0) {
                 const distShaper = audioContext.createWaveShaper();
-                distShaper.curve = makeDistortionCurve(p.distortion);
+                distShaper.curve = makeDistortionCurve(Math.min(35, p.distortion * 0.5));
                 distShaper.oversample = '2x';
 
                 lastNode.connect(distShaper);
@@ -2163,28 +2164,23 @@
                 currentFxNodes.push(airShelf);
             }
 
-            // 7. Breath Air Noise (リアル息漏れ)
+            // 7. Breath Air (リアル息漏れエンハンサー: 外部ノイズではなく声のブレス成分そのものをブースト)
             if (p.breathAir > 0) {
-                const noiseBuf = createNoiseBuffer(2.0);
-                if (noiseBuf) {
-                    const airSrc = audioContext.createBufferSource();
-                    airSrc.buffer = noiseBuf;
-                    airSrc.loop = true;
+                const breathEnhancer = audioContext.createBiquadFilter();
+                breathEnhancer.type = 'peaking';
+                breathEnhancer.frequency.setValueAtTime(2800, now);
+                breathEnhancer.Q.setValueAtTime(1.5, now);
+                breathEnhancer.gain.setValueAtTime((p.breathAir / 100) * 8.0, now);
 
-                    const airBand = audioContext.createBiquadFilter();
-                    airBand.type = 'bandpass';
-                    airBand.frequency.setValueAtTime(2500, now);
-                    airBand.Q.setValueAtTime(1.6, now);
+                const breathAirShelf = audioContext.createBiquadFilter();
+                breathAirShelf.type = 'highshelf';
+                breathAirShelf.frequency.setValueAtTime(5000, now);
+                breathAirShelf.gain.setValueAtTime((p.breathAir / 100) * 7.5, now);
 
-                    const airGain = audioContext.createGain();
-                    airGain.gain.setValueAtTime((p.breathAir / 100) * 0.28, now);
-
-                    airSrc.connect(airBand);
-                    airBand.connect(airGain);
-                    airGain.connect(fxProcessedMasterGain);
-                    airSrc.start();
-                    currentFxNodes.push(airSrc, airBand, airGain);
-                }
+                lastNode.connect(breathEnhancer);
+                breathEnhancer.connect(breathAirShelf);
+                lastNode = breathAirShelf;
+                currentFxNodes.push(breathEnhancer, breathAirShelf);
             }
 
             // 8. Echo / Delay & Feedback (エコー・残響)
