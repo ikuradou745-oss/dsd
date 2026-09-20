@@ -612,7 +612,7 @@
                             <button id="openYoutubeVcBtn" class="screenshare-btn" style="background:linear-gradient(135deg, #ff0000, #c40000); color:white; border-color:#ff4444;" title="YouTube動画や音楽をVCメンバー全員と同時視聴・再生"><i class="fab fa-youtube"></i> YouTube同期再生</button>
                             <button id="inviteToVoiceBtn" style="background:#3c3f45; display:none;"><i class="fas fa-user-plus"></i> 招待</button>
                             <button id="openSoundboardBtn" style="background:#3c3f45;"><i class="fas fa-music"></i> 効果音</button>
-                            <button id="toggleSubtitlesBtn" class="btn-secondary"><i class="fas fa-closed-captioning"></i> 字幕: OFF</button>
+                            <button id="toggleSubtitlesBtn" class="btn-success"><i class="fas fa-closed-captioning"></i> 字幕: ON</button>
                         </div>
                     </div>
 
@@ -699,7 +699,7 @@
                     </div>
 
                     <!-- Live Real-Time Subtitles & AI Meeting Notes -->
-                    <div class="voice-subtitles-drawer" id="voiceSubtitlesDrawer" style="display:none;">
+                    <div class="voice-subtitles-drawer" id="voiceSubtitlesDrawer" style="display:flex;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
                             <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;"><i class="fas fa-wave-square"></i> リアルタイム高精度音声文字起こし</div>
                             <div style="display:flex; gap:6px;">
@@ -719,7 +719,9 @@
                             </div>
                             <div id="aiSummaryContent" style="line-height:1.5; color:var(--text-main);"></div>
                         </div>
-                        <div id="subtitlesList" style="display:flex; flex-direction:column; gap:4px; max-height:120px; overflow-y:auto;"></div>
+                        <div id="subtitlesList" style="display:flex; flex-direction:column; gap:4px; max-height:120px; overflow-y:auto;">
+                            <div style="color:var(--text-muted); font-size:0.8rem; font-style:italic; padding:4px 0;"><i class="fas fa-microphone"></i> マイクで話すとここにリアルタイムで字幕が表示されます</div>
+                        </div>
                     </div>
 
                     <!-- Bottom Studio Voice Control Bar -->
@@ -1133,6 +1135,17 @@
                     </div>
                 </div>
 
+                <!-- Instant Trigger Test Input Bar -->
+                <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:14px; padding:12px 18px; margin-bottom:24px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <div style="font-weight:700; font-size:0.88rem; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+                        <i class="fas fa-keyboard" style="color:#58a6ff;"></i> テキスト発言テスト:
+                    </div>
+                    <input type="text" id="manualTriggerTextInput" placeholder="例: nice, 草, ありがとう, 爆発..." style="flex:1; min-width:180px; background:var(--bg-darker); border:1px solid var(--border-color); border-radius:10px; padding:7px 12px; font-size:0.88rem; color:var(--text-main);">
+                    <button id="sendManualTriggerBtn" class="btn-success" style="padding:7px 16px; font-size:0.85rem; border-radius:10px;">
+                        <i class="fas fa-paper-plane"></i> テスト発動
+                    </button>
+                </div>
+
                 <!-- Custom User Created Triggers Area -->
                 <div id="customTriggersSection" style="margin-bottom:28px; display:none;">
                     <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
@@ -1227,6 +1240,8 @@
         <button class="sound-btn" data-sound="drum">🥁 ドラムロール</button>
         <button class="sound-btn" data-sound="laugh">😂 笑い声</button>
         <button class="sound-btn" data-sound="gameover">👾 ゲームオーバー</button>
+        <button class="sound-btn" data-sound="coin">🪙 コイン</button>
+        <button class="sound-btn" data-sound="bomb">💥 ドカン爆発</button>
     </div>
     <button id="closeSoundboardBtn" class="btn-secondary" style="margin-top:16px; width:100%;">閉じる</button>
 </div>
@@ -1470,7 +1485,7 @@
     let micTestMonitorNode = null;
     let isRtcMicMuted = false;
     let isDeafened = false;
-    let isSubtitlesEnabled = false;
+    let isSubtitlesEnabled = true;
     let speechRecognition = null;
     let currentVoiceRoomId = null;
     let currentVoiceRoomName = "";
@@ -1692,8 +1707,29 @@
     }
 
     // Audio Constraints with Resilient Fallback & Web Audio FX Destination
+    function createSilentAudioStream() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const osc = audioContext.createOscillator();
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0.0;
+        const dst = audioContext.createMediaStreamDestination();
+        osc.connect(silentGain);
+        silentGain.connect(dst);
+        try { osc.start(); } catch(e) {}
+        return dst.stream;
+    }
+
     async function setupLocalAudioStream() {
         if (localAudioStream && processedAudioStream) return localAudioStream;
+
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume().catch(() => {});
+        }
 
         // ブラウザ標準の強力なフィルタ (noiseSuppression: true, echoCancellation: true) を指定
         const constraints = {
@@ -1701,7 +1737,6 @@
                 echoCancellation: { ideal: true },
                 noiseSuppression: { ideal: isBrowserNoiseSuppression },
                 autoGainControl: { ideal: true },
-                // Chromium / WebKit 固有のWebRTC高度ノイズ除去・AIエコー抑制・VADフラグ
                 googEchoCancellation: { ideal: true },
                 googAutoGainControl: { ideal: true },
                 googNoiseSuppression: { ideal: isBrowserNoiseSuppression },
@@ -1714,9 +1749,11 @@
             video: false
         };
 
+        let hasRealMic = false;
         try {
             try {
                 localAudioStream = await navigator.mediaDevices.getUserMedia(constraints);
+                hasRealMic = true;
             } catch(primaryErr) {
                 console.warn("Primary mic constraints failed, attempting standard fallback:", primaryErr);
                 localAudioStream = await navigator.mediaDevices.getUserMedia({
@@ -1727,16 +1764,20 @@
                     },
                     video: false
                 });
+                hasRealMic = true;
             }
-            
-            // Web Audio API Context for live DSP processing, visualizer & FX pipeline
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(err) {
+            console.warn("Microphone access unavailable or denied, falling back to silent stream (listener mode):", err);
+            localAudioStream = createSilentAudioStream();
+            hasRealMic = false;
+            // Show non-blocking toast warning
+            const badge = document.getElementById('rtcConnectionBadge');
+            if (badge) {
+                badge.title = "マイク未許可・聞き専モードで接続中";
             }
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
-            }
+        }
 
+        try {
             micSourceNode = audioContext.createMediaStreamSource(localAudioStream);
             micGainNode = audioContext.createGain();
             micGainNode.gain.setValueAtTime(isRtcMicMuted ? 0 : 1.0, audioContext.currentTime);
@@ -1752,14 +1793,13 @@
             fxDestinationNode = audioContext.createMediaStreamDestination();
             processedAudioStream = fxDestinationNode.stream;
             // Sync track enabled state immediately
-            if (localAudioStream) localAudioStream.getAudioTracks().forEach(t => t.enabled = !isRtcMicMuted);
-            if (processedAudioStream) processedAudioStream.getAudioTracks().forEach(t => t.enabled = !isRtcMicMuted);
+            if (localAudioStream) localAudioStream.getAudioTracks().forEach(t => t.enabled = (!isRtcMicMuted && hasRealMic));
+            if (processedAudioStream) processedAudioStream.getAudioTracks().forEach(t => t.enabled = (!isRtcMicMuted && hasRealMic));
             fxProcessedMasterGain.connect(fxDestinationNode);
 
             // Web Audio API によるルーティング:
-            // 取り込んだ綺麗な音声を AudioContext を通してスピーカー（destination）へリアルタイムに流す
             selfVoiceMonitorNode = audioContext.createGain();
-            const shouldMonitor = (!isRtcMicMuted) && (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting);
+            const shouldMonitor = (!isRtcMicMuted) && (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting) && hasRealMic;
             selfVoiceMonitorNode.gain.setValueAtTime(shouldMonitor ? 1.0 : 0.0, audioContext.currentTime);
             fxProcessedMasterGain.connect(selfVoiceMonitorNode);
             selfVoiceMonitorNode.connect(audioContext.destination);
@@ -1774,10 +1814,12 @@
 
             startAudioMeterLoop();
             return localAudioStream;
-        } catch (err) {
-            console.error("Microphone access failed:", err);
-            alert("マイクへのアクセスに失敗しました。ブラウザのマイク権限を許可してください。");
-            throw err;
+        } catch (setupErr) {
+            console.warn("Web Audio pipeline initialization warning:", setupErr);
+            if (!processedAudioStream) {
+                processedAudioStream = localAudioStream;
+            }
+            return localAudioStream;
         }
     }
 
@@ -2722,7 +2764,7 @@
             await setupLocalAudioStream();
             setRtcMicMute(isRtcMicMuted, false);
         } catch(e) {
-            return;
+            console.warn("Audio stream setup non-blocking warning:", e);
         }
 
         currentVoiceRoomId = roomId;
@@ -2881,6 +2923,9 @@
 
         // Setup Live Subtitles & Soundboard listeners for this room
         setupRoomEventBroadcasting(roomId);
+
+        // Auto start keyword recognition and subtitles engine
+        startVoiceSpeechRecognitionIfAvailable();
     }
 
     function setupSignalingListeners(roomId) {
@@ -3719,11 +3764,13 @@
         // Soundboard receiver
         if (currentVoiceRoomSoundboardRef) currentVoiceRoomSoundboardRef.off();
         currentVoiceRoomSoundboardRef = db.ref(`voiceRooms/${roomId}/soundboard`);
+        const soundboardJoinTs = Date.now() - 2000;
         currentVoiceRoomSoundboardRef.on('child_added', (snap) => {
             const data = snap.val();
-            if (data && data.timestamp > Date.now() - 5000) {
-                playSampleSound(data.sound);
-                snap.ref.remove();
+            if (data && data.timestamp > soundboardJoinTs) {
+                if (data.senderUid !== currentUser.uid) {
+                    playSampleSound(data.sound);
+                }
             }
         });
 
@@ -3756,57 +3803,90 @@
 
     function playSampleSound(soundType) {
         if (isDeafened) return;
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+        } catch(e) {}
+
         if (soundType === 'clap') {
-            for(let i = 0; i < 6; i++) {
-                setTimeout(() => playTone(300 + Math.random() * 200, 0.05, 'square', 0.1), i * 70);
+            for(let i = 0; i < 7; i++) {
+                setTimeout(() => playTone(300 + Math.random() * 250, 0.06, 'square', 0.22), i * 65);
             }
         } else if (soundType === 'tada') {
-            playTone(523, 0.1, 'sine', 0.2);
-            setTimeout(() => playTone(659, 0.1, 'sine', 0.2), 100);
-            setTimeout(() => playTone(783, 0.3, 'sine', 0.25), 200);
+            playTone(523, 0.12, 'sine', 0.3);
+            setTimeout(() => playTone(659, 0.12, 'sine', 0.3), 110);
+            setTimeout(() => playTone(783, 0.35, 'sine', 0.35), 220);
         } else if (soundType === 'ding') {
-            playTone(880, 0.5, 'sine', 0.3);
+            playTone(987, 0.5, 'sine', 0.4);
+            setTimeout(() => playTone(1318, 0.6, 'sine', 0.35), 80);
         } else if (soundType === 'drum') {
-            for(let i = 0; i < 8; i++) {
-                setTimeout(() => playTone(120, 0.04, 'triangle', 0.2), i * 50);
+            for(let i = 0; i < 10; i++) {
+                setTimeout(() => playTone(120, 0.05, 'triangle', 0.28), i * 45);
             }
-            setTimeout(() => playTone(80, 0.3, 'triangle', 0.3), 450);
+            setTimeout(() => playTone(80, 0.35, 'triangle', 0.45), 480);
         } else if (soundType === 'laugh') {
-            for(let i = 0; i < 5; i++) {
-                setTimeout(() => playTone(400 + (i % 2) * 80, 0.08, 'sawtooth', 0.08), i * 90);
+            for(let i = 0; i < 6; i++) {
+                setTimeout(() => playTone(440 + (i % 2) * 100, 0.1, 'sawtooth', 0.2), i * 85);
             }
         } else if (soundType === 'gameover') {
-            playTone(400, 0.15, 'sawtooth', 0.2);
-            setTimeout(() => playTone(350, 0.15, 'sawtooth', 0.2), 150);
-            setTimeout(() => playTone(300, 0.3, 'sawtooth', 0.2), 300);
+            playTone(440, 0.18, 'sawtooth', 0.3);
+            setTimeout(() => playTone(370, 0.18, 'sawtooth', 0.3), 160);
+            setTimeout(() => playTone(311, 0.35, 'sawtooth', 0.3), 320);
+        } else if (soundType === 'coin') {
+            playTone(987.77, 0.08, 'square', 0.25);
+            setTimeout(() => playTone(1318.51, 0.35, 'square', 0.3), 80);
+        } else if (soundType === 'bomb') {
+            playTone(65, 0.6, 'sine', 0.5);
+            playTone(120, 0.4, 'triangle', 0.4);
         }
     }
 
-    // --- High-Precision Live Subtitles (Speech Recognition Hybrid) ---
+    // --- High-Precision Live Subtitles & Keyword Recognition (Speech Recognition Hybrid) ---
+    let isSpeechRecActive = false;
+
     function setupSpeechRecognition() {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            console.log("Speech recognition not supported in this browser");
+            return;
+        }
+        if (speechRecognition) return;
+
         const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
         speechRecognition = new SpeechRec();
         speechRecognition.lang = 'ja-JP';
         speechRecognition.continuous = true;
         speechRecognition.interimResults = true;
 
+        speechRecognition.onstart = () => {
+            isSpeechRecActive = true;
+        };
+
         speechRecognition.onresult = async (event) => {
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript.trim();
                 const isFinal = event.results[i].isFinal;
-                if (transcript && isFinal && currentVoiceRoomId) {
+                if (!transcript) continue;
+
+                // Check keyword trigger on both interim and final results for lightning-fast reaction
+                if (currentVoiceRoomId && typeof checkAndTriggerVoiceKeywords === 'function') {
+                    checkAndTriggerVoiceKeywords(transcript, currentUser.uid, currentUser.name);
+                }
+
+                if (isFinal && currentVoiceRoomId) {
                     const fResult = filterNsfwWords(transcript);
                     if (fResult.censored) {
                         showNsfwWarningToast();
                     }
-                    await db.ref(`voiceRooms/${currentVoiceRoomId}/subtitles`).push({
-                        name: currentUser.name,
-                        text: fResult.text,
-                        timestamp: Date.now()
-                    });
-                    if (typeof checkAndTriggerVoiceKeywords === 'function') {
-                        checkAndTriggerVoiceKeywords(fResult.text, currentUser.uid, currentUser.name);
+                    if (isSubtitlesEnabled) {
+                        await db.ref(`voiceRooms/${currentVoiceRoomId}/subtitles`).push({
+                            name: currentUser.name,
+                            text: fResult.text,
+                            timestamp: Date.now()
+                        });
                     }
                 }
             }
@@ -3814,13 +3894,32 @@
 
         speechRecognition.onerror = (e) => {
             if (e.error !== 'no-speech') console.warn('SpeechRecognition error:', e);
+            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                isSpeechRecActive = false;
+            }
         };
 
         speechRecognition.onend = () => {
-            if (isSubtitlesEnabled && currentVoiceRoomId) {
-                try { speechRecognition.start(); } catch(e) {}
+            isSpeechRecActive = false;
+            if (currentVoiceRoomId && (isSubtitlesEnabled || voiceTriggerMasterToggle)) {
+                setTimeout(() => {
+                    startVoiceSpeechRecognitionIfAvailable();
+                }, 400);
             }
         };
+    }
+
+    function startVoiceSpeechRecognitionIfAvailable() {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
+        if (!speechRecognition) setupSpeechRecognition();
+        if (speechRecognition && !isSpeechRecActive) {
+            try {
+                speechRecognition.start();
+                isSpeechRecActive = true;
+            } catch(e) {
+                // already active or starting
+            }
+        }
     }
 
     // --- Channel Counters Polling ---
@@ -3883,21 +3982,22 @@
             }
         });
 
-        initTabs();
-        loadIconPicker();
-        setupTriggersAndNewFeatures();
-        renderTriggersView();
-        setupVoiceControls();
-        setupMasterVolumeControls();
-        setupImageViewerModal();
-        setupChatDataListeners();
-        listenVoiceInvites();
-        renderShop();
-        setupGroupModal();
-        startNewMessageListener();
-        setupSpeechRecognition();
-        startChannelCounters();
-        requestSystemNotificationPermission();
+        try { initTabs(); } catch(e) { console.warn("initTabs err:", e); }
+        try { loadIconPicker(); } catch(e) { console.warn("loadIconPicker err:", e); }
+        try { setupTriggersAndNewFeatures(); } catch(e) { console.warn("setupTriggersAndNewFeatures err:", e); }
+        try { renderTriggersView(); } catch(e) { console.warn("renderTriggersView err:", e); }
+        try { setupVoiceControls(); } catch(e) { console.warn("setupVoiceControls err:", e); }
+        try { setupMasterVolumeControls(); } catch(e) { console.warn("setupMasterVolumeControls err:", e); }
+        try { setupImageViewerModal(); } catch(e) { console.warn("setupImageViewerModal err:", e); }
+        try { setupChatDataListeners(); } catch(e) { console.warn("setupChatDataListeners err:", e); }
+        try { ensureDefaultPublicGroups(); } catch(e) { console.warn("ensureDefaultPublicGroups err:", e); }
+        try { listenVoiceInvites(); } catch(e) { console.warn("listenVoiceInvites err:", e); }
+        try { renderShop(); } catch(e) { console.warn("renderShop err:", e); }
+        try { setupGroupModal(); } catch(e) { console.warn("setupGroupModal err:", e); }
+        try { startNewMessageListener(); } catch(e) { console.warn("startNewMessageListener err:", e); }
+        try { setupSpeechRecognition(); } catch(e) { console.warn("setupSpeechRecognition err:", e); }
+        try { startChannelCounters(); } catch(e) { console.warn("startChannelCounters err:", e); }
+        try { requestSystemNotificationPermission(); } catch(e) {}
 
         // Global User Interaction Audio Unlock (Browser Autoplay Policy handling)
         const unlockAudio = () => {
@@ -3953,26 +4053,13 @@
     }
 
     function setupVoiceControls() {
-        // Microphone Mute Button
-        document.getElementById('toggleRtcMicBtn').onclick = () => {
-            isRtcMicMuted = !isRtcMicMuted;
-            const btn = document.getElementById('toggleRtcMicBtn');
-            if (localAudioStream) {
-                localAudioStream.getAudioTracks().forEach(t => t.enabled = !isRtcMicMuted);
-            }
-            if (isRtcMicMuted) {
-                btn.className = 'voice-action-btn muted-btn';
-                btn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
-                playRtcSound('mute');
-            } else {
-                btn.className = 'voice-action-btn active-mic';
-                btn.innerHTML = '<i class="fas fa-microphone"></i>';
-                playRtcSound('unmute');
-            }
-            if (currentVoiceRoomId && currentUser) {
-                db.ref(`voiceRooms/${currentVoiceRoomId}/members/${currentUser.uid}/muted`).set(isRtcMicMuted);
-            }
-        };
+        // Microphone Mute Button (Unified)
+        const micBtn = document.getElementById('toggleRtcMicBtn');
+        if (micBtn) {
+            micBtn.onclick = () => {
+                toggleRtcMic();
+            };
+        }
 
         // Self-Voice (自分の声) Monitoring Toggle Button in VC Bar
         const selfVoiceBtn = document.getElementById('toggleSelfVoiceBtn');
@@ -3987,23 +4074,36 @@
             };
         }
 
-        // Deafen Button (Mute incoming speakers)
-        document.getElementById('toggleDeafenBtn').onclick = () => {
-            isDeafened = !isDeafened;
-            const btn = document.getElementById('toggleDeafenBtn');
-            Object.values(remoteAudioElements).forEach(audio => {
-                audio.muted = isDeafened;
-            });
-            if (isDeafened) {
-                btn.className = 'voice-action-btn deafened-btn';
-                btn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                playTone(300, 0.1, 'sine', 0.2);
-            } else {
-                btn.className = 'voice-action-btn';
-                btn.innerHTML = '<i class="fas fa-headphones"></i>';
-                playTone(600, 0.1, 'sine', 0.2);
-            }
-        };
+        // Deafen Button (Mute incoming speakers & remote Web Audio nodes)
+        const deafenBtn = document.getElementById('toggleDeafenBtn');
+        if (deafenBtn) {
+            deafenBtn.onclick = () => {
+                isDeafened = !isDeafened;
+                // Mute/unmute all HTML5 remote audio tags
+                Object.values(remoteAudioElements).forEach(audio => {
+                    if (audio) audio.muted = isDeafened;
+                });
+                // Mute/unmute Web Audio peer gain nodes
+                Object.values(peerGainNodes).forEach(gainNode => {
+                    if (gainNode && audioContext) {
+                        try {
+                            gainNode.gain.setValueAtTime(isDeafened ? 0 : 1.0, audioContext.currentTime);
+                        } catch(e) {}
+                    }
+                });
+                if (isDeafened) {
+                    deafenBtn.className = 'voice-action-btn deafened-btn';
+                    deafenBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                    deafenBtn.title = "スピーカーミュート解除 (Deafen解除)";
+                    playTone(300, 0.1, 'sine', 0.2);
+                } else {
+                    deafenBtn.className = 'voice-action-btn';
+                    deafenBtn.innerHTML = '<i class="fas fa-headphones"></i>';
+                    deafenBtn.title = "スピーカーミュート (Deafen)";
+                    playTone(600, 0.1, 'sine', 0.2);
+                }
+            };
+        }
 
         // Noise Suppression Toggle (if element exists)
         const noiseSuppBtn = document.getElementById('noiseSuppressionToggleBtn');
@@ -4028,15 +4128,15 @@
         // Screen Share Button Trigger
         const screenShareToggleBtn = document.getElementById('toggleScreenShareBtn');
         if (screenShareToggleBtn) {
-            screenShareToggleBtn.onclick = () => {
+            screenShareToggleBtn.onclick = async () => {
                 if (!currentVoiceRoomId) {
-                    alert("画面共有を開始するには、まずボイスチャンネルに接続してください。");
-                    return;
+                    document.querySelector('.sidebar-icon[data-tab="voice"]')?.click();
+                    await joinRtcVoiceRoom('public_lobby_1', '🔊 一般ロビー 1');
                 }
                 if (isScreenSharing) {
-                    stopScreenShare();
+                    await stopScreenShare();
                 } else {
-                    startScreenShare();
+                    await startScreenShare();
                 }
             };
         }
@@ -4098,9 +4198,19 @@
         // Leave Voice Room
         document.getElementById('leaveRtcVoiceBtn').onclick = () => leaveRtcVoiceRoom();
 
-        // Channel Join Buttons
+        // Channel Join Buttons & Cards
+        document.querySelectorAll('.voice-channel-card').forEach(card => {
+            card.style.cursor = 'pointer';
+            card.onclick = (e) => {
+                const btn = card.querySelector('.join-channel-btn');
+                const rid = btn ? btn.getAttribute('data-room-id') : card.getAttribute('data-room-id');
+                const rname = btn ? btn.getAttribute('data-name') : 'ボイスルーム';
+                joinRtcVoiceRoom(rid, rname);
+            };
+        });
         document.querySelectorAll('.join-channel-btn').forEach(btn => {
-            btn.onclick = () => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
                 const rid = btn.getAttribute('data-room-id');
                 const rname = btn.getAttribute('data-name');
                 joinRtcVoiceRoom(rid, rname);
@@ -4150,14 +4260,15 @@
         document.querySelectorAll('.sound-btn').forEach(btn => {
             btn.onclick = () => {
                 const sound = btn.getAttribute('data-sound');
+                // Always play locally immediately
+                playSampleSound(sound);
                 if (currentVoiceRoomId) {
                     db.ref(`voiceRooms/${currentVoiceRoomId}/soundboard`).push({
                         sound,
                         from: currentUser.name,
+                        senderUid: currentUser.uid,
                         timestamp: Date.now()
                     });
-                } else {
-                    playSampleSound(sound);
                 }
             };
         });
@@ -4955,8 +5066,10 @@
             const groups = snap.val() || {};
             const newGroupCache = {};
             Object.entries(groups).forEach(([gid, group]) => {
-                if (group && group.members && group.members[currentUser.uid]) {
-                    newGroupCache[gid] = group;
+                if (group) {
+                    if ((group.members && group.members[currentUser.uid]) || group.isPublic) {
+                        newGroupCache[gid] = group;
+                    }
                 }
             });
             cachedGroups = newGroupCache;
@@ -4968,6 +5081,46 @@
             renderChatListWithUnread();
             playTone(700, 0.05, 'sine', 0.1);
         });
+    }
+
+    async function ensureDefaultPublicGroups() {
+        if (!currentUser) return;
+        try {
+            const defaultGroups = {
+                'public_group_lounge': {
+                    name: '🎉 公式雑談ラウンジ',
+                    isPublic: true,
+                    createdAt: 1700000000000,
+                    members: { [currentUser.uid]: true }
+                },
+                'public_group_gaming': {
+                    name: '🎮 ゲーム＆VC募集広場',
+                    isPublic: true,
+                    createdAt: 1700000000001,
+                    members: { [currentUser.uid]: true }
+                },
+                'public_group_chill': {
+                    name: '☕ まったりおしゃべり',
+                    isPublic: true,
+                    createdAt: 1700000000002,
+                    members: { [currentUser.uid]: true }
+                }
+            };
+
+            for (const [gid, gdata] of Object.entries(defaultGroups)) {
+                const snap = await db.ref(`groups/${gid}`).once('value');
+                if (!snap.exists()) {
+                    await db.ref(`groups/${gid}`).set(gdata);
+                } else {
+                    const val = snap.val();
+                    if (!val.members || !val.members[currentUser.uid]) {
+                        await db.ref(`groups/${gid}/members/${currentUser.uid}`).set(true);
+                    }
+                }
+            }
+        } catch(e) {
+            console.warn("Default public groups check warning:", e);
+        }
     }
 
     function startNewMessageListener() {
@@ -4989,35 +5142,70 @@
         // 1. Global Chat item
         const gDiv = document.createElement('div');
         gDiv.className = `chat-item ${currentChatId === 'global' ? 'active-chat' : ''}`;
-        gDiv.innerHTML = `<div><i class="fas fa-globe"></i> 🌍 全体チャット</div>${unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''}`;
+        gDiv.innerHTML = `<div><i class="fas fa-globe" style="color:#5865f2;"></i> <strong>全体チャット</strong></div>${unreadCounts['global'] ? `<span class="unread-badge">${unreadCounts['global']}</span>` : ''}`;
         gDiv.onclick = () => { openChat('global', 'global'); unreadCounts['global'] = 0; renderChatListWithUnread(); };
         container.appendChild(gDiv);
 
-        // 2. Friends Direct chats (Rendered smoothly from cache)
-        Object.entries(cachedFriends).forEach(([friendId, fdata]) => {
-            const unread = unreadCounts[`friend_${friendId}`] || 0;
-            const fd = document.createElement('div');
-            fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`;
-            fd.innerHTML = `<div>${fdata.icon || '😀'} ${escapeHtml(fdata.name)}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
-            fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); };
-            container.appendChild(fd);
-        });
+        // Section header for Direct Messages
+        const dmHeader = document.createElement('div');
+        dmHeader.style.cssText = 'font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-top:8px; padding:4px 8px;';
+        dmHeader.innerText = 'ダイレクトメッセージ (DM)';
+        container.appendChild(dmHeader);
+
+        // 2. Friends Direct chats
+        const friendEntries = Object.entries(cachedFriends);
+        if (friendEntries.length === 0) {
+            const emptyDm = document.createElement('div');
+            emptyDm.style.cssText = 'font-size:0.8rem; color:var(--text-muted); padding:6px 8px;';
+            emptyDm.innerText = 'フレンドを追加するとDMができます';
+            container.appendChild(emptyDm);
+        } else {
+            friendEntries.forEach(([friendId, fdata]) => {
+                const unread = unreadCounts[`friend_${friendId}`] || 0;
+                const fd = document.createElement('div');
+                fd.className = `chat-item ${currentChatId === `friend_${friendId}` ? 'active-chat' : ''}`;
+                fd.innerHTML = `<div>${fdata.icon || '😀'} ${escapeHtml(fdata.name)}</div>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
+                fd.onclick = () => { openChat(`friend_${friendId}`, 'friend'); unreadCounts[`friend_${friendId}`] = 0; renderChatListWithUnread(); };
+                container.appendChild(fd);
+            });
+        }
+
+        // Section header for Groups
+        const groupHeader = document.createElement('div');
+        groupHeader.style.cssText = 'font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-top:8px; padding:4px 8px; display:flex; justify-content:space-between; align-items:center;';
+        groupHeader.innerHTML = '<span>グループチャット</span>';
+        container.appendChild(groupHeader);
 
         // 3. Groups (Rendered smoothly from cache)
-        Object.entries(cachedGroups).forEach(([gid, group]) => {
-            const unread = unreadCounts[gid] || 0;
-            const gd = document.createElement('div');
-            gd.className = `chat-item ${currentChatId === gid ? 'active-chat' : ''}`;
-            gd.innerHTML = `<div><i class="fas fa-users"></i> ${escapeHtml(group.name || 'グループ')}</div><button class="group-exit-btn" data-group="${gid}">退出</button>${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}`;
-            gd.onclick = (e) => {
-                if (e.target.className !== 'group-exit-btn') {
-                    openChat(gid, 'group');
-                    unreadCounts[gid] = 0;
-                    renderChatListWithUnread();
-                }
-            };
-            container.appendChild(gd);
-        });
+        const groupEntries = Object.entries(cachedGroups);
+        if (groupEntries.length === 0) {
+            const emptyGroup = document.createElement('div');
+            emptyGroup.style.cssText = 'font-size:0.8rem; color:var(--text-muted); padding:6px 8px;';
+            emptyGroup.innerText = 'グループを読み込み中...';
+            container.appendChild(emptyGroup);
+        } else {
+            groupEntries.forEach(([gid, group]) => {
+                const unread = unreadCounts[gid] || 0;
+                const gd = document.createElement('div');
+                gd.className = `chat-item ${currentChatId === gid ? 'active-chat' : ''}`;
+                const isMember = group.members && group.members[currentUser.uid];
+                gd.innerHTML = `<div><i class="fas fa-users" style="color:${group.isPublic ? '#57f287' : '#ffa500'};"></i> ${escapeHtml(group.name || 'グループ')}</div>` +
+                    (isMember && !group.isPublic ? `<button class="group-exit-btn" data-group="${gid}">退出</button>` : '') +
+                    (unread > 0 ? `<span class="unread-badge">${unread}</span>` : '');
+                gd.onclick = async (e) => {
+                    if (e.target.className !== 'group-exit-btn') {
+                        if (!isMember) {
+                            await db.ref(`groups/${gid}/members/${currentUser.uid}`).set(true);
+                            if (group.members) group.members[currentUser.uid] = true;
+                        }
+                        openChat(gid, 'group');
+                        unreadCounts[gid] = 0;
+                        renderChatListWithUnread();
+                    }
+                };
+                container.appendChild(gd);
+            });
+        }
 
         document.querySelectorAll('.group-exit-btn').forEach(btn => {
             btn.onclick = async (e) => {
@@ -6551,7 +6739,7 @@ function getFxColor(id) {
 
 // --- 🎯 Process Speech for Keyword Triggers & Broadcast to Room ---
 function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
-    if (!spokenText || !currentVoiceRoomId) return;
+    if (!spokenText) return;
     const lower = spokenText.toLowerCase().trim();
 
     // Check custom triggers first
@@ -6560,23 +6748,29 @@ function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
         const targetWord = ct.word.toLowerCase();
         if (lower.includes(targetWord)) {
             const now = Date.now();
-            if (triggerCoolDownMap[targetWord] && (now - triggerCoolDownMap[targetWord] < 2200)) return;
+            if (triggerCoolDownMap[targetWord] && (now - triggerCoolDownMap[targetWord] < 2000)) return;
             triggerCoolDownMap[targetWord] = now;
 
-            // Broadcast to room
-            db.ref(`voiceRooms/${currentVoiceRoomId}/triggers`).push({
-                type: 'custom',
-                id: ct.id,
-                name: ct.name,
-                word: ct.word,
-                soundId: ct.soundId || 'nice',
-                customAudioUrl: ct.customAudioUrl || null,
-                effectId: ct.effectId || 'nice',
-                customImageUrl: ct.customImageUrl || null,
-                senderUid: senderUid,
-                senderName: senderName,
-                timestamp: Date.now()
-            });
+            // Trigger locally immediately for zero-latency feedback
+            playSynthesizedTriggerSound(ct.soundId || 'nice', ct.customAudioUrl || null);
+            renderTriggerVisualEffect(ct.effectId || 'nice', ct.customImageUrl || null, senderName, ct.word);
+
+            // Broadcast to room if in voice channel
+            if (currentVoiceRoomId) {
+                db.ref(`voiceRooms/${currentVoiceRoomId}/triggers`).push({
+                    type: 'custom',
+                    id: ct.id,
+                    name: ct.name,
+                    word: ct.word,
+                    soundId: ct.soundId || 'nice',
+                    customAudioUrl: ct.customAudioUrl || null,
+                    effectId: ct.effectId || 'nice',
+                    customImageUrl: ct.customImageUrl || null,
+                    senderUid: senderUid,
+                    senderName: senderName,
+                    timestamp: Date.now()
+                });
+            }
             return;
         }
     }
@@ -6587,21 +6781,27 @@ function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
         const hit = matches.some(alias => lower.includes(alias.toLowerCase()));
         if (hit) {
             const now = Date.now();
-            if (triggerCoolDownMap[preset.id] && (now - triggerCoolDownMap[preset.id] < 2200)) return;
+            if (triggerCoolDownMap[preset.id] && (now - triggerCoolDownMap[preset.id] < 2000)) return;
             triggerCoolDownMap[preset.id] = now;
 
-            // Broadcast to room
-            db.ref(`voiceRooms/${currentVoiceRoomId}/triggers`).push({
-                type: 'preset',
-                id: preset.id,
-                name: preset.name,
-                word: preset.word,
-                soundId: preset.id,
-                effectId: preset.id,
-                senderUid: senderUid,
-                senderName: senderName,
-                timestamp: Date.now()
-            });
+            // Trigger locally immediately for zero-latency feedback
+            playSynthesizedTriggerSound(preset.id, null);
+            renderTriggerVisualEffect(preset.id, null, senderName, preset.word);
+
+            // Broadcast to room if in voice channel
+            if (currentVoiceRoomId) {
+                db.ref(`voiceRooms/${currentVoiceRoomId}/triggers`).push({
+                    type: 'preset',
+                    id: preset.id,
+                    name: preset.name,
+                    word: preset.word,
+                    soundId: preset.id,
+                    effectId: preset.id,
+                    senderUid: senderUid,
+                    senderName: senderName,
+                    timestamp: Date.now()
+                });
+            }
             return;
         }
     }
@@ -6614,14 +6814,17 @@ function listenToRoomTriggers(roomId) {
         currentVoiceRoomTriggersRef.off();
         currentVoiceRoomTriggersRef = null;
     }
+    const joinTs = Date.now() - 2000;
     currentVoiceRoomTriggersRef = db.ref(`voiceRooms/${roomId}/triggers`);
-    currentVoiceRoomTriggersRef.limitToLast(1).on('child_added', (snap) => {
+    currentVoiceRoomTriggersRef.on('child_added', (snap) => {
         const data = snap.val();
         if (!data || !data.timestamp) return;
-        // Only trigger recent events within last 8 seconds
-        if (Date.now() - data.timestamp > 8000) return;
+        if (data.timestamp < joinTs) return;
 
-        // Play Sound
+        // Skip local user because we already played locally with zero-latency
+        if (currentUser && data.senderUid === currentUser.uid) return;
+
+        // Play Sound for other peers in the room
         playSynthesizedTriggerSound(data.soundId, data.customAudioUrl);
 
         // Render Visual Effect
@@ -6838,6 +7041,34 @@ function setupTriggersAndNewFeatures() {
     // Search filter input
     if (searchInput) {
         searchInput.oninput = () => renderTriggersView();
+    }
+
+    // Manual test trigger input & button
+    const manualInput = document.getElementById('manualTriggerTextInput');
+    const manualBtn = document.getElementById('sendManualTriggerBtn');
+    const fireManualTrigger = () => {
+        if (!manualInput) return;
+        const text = manualInput.value.trim();
+        if (!text) return;
+        const sUid = currentUser ? currentUser.uid : 'self';
+        const sName = currentUser ? currentUser.name : 'あなた';
+        checkAndTriggerVoiceKeywords(text, sUid, sName);
+        // Also feed into subtitles
+        if (currentVoiceRoomId) {
+            db.ref(`voiceRooms/${currentVoiceRoomId}/subtitles`).push({
+                uid: sUid,
+                name: sName,
+                text: text,
+                timestamp: Date.now()
+            });
+        }
+        manualInput.value = '';
+    };
+    if (manualBtn) manualBtn.onclick = fireManualTrigger;
+    if (manualInput) {
+        manualInput.onkeydown = (e) => {
+            if (e.key === 'Enter') fireManualTrigger();
+        };
     }
 
     // Master Trigger Toggle
