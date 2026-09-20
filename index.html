@@ -1486,6 +1486,16 @@
     let backgroundKeepAliveAudio = null;
     let voiceWakeLock = null;
 
+    // Active Voice Room Firebase Listeners (for leak-free cleanup on leave)
+    let currentVoiceRoomMembersRef = null;
+    let currentVoiceRoomSpeakingRef = null;
+    let currentVoiceRoomScreenshareRef = null;
+    let currentVoiceRoomScreenFrameRef = null;
+    let currentVoiceRoomSoundboardRef = null;
+    let currentVoiceRoomSubtitlesRef = null;
+    let currentVoiceRoomTriggersRef = null;
+    let lastSpeakingSent = null;
+
     // --- Loud Notification & Noise Cut & Custom Voice States ---
     let isLoudAlertEnabled = localStorage.getItem('forcord_loud_alert_enabled') !== 'false';
     let isBrowserNoiseSuppression = localStorage.getItem('forcord_browser_noise_suppression') !== 'false'; // noiseSuppression: true
@@ -1729,23 +1739,27 @@
 
             micSourceNode = audioContext.createMediaStreamSource(localAudioStream);
             micGainNode = audioContext.createGain();
+            micGainNode.gain.setValueAtTime(isRtcMicMuted ? 0 : 1.0, audioContext.currentTime);
             micAnalyser = audioContext.createAnalyser();
             micAnalyser.fftSize = 256;
             micAnalyser.smoothingTimeConstant = 0.3;
 
             // Master GainNode for all processed FX audio
             fxProcessedMasterGain = audioContext.createGain();
-            fxProcessedMasterGain.gain.setValueAtTime(1.0, audioContext.currentTime);
+            fxProcessedMasterGain.gain.setValueAtTime(isRtcMicMuted ? 0 : 1.0, audioContext.currentTime);
 
             // MediaStream Destination for sending FX-processed audio over WebRTC to peers
             fxDestinationNode = audioContext.createMediaStreamDestination();
             processedAudioStream = fxDestinationNode.stream;
+            // Sync track enabled state immediately
+            if (localAudioStream) localAudioStream.getAudioTracks().forEach(t => t.enabled = !isRtcMicMuted);
+            if (processedAudioStream) processedAudioStream.getAudioTracks().forEach(t => t.enabled = !isRtcMicMuted);
             fxProcessedMasterGain.connect(fxDestinationNode);
 
             // Web Audio API によるルーティング:
             // 取り込んだ綺麗な音声を AudioContext を通してスピーカー（destination）へリアルタイムに流す
             selfVoiceMonitorNode = audioContext.createGain();
-            const shouldMonitor = (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting);
+            const shouldMonitor = (!isRtcMicMuted) && (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting);
             selfVoiceMonitorNode.gain.setValueAtTime(shouldMonitor ? 1.0 : 0.0, audioContext.currentTime);
             fxProcessedMasterGain.connect(selfVoiceMonitorNode);
             selfVoiceMonitorNode.connect(audioContext.destination);
@@ -2046,6 +2060,14 @@
             }
             updateVoiceOnlyUI(false, false);
         }
+
+        // Ensure mute gain state is preserved across audio pipeline reconnections
+        if (micGainNode && audioContext) {
+            micGainNode.gain.setValueAtTime(isRtcMicMuted ? 0 : 1.0, audioContext.currentTime);
+        }
+        if (fxProcessedMasterGain && audioContext) {
+            fxProcessedMasterGain.gain.setValueAtTime(isRtcMicMuted ? 0 : 1.0, audioContext.currentTime);
+        }
     }
 
     // --- AI Voice Recognition Engine (Google Speech AI / Web Speech API 連携) ---
@@ -2214,7 +2236,7 @@
                 voiceOnlyLastSpokenTimestamp = now;
             }
 
-            const shouldPass = (now - lastVoiceDetectedTime) < holdTimeMs;
+            const shouldPass = (!isRtcMicMuted) && ((now - lastVoiceDetectedTime) < holdTimeMs);
 
             if (shouldPass) {
                 if (!isGateOpen) {
@@ -2505,7 +2527,112 @@
         return null;
     }
 
-    // Real-time Audio Visualizer & Speaking Glow Detector
+    // --- 🎙️ Unified Bulletproof Microphone Mute Controller ---
+    function setRtcMicMute(muted, playSound = true) {
+        isRtcMicMuted = muted;
+
+        // 1. Disable / Enable raw input tracks
+        if (localAudioStream) {
+            localAudioStream.getAudioTracks().forEach(t => {
+                t.enabled = !muted;
+            });
+        }
+
+        // 2. Disable / Enable processed destination tracks
+        if (processedAudioStream) {
+            processedAudioStream.getAudioTracks().forEach(t => {
+                t.enabled = !muted;
+            });
+        }
+
+        // 3. Control Web Audio API gain nodes for complete signal cutoff
+        if (audioContext) {
+            try {
+                if (micGainNode) {
+                    micGainNode.gain.setValueAtTime(muted ? 0 : 1.0, audioContext.currentTime);
+                }
+                if (fxProcessedMasterGain) {
+                    fxProcessedMasterGain.gain.setValueAtTime(muted ? 0 : 1.0, audioContext.currentTime);
+                }
+                if (selfVoiceMonitorNode) {
+                    const shouldMonitor = (!muted) && (isSelfVoiceEnabled || isMicTesting || isAudioPassThroughTesting);
+                    selfVoiceMonitorNode.gain.setValueAtTime(shouldMonitor ? 1.0 : 0.0, audioContext.currentTime);
+                }
+            } catch (e) {
+                console.warn("Error updating audio gain nodes on mute toggle:", e);
+            }
+        }
+
+        // 4. Update all active WebRTC senders to guarantee remote peers receive silence
+        Object.values(peerConnections).forEach(pc => {
+            try {
+                pc.getSenders().forEach(sender => {
+                    if (sender.track && sender.track.kind === 'audio') {
+                        sender.track.enabled = !muted;
+                    }
+                });
+            } catch (e) {}
+        });
+
+        // 5. Update UI Button styling & tooltip
+        const btn = document.getElementById('toggleRtcMicBtn');
+        if (btn) {
+            if (muted) {
+                btn.className = 'voice-action-btn muted-btn';
+                btn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                btn.title = "マイクONにする (M)";
+            } else {
+                btn.className = 'voice-action-btn active-mic';
+                btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                btn.title = "マイクOFFにする (M)";
+            }
+        }
+
+        // 6. Reset audio visualizers & speaking glow
+        if (muted) {
+            const liveBar = document.getElementById('liveMicMeterBar');
+            const settingsBar = document.getElementById('settingsMicMeterBar');
+            if (liveBar) liveBar.style.width = '0%';
+            if (settingsBar) settingsBar.style.width = '0%';
+
+            if (currentVoiceRoomId && currentUser) {
+                if (lastSpeakingSent !== false) {
+                    lastSpeakingSent = false;
+                    db.ref(`voiceRooms/${currentVoiceRoomId}/speaking/${currentUser.uid}`).set(false);
+                }
+            }
+            if (currentUser) {
+                const myCard = document.getElementById(`voice_card_${currentUser.uid}`);
+                if (myCard) myCard.classList.remove('is-speaking');
+            }
+        }
+
+        // 7. Update status on own participant card
+        if (currentUser) {
+            const statusEl = document.getElementById(`mic_status_${currentUser.uid}`);
+            if (statusEl) {
+                statusEl.innerHTML = muted 
+                    ? '<i class="fas fa-microphone-slash" style="color:var(--danger)"></i> ミュート中' 
+                    : '<i class="fas fa-microphone" style="color:var(--success)"></i> マイクON';
+            }
+        }
+
+        // 8. Update database member status
+        if (currentVoiceRoomId && currentUser) {
+            db.ref(`voiceRooms/${currentVoiceRoomId}/members/${currentUser.uid}/muted`).set(muted);
+        }
+
+        // 9. Sound effect confirmation
+        if (playSound) {
+            playRtcSound(muted ? 'mute' : 'unmute');
+        }
+    }
+
+    function toggleRtcMic() {
+        setRtcMicMute(!isRtcMicMuted, true);
+    }
+
+    // Real-time Audio Visualizer & Speaking Glow Detector (Throttled DB writes to prevent DDoS lag)
     function startAudioMeterLoop() {
         if (meterAnimationId) cancelAnimationFrame(meterAnimationId);
 
@@ -2529,7 +2656,10 @@
                 // Check speaking state for current user
                 const isSpeaking = (average / 255) > noiseGateThreshold;
                 if (currentVoiceRoomId && currentUser) {
-                    db.ref(`voiceRooms/${currentVoiceRoomId}/speaking/${currentUser.uid}`).set(isSpeaking);
+                    if (lastSpeakingSent !== isSpeaking) {
+                        lastSpeakingSent = isSpeaking;
+                        db.ref(`voiceRooms/${currentVoiceRoomId}/speaking/${currentUser.uid}`).set(isSpeaking);
+                    }
                     const myCard = document.getElementById(`voice_card_${currentUser.uid}`);
                     if (myCard) {
                         if (isSpeaking) myCard.classList.add('is-speaking');
@@ -2540,7 +2670,14 @@
                 if (liveBar) liveBar.style.width = '0%';
                 if (settingsBar) settingsBar.style.width = '0%';
                 if (currentVoiceRoomId && currentUser) {
-                    db.ref(`voiceRooms/${currentVoiceRoomId}/speaking/${currentUser.uid}`).set(false);
+                    if (lastSpeakingSent !== false) {
+                        lastSpeakingSent = false;
+                        db.ref(`voiceRooms/${currentVoiceRoomId}/speaking/${currentUser.uid}`).set(false);
+                    }
+                }
+                if (currentUser) {
+                    const myCard = document.getElementById(`voice_card_${currentUser.uid}`);
+                    if (myCard) myCard.classList.remove('is-speaking');
                 }
             }
             meterAnimationId = requestAnimationFrame(updateMeter);
@@ -2583,6 +2720,7 @@
 
         try {
             await setupLocalAudioStream();
+            setRtcMicMute(isRtcMicMuted, false);
         } catch(e) {
             return;
         }
@@ -2618,7 +2756,9 @@
         });
 
         // Listen for participant members
-        db.ref(`voiceRooms/${roomId}/members`).on('value', async (snap) => {
+        if (currentVoiceRoomMembersRef) currentVoiceRoomMembersRef.off();
+        currentVoiceRoomMembersRef = db.ref(`voiceRooms/${roomId}/members`);
+        currentVoiceRoomMembersRef.on('value', async (snap) => {
             const members = snap.val() || {};
             renderVoiceParticipants(members);
             
@@ -2642,7 +2782,9 @@
         });
 
         // Listen for speaking indicators
-        db.ref(`voiceRooms/${roomId}/speaking`).on('value', (snap) => {
+        if (currentVoiceRoomSpeakingRef) currentVoiceRoomSpeakingRef.off();
+        currentVoiceRoomSpeakingRef = db.ref(`voiceRooms/${roomId}/speaking`);
+        currentVoiceRoomSpeakingRef.on('value', (snap) => {
             const speakingMap = snap.val() || {};
             Object.entries(speakingMap).forEach(([uid, isSpeaking]) => {
                 const card = document.getElementById(`voice_card_${uid}`);
@@ -2654,7 +2796,9 @@
         });
 
         // Listen for active screen share in this room
-        db.ref(`voiceRooms/${roomId}/screenshare`).on('value', (snap) => {
+        if (currentVoiceRoomScreenshareRef) currentVoiceRoomScreenshareRef.off();
+        currentVoiceRoomScreenshareRef = db.ref(`voiceRooms/${roomId}/screenshare`);
+        currentVoiceRoomScreenshareRef.on('value', (snap) => {
             const ssData = snap.val();
             const stage = document.getElementById('screenShareStage');
             const videoEl = document.getElementById('screenShareVideo');
@@ -2714,7 +2858,9 @@
         });
 
         // Listen for Real-Time Frame Relay (Instant zero-fail visual mirror across all networks)
-        db.ref(`voiceRooms/${roomId}/screenFrame`).on('value', (snap) => {
+        if (currentVoiceRoomScreenFrameRef) currentVoiceRoomScreenFrameRef.off();
+        currentVoiceRoomScreenFrameRef = db.ref(`voiceRooms/${roomId}/screenFrame`);
+        currentVoiceRoomScreenFrameRef.on('value', (snap) => {
             const frameData = snap.val();
             if (frameData && frameData.frame && frameData.uid !== currentUser.uid) {
                 lastReceivedFrameTs = Date.now();
@@ -2847,6 +2993,7 @@
         // Add local audio tracks if available (with voice FX applied!)
         const audioTrack = getSendingAudioTrack();
         if (audioTrack) {
+            audioTrack.enabled = !isRtcMicMuted;
             const audioStream = processedAudioStream || localAudioStream;
             const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
             if (audioSender) {
@@ -2877,11 +3024,13 @@
                     audioEl.autoplay = true;
                     audioEl.playsInline = true;
                     audioEl.id = `remote_audio_${targetUid}`;
+                    audioEl.volume = 0; // Prevent echo with Web Audio GainNode
                     document.getElementById('remoteAudioContainer').appendChild(audioEl);
                     remoteAudioElements[targetUid] = audioEl;
                 }
                 audioEl.srcObject = remoteStream;
                 audioEl.muted = isDeafened;
+                audioEl.volume = 0;
                 audioEl.play().catch(e => console.log("Autoplay handled:", e));
 
                 // Web Audio API GainNode routing for 50% - 500% Volume Boost
@@ -3143,15 +3292,54 @@
 
         playRtcSound('leave');
 
-        // Remove from room & user presence
-        await db.ref(`voiceRooms/${currentVoiceRoomId}/members/${currentUser.uid}`).remove();
-        await db.ref(`voiceRooms/${currentVoiceRoomId}/speaking/${currentUser.uid}`).remove();
-        await db.ref(`users/${currentUser.uid}/voiceRoom`).remove();
+        const leavingRoomId = currentVoiceRoomId;
 
-        // Close peer connections
+        // Unsubscribe from all active room Firebase listeners
+        if (currentVoiceRoomMembersRef) {
+            currentVoiceRoomMembersRef.off();
+            currentVoiceRoomMembersRef = null;
+        }
+        if (currentVoiceRoomSpeakingRef) {
+            currentVoiceRoomSpeakingRef.off();
+            currentVoiceRoomSpeakingRef = null;
+        }
+        if (currentVoiceRoomScreenshareRef) {
+            currentVoiceRoomScreenshareRef.off();
+            currentVoiceRoomScreenshareRef = null;
+        }
+        if (currentVoiceRoomScreenFrameRef) {
+            currentVoiceRoomScreenFrameRef.off();
+            currentVoiceRoomScreenFrameRef = null;
+        }
+        if (currentVoiceRoomSoundboardRef) {
+            currentVoiceRoomSoundboardRef.off();
+            currentVoiceRoomSoundboardRef = null;
+        }
+        if (currentVoiceRoomSubtitlesRef) {
+            currentVoiceRoomSubtitlesRef.off();
+            currentVoiceRoomSubtitlesRef = null;
+        }
+        if (currentVoiceRoomTriggersRef) {
+            currentVoiceRoomTriggersRef.off();
+            currentVoiceRoomTriggersRef = null;
+        }
+
+        // Remove from room & user presence in database
+        if (currentUser) {
+            try {
+                await db.ref(`voiceRooms/${leavingRoomId}/members/${currentUser.uid}`).remove();
+                await db.ref(`voiceRooms/${leavingRoomId}/speaking/${currentUser.uid}`).remove();
+                await db.ref(`users/${currentUser.uid}/voiceRoom`).remove();
+            } catch(e) {
+                console.warn("Error removing user presence on leave:", e);
+            }
+        }
+
+        // Close peer connections & clear media streams
         Object.keys(peerConnections).forEach(uid => closePeerConnection(uid));
         remoteVideoStreams = {};
         activePresenterUid = null;
+        lastSpeakingSent = null;
 
         if (signalingRef) {
             signalingRef.off();
@@ -3394,14 +3582,16 @@
         playTone(350, 0.12, 'sine', 0.2);
     }
 
-    // --- Render Voice Participant Grid Cards with 50% - 500% Volume Controls ---
+    // --- Render Voice Participant Grid Cards with 50% - 500% Volume Controls (Smooth Diff Update) ---
     function renderVoiceParticipants(members) {
         const grid = document.getElementById('voiceParticipantsGrid');
-        grid.innerHTML = '';
+        if (!grid) return;
 
-        if (Object.keys(members).length === 0) {
+        const memberUids = Object.keys(members || {});
+
+        if (memberUids.length === 0) {
             grid.innerHTML = `
-                <div style="grid-column: 1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; color:var(--text-muted); text-align:center;">
+                <div class="empty-voice-state" style="grid-column: 1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; color:var(--text-muted); text-align:center;">
                     <i class="fas fa-microphone-alt" style="font-size:4rem; margin-bottom:16px; opacity:0.3;"></i>
                     <h3 style="font-size:1.3rem; margin-bottom:8px; color:var(--text-main);">ボイスチャンネルに未接続です</h3>
                     <p style="font-size:0.9rem; max-width:420px;">左のボイスチャンネルを選択するか、フレンドに発信して最高精度のWebRTCボイスチャットを始めましょう！</p>
@@ -3410,96 +3600,126 @@
             return;
         }
 
-        Object.entries(members).forEach(([uid, data]) => {
-            const isMe = (uid === currentUser.uid);
-            const card = document.createElement('div');
-            card.className = 'voice-card';
-            card.id = `voice_card_${uid}`;
+        // Remove placeholder if present
+        const emptyState = grid.querySelector('.empty-voice-state');
+        if (emptyState) emptyState.remove();
 
-            const volValue = userVolumes[uid] !== undefined ? Math.round(userVolumes[uid] * 100) : 100;
-
-            card.innerHTML = `
-                <div class="voice-avatar-wrap">
-                    <div class="voice-ring"></div>
-                    <div class="voice-avatar">${renderUserAvatarHtml(data.icon, 'voice-avatar-inner')}</div>
-                </div>
-                <div class="voice-user-name">
-                    ${escapeHtml(data.name || 'ユーザー')}
-                    ${isMe ? '<span class="voice-user-badge">あなた</span>' : ''}
-                </div>
-                <div class="voice-card-status" style="display:flex; flex-direction:column; gap:4px; align-items:center;">
-                    <span id="mic_status_${uid}">${data.muted ? '<i class="fas fa-microphone-slash" style="color:var(--danger)"></i> ミュート中' : '<i class="fas fa-microphone" style="color:var(--success)"></i> マイクON'}</span>
-                    ${isMe ? `<span id="self_voice_indicator_${uid}" style="font-size:0.75rem; color:#57f287; display:${isSelfVoiceEnabled ? 'inline-block' : 'none'};"><i class="fas fa-headset"></i> 自分の声モニタ中</span>` : ''}
-                </div>
-                ${!isMe ? `
-                <div class="voice-user-controls">
-                    <div class="voice-slider-row">
-                        <span><i class="fas fa-volume-up"></i> 音量</span>
-                        <span id="vol_val_${uid}" style="font-weight:700; color:var(--accent);">${volValue}%</span>
-                    </div>
-                    <div class="volume-preset-group" data-uid="${uid}">
-                        <button class="vol-preset-btn ${volValue === 50 ? 'active' : ''}" data-vol="50">50%</button>
-                        <button class="vol-preset-btn ${volValue === 100 ? 'active' : ''}" data-vol="100">100%</button>
-                        <button class="vol-preset-btn ${volValue === 200 ? 'active' : ''}" data-vol="200">200%</button>
-                        <button class="vol-preset-btn ${volValue === 300 ? 'active' : ''}" data-vol="300">300%</button>
-                        <button class="vol-preset-btn ${volValue === 400 ? 'active' : ''}" data-vol="400">400%</button>
-                        <button class="vol-preset-btn ${volValue === 500 ? 'active' : ''}" data-vol="500">500%</button>
-                    </div>
-                    <input type="range" class="voice-volume-slider" min="0" max="500" step="5" value="${volValue}" data-uid="${uid}" style="margin-top:8px;">
-                </div>` : ''}
-            `;
-
-            grid.appendChild(card);
+        // Remove departed cards
+        grid.querySelectorAll('.voice-card').forEach(card => {
+            const cardId = card.id;
+            const uid = cardId.replace('voice_card_', '');
+            if (!members[uid]) {
+                card.remove();
+            }
         });
 
-        // Attach per-user volume slider & preset button listeners
-        document.querySelectorAll('.voice-volume-slider').forEach(slider => {
-            slider.oninput = (e) => {
-                const targetUid = slider.getAttribute('data-uid');
-                const val = parseInt(slider.value);
-                userVolumes[targetUid] = val / 100;
-                
-                const valLabel = document.getElementById(`vol_val_${targetUid}`);
-                if (valLabel) valLabel.innerText = `${val}%`;
-                
-                // Update preset active classes
-                const presetGroup = document.querySelector(`.volume-preset-group[data-uid="${targetUid}"]`);
-                if (presetGroup) {
-                    presetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
-                        btn.classList.toggle('active', parseInt(btn.getAttribute('data-vol')) === val);
-                    });
+        // Update or Add participant cards
+        memberUids.forEach(uid => {
+            const data = members[uid];
+            const isMe = (currentUser && uid === currentUser.uid);
+            const isMuted = isMe ? isRtcMicMuted : !!data.muted;
+            let card = document.getElementById(`voice_card_${uid}`);
+
+            if (card) {
+                // Update existing card status without breaking active sliders or focus
+                const micStatusEl = document.getElementById(`mic_status_${uid}`);
+                if (micStatusEl) {
+                    micStatusEl.innerHTML = isMuted 
+                        ? '<i class="fas fa-microphone-slash" style="color:var(--danger)"></i> ミュート中' 
+                        : '<i class="fas fa-microphone" style="color:var(--success)"></i> マイクON';
                 }
-                applyPeerVolume(targetUid);
-            };
-        });
+                if (isMe) {
+                    const selfVoiceEl = document.getElementById(`self_voice_indicator_${uid}`);
+                    if (selfVoiceEl) {
+                        selfVoiceEl.style.display = (!isRtcMicMuted && isSelfVoiceEnabled) ? 'inline-block' : 'none';
+                    }
+                }
+            } else {
+                // Create new card
+                card = document.createElement('div');
+                card.className = 'voice-card';
+                card.id = `voice_card_${uid}`;
 
-        document.querySelectorAll('.volume-preset-group[data-uid] .vol-preset-btn').forEach(btn => {
-            btn.onclick = () => {
-                const presetGroup = btn.parentElement;
-                const targetUid = presetGroup.getAttribute('data-uid');
-                const val = parseInt(btn.getAttribute('data-vol'));
-                
-                userVolumes[targetUid] = val / 100;
-                
-                const valLabel = document.getElementById(`vol_val_${targetUid}`);
-                if (valLabel) valLabel.innerText = `${val}%`;
-                
-                const slider = document.querySelector(`.voice-volume-slider[data-uid="${targetUid}"]`);
-                if (slider) slider.value = val;
-                
-                presetGroup.querySelectorAll('.vol-preset-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                applyPeerVolume(targetUid);
-                playTone(600, 0.05, 'sine', 0.1);
-            };
+                const volValue = userVolumes[uid] !== undefined ? Math.round(userVolumes[uid] * 100) : 100;
+
+                card.innerHTML = `
+                    <div class="voice-avatar-wrap">
+                        <div class="voice-ring"></div>
+                        <div class="voice-avatar">${renderUserAvatarHtml(data.icon, 'voice-avatar-inner')}</div>
+                    </div>
+                    <div class="voice-user-name">
+                        ${escapeHtml(data.name || 'ユーザー')}
+                        ${isMe ? '<span class="voice-user-badge">あなた</span>' : ''}
+                    </div>
+                    <div class="voice-card-status" style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+                        <span id="mic_status_${uid}">${isMuted ? '<i class="fas fa-microphone-slash" style="color:var(--danger)"></i> ミュート中' : '<i class="fas fa-microphone" style="color:var(--success)"></i> マイクON'}</span>
+                        ${isMe ? `<span id="self_voice_indicator_${uid}" style="font-size:0.75rem; color:#57f287; display:${(!isRtcMicMuted && isSelfVoiceEnabled) ? 'inline-block' : 'none'};"><i class="fas fa-headset"></i> 自分の声モニタ中</span>` : ''}
+                    </div>
+                    ${!isMe ? `
+                    <div class="voice-user-controls">
+                        <div class="voice-slider-row">
+                            <span><i class="fas fa-volume-up"></i> 音量</span>
+                            <span id="vol_val_${uid}" style="font-weight:700; color:var(--accent);">${volValue}%</span>
+                        </div>
+                        <div class="volume-preset-group" data-uid="${uid}">
+                            <button class="vol-preset-btn ${volValue === 50 ? 'active' : ''}" data-vol="50">50%</button>
+                            <button class="vol-preset-btn ${volValue === 100 ? 'active' : ''}" data-vol="100">100%</button>
+                            <button class="vol-preset-btn ${volValue === 200 ? 'active' : ''}" data-vol="200">200%</button>
+                            <button class="vol-preset-btn ${volValue === 300 ? 'active' : ''}" data-vol="300">300%</button>
+                            <button class="vol-preset-btn ${volValue === 400 ? 'active' : ''}" data-vol="400">400%</button>
+                            <button class="vol-preset-btn ${volValue === 500 ? 'active' : ''}" data-vol="500">500%</button>
+                        </div>
+                        <input type="range" class="voice-volume-slider" min="0" max="500" step="5" value="${volValue}" data-uid="${uid}" style="margin-top:8px;">
+                    </div>` : ''}
+                `;
+
+                grid.appendChild(card);
+
+                // Attach slider listener for this new card
+                const slider = card.querySelector('.voice-volume-slider');
+                if (slider) {
+                    slider.oninput = () => {
+                        const val = parseInt(slider.value);
+                        userVolumes[uid] = val / 100;
+                        const valLabel = card.querySelector(`#vol_val_${uid}`);
+                        if (valLabel) valLabel.innerText = `${val}%`;
+                        const presetGroup = card.querySelector(`.volume-preset-group`);
+                        if (presetGroup) {
+                            presetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                                btn.classList.toggle('active', parseInt(btn.getAttribute('data-vol')) === val);
+                            });
+                        }
+                        applyPeerVolume(uid);
+                    };
+                }
+
+                // Attach preset buttons for this new card
+                card.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        const val = parseInt(btn.getAttribute('data-vol'));
+                        userVolumes[uid] = val / 100;
+                        const valLabel = card.querySelector(`#vol_val_${uid}`);
+                        if (valLabel) valLabel.innerText = `${val}%`;
+                        if (slider) slider.value = val;
+                        const presetGroup = btn.parentElement;
+                        if (presetGroup) {
+                            presetGroup.querySelectorAll('.vol-preset-btn').forEach(b => b.classList.remove('active'));
+                        }
+                        btn.classList.add('active');
+                        applyPeerVolume(uid);
+                        playTone(600, 0.05, 'sine', 0.1);
+                    };
+                });
+            }
         });
     }
 
     // --- Soundboard & Room Events ---
     function setupRoomEventBroadcasting(roomId) {
         // Soundboard receiver
-        db.ref(`voiceRooms/${roomId}/soundboard`).on('child_added', (snap) => {
+        if (currentVoiceRoomSoundboardRef) currentVoiceRoomSoundboardRef.off();
+        currentVoiceRoomSoundboardRef = db.ref(`voiceRooms/${roomId}/soundboard`);
+        currentVoiceRoomSoundboardRef.on('child_added', (snap) => {
             const data = snap.val();
             if (data && data.timestamp > Date.now() - 5000) {
                 playSampleSound(data.sound);
@@ -3513,7 +3733,9 @@
         }
 
         // Subtitles receiver
-        db.ref(`voiceRooms/${roomId}/subtitles`).limitToLast(25).on('value', (snap) => {
+        if (currentVoiceRoomSubtitlesRef) currentVoiceRoomSubtitlesRef.off();
+        currentVoiceRoomSubtitlesRef = db.ref(`voiceRooms/${roomId}/subtitles`);
+        currentVoiceRoomSubtitlesRef.limitToLast(25).on('value', (snap) => {
             const list = snap.val() || {};
             const arr = Object.values(list).sort((a,b) => a.timestamp - b.timestamp);
             window.recordedSubtitles = arr;
@@ -6388,8 +6610,12 @@ function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
 // --- 🛰️ Listen for Room Triggers (Play across all VC peers) ---
 function listenToRoomTriggers(roomId) {
     if (!roomId) return;
-    const trigRef = db.ref(`voiceRooms/${roomId}/triggers`);
-    trigRef.limitToLast(1).on('child_added', (snap) => {
+    if (currentVoiceRoomTriggersRef) {
+        currentVoiceRoomTriggersRef.off();
+        currentVoiceRoomTriggersRef = null;
+    }
+    currentVoiceRoomTriggersRef = db.ref(`voiceRooms/${roomId}/triggers`);
+    currentVoiceRoomTriggersRef.limitToLast(1).on('child_added', (snap) => {
         const data = snap.val();
         if (!data || !data.timestamp) return;
         // Only trigger recent events within last 8 seconds
