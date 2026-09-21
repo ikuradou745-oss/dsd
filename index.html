@@ -1486,7 +1486,9 @@
     let isRtcMicMuted = false;
     let isDeafened = false;
     let isSubtitlesEnabled = true;
+    let isVoiceTriggerEnabled = (localStorage.getItem('forcord_voice_trigger_enabled') !== 'false');
     let speechRecognition = null;
+    let speechRecognitionWatchdog = null;
     let currentVoiceRoomId = null;
     let currentVoiceRoomName = "";
     let peerConnections = {}; // targetUid -> RTCPeerConnection
@@ -1590,10 +1592,10 @@
     }
 
     // Web Audio Sound Synthesizer for UI & Soundboard
-    function playTone(freq, duration, type = 'sine', gainVal = 0.15) {
+    function playTone(freq, duration, type = 'sine', gainVal = 0.35) {
         try {
             const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
-            if (ctx.state === 'suspended') ctx.resume();
+            if (ctx.state === 'suspended') ctx.resume().catch(() => {});
             const osc = ctx.createOscillator();
             const g = ctx.createGain();
             osc.type = type;
@@ -2924,8 +2926,14 @@
         // Setup Live Subtitles & Soundboard listeners for this room
         setupRoomEventBroadcasting(roomId);
 
-        // Auto start keyword recognition and subtitles engine
+        // Auto start keyword recognition and subtitles engine with continuous watchdog
         startVoiceSpeechRecognitionIfAvailable();
+        if (speechRecognitionWatchdog) clearInterval(speechRecognitionWatchdog);
+        speechRecognitionWatchdog = setInterval(() => {
+            if (currentVoiceRoomId && !isSpeechRecActive) {
+                startVoiceSpeechRecognitionIfAvailable();
+            }
+        }, 2500);
     }
 
     function setupSignalingListeners(roomId) {
@@ -3401,6 +3409,11 @@
         currentVoiceRoomName = "";
         stopBackgroundKeepAlive();
 
+        if (speechRecognitionWatchdog) {
+            clearInterval(speechRecognitionWatchdog);
+            speechRecognitionWatchdog = null;
+        }
+
         const stage = document.getElementById('screenShareStage');
         if (stage) stage.classList.remove('active');
 
@@ -3872,8 +3885,10 @@
                 if (!transcript) continue;
 
                 // Check keyword trigger on both interim and final results for lightning-fast reaction
-                if (currentVoiceRoomId && typeof checkAndTriggerVoiceKeywords === 'function') {
-                    checkAndTriggerVoiceKeywords(transcript, currentUser.uid, currentUser.name);
+                if (typeof checkAndTriggerVoiceKeywords === 'function' && isVoiceTriggerEnabled) {
+                    const uUid = (currentUser && currentUser.uid) ? currentUser.uid : 'self';
+                    const uName = (currentUser && currentUser.name) ? currentUser.name : 'あなた';
+                    checkAndTriggerVoiceKeywords(transcript, uUid, uName);
                 }
 
                 if (isFinal && currentVoiceRoomId) {
@@ -3883,7 +3898,7 @@
                     }
                     if (isSubtitlesEnabled) {
                         await db.ref(`voiceRooms/${currentVoiceRoomId}/subtitles`).push({
-                            name: currentUser.name,
+                            name: (currentUser && currentUser.name) ? currentUser.name : 'あなた',
                             text: fResult.text,
                             timestamp: Date.now()
                         });
@@ -3894,17 +3909,22 @@
 
         speechRecognition.onerror = (e) => {
             if (e.error !== 'no-speech') console.warn('SpeechRecognition error:', e);
-            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-                isSpeechRecActive = false;
+            isSpeechRecActive = false;
+            if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed') {
+                setTimeout(() => {
+                    if (currentVoiceRoomId || isVoiceTriggerEnabled) {
+                        startVoiceSpeechRecognitionIfAvailable();
+                    }
+                }, 300);
             }
         };
 
         speechRecognition.onend = () => {
             isSpeechRecActive = false;
-            if (currentVoiceRoomId && (isSubtitlesEnabled || voiceTriggerMasterToggle)) {
+            if (currentVoiceRoomId || isVoiceTriggerEnabled || isSubtitlesEnabled) {
                 setTimeout(() => {
                     startVoiceSpeechRecognitionIfAvailable();
-                }, 400);
+                }, 200);
             }
         };
     }
@@ -3912,12 +3932,14 @@
     function startVoiceSpeechRecognitionIfAvailable() {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
         if (!speechRecognition) setupSpeechRecognition();
-        if (speechRecognition && !isSpeechRecActive) {
-            try {
-                speechRecognition.start();
+        if (!speechRecognition) return;
+
+        try {
+            speechRecognition.start();
+            isSpeechRecActive = true;
+        } catch(e) {
+            if (e.name === 'InvalidStateError' || (e.message && e.message.includes('already started'))) {
                 isSpeechRecActive = true;
-            } catch(e) {
-                // already active or starting
             }
         }
     }
@@ -6407,36 +6429,36 @@
 
 // 30 Presets Data Definition (音30種類 & エフェクト30種類)
 const TRIGGER_PRESETS = [
-    { id: 'nice', name: 'ナイス！', word: 'nice', soundName: '爽快ファンファーレ', fxName: 'ゴールドスターバースト', icon: '⭐', aliases: ['ナイス', 'いいね', 'nice', 'good'] },
-    { id: 'yes', name: 'YES / はい', word: 'yes', soundName: 'ポジティブチャイム', fxName: 'グリーンチェックリング', icon: '✅', aliases: ['yes', 'はい', 'うん', 'イエス', 'おけ'] },
-    { id: 'no', name: 'NO / だめ', word: 'no', soundName: '警告ブザー', fxName: 'レッドクロスバツ', icon: '❌', aliases: ['no', 'だめ', 'ダメ', 'ちがう', '無理', 'ノー'] },
-    { id: 'um', name: 'えーと / um..', word: 'um', soundName: '考え中ポワン音', fxName: 'クエスチョンバブル', icon: '💭', aliases: ['um', 'えーと', 'あの', 'うーん', 'えっと'] },
-    { id: 'lol', name: '草 / 笑 / lol', word: 'lol', soundName: 'コミカルピロリ', fxName: '爆笑フェイスシャワー', icon: '🤣', aliases: ['lol', '草', '笑', 'www', 'おもしろい', 'ウケる'] },
-    { id: 'gg', name: 'GG / おつかれ', word: 'gg', soundName: 'ビクトリーホーン', fxName: 'トロフィー＆紙吹雪', icon: '🏆', aliases: ['gg', 'おつかれ', 'お疲れ', 'ナイスゲーム', '勝った'] },
-    { id: 'clap', name: '拍手 / 888', word: 'clap', soundName: '歓声＆拍手クラップ', fxName: 'クラッカーシャワー', icon: '👏', aliases: ['clap', '888', '拍手', 'ぱちぱち', 'パチパチ', 'ブラボー'] },
-    { id: 'wow', name: 'すごい / wow', word: 'wow', soundName: 'きらきらハープ音', fxName: 'キラキラビーム', icon: '✨', aliases: ['wow', 'すごい', 'スゴイ', 'うわー', 'すげえ', 'ヤバ'] },
-    { id: 'rip', name: 'RIP / やばい', word: 'rip', soundName: '哀愁のゴング', fxName: 'ゴースト＆ドクロ', icon: '💀', aliases: ['rip', 'あああ', 'オワタ', '死んだ', 'やられた', 'チーン'] },
-    { id: 'fire', name: '燃えてきた / ファイヤー', word: 'fire', soundName: 'バーニングフレイム', fxName: '猛火フレアバースト', icon: '🔥', aliases: ['fire', '燃えてきた', 'アツい', 'ファイヤー', '炎', '熱い'] },
-    { id: 'hello', name: 'こんにちは / ハロー', word: 'hello', soundName: '爽やかベルチャイム', fxName: 'ウェーブハンド', icon: '👋', aliases: ['hello', 'こんにちは', 'ハロー', 'よろしく', 'おは', 'こん'] },
-    { id: 'bye', name: 'バイバイ / またね', word: 'bye', soundName: 'オルゴールアルペジオ', fxName: 'スパークルバイバイ', icon: '🌸', aliases: ['bye', 'バイバイ', 'またね', 'さようなら', 'おつ', 'ばいばい'] },
-    { id: 'ok', name: '了解 / OK', word: 'ok', soundName: 'スナッピーサイン音', fxName: 'グッドサムズアップ', icon: '👍', aliases: ['ok', 'オーケー', '了解', 'りょうかい', 'おっけー', 'おk'] },
-    { id: 'wait', name: '待って / ちょっと', word: 'wait', soundName: '時計チクタク音', fxName: 'ストップハンド', icon: '⏳', aliases: ['wait', '待って', 'まて', 'ちょっと', 'ストップ', 'タイム'] },
-    { id: 'sorry', name: 'ごめん / sorry', word: 'sorry', soundName: 'しょんぼりコード', fxName: 'ぽろぽろ涙しずく', icon: '🙇', aliases: ['sorry', 'ごめん', 'ごめんなさい', 'すまん', 'すいません', '陳謝'] },
-    { id: 'thanks', name: 'ありがとう / 感謝', word: 'thanks', soundName: '感謝のグロッケン', fxName: 'ブーケフラワー', icon: '💐', aliases: ['thanks', 'ありがとう', '感謝', 'サンキュー', 'あざす', 'ありがと'] },
-    { id: 'danger', name: '危険 / あぶない', word: 'danger', soundName: '緊急サイレンアラート', fxName: 'デンジャーフラッシュ', icon: '🚨', aliases: ['danger', 'あぶない', '危険', '警戒', '逃げて', 'デンジャー'] },
-    { id: 'alert', name: '注目 / 見て', word: 'alert', soundName: 'ソナーピン音', fxName: 'びっくりエクスクラメーション', icon: '❗', aliases: ['alert', '注目', '見て', '聞いて', '重要', 'ここ'] },
-    { id: 'question', name: 'なんで？ / 疑問', word: 'question', soundName: 'ひらめきティン音', fxName: '巨大はてなマーク', icon: '❓', aliases: ['question', 'なんで', 'どうして', 'なぜ', 'はてな', '何'] },
-    { id: 'bomb', name: 'ドカン / 爆発', word: 'bomb', soundName: '重低音エクスプロージョン', fxName: 'メガブラスト爆炎', icon: '💥', aliases: ['bomb', '爆発', 'ドカン', 'ボム', 'ばくはつ', 'ドカン'] },
+    { id: 'nice', name: 'ナイス！', word: 'nice', soundName: '爽快ファンファーレ', fxName: 'ゴールドスターバースト', icon: '⭐', aliases: ['ナイス', 'ないす', 'いいね', 'イイネ', 'nice', 'good', 'グッド', 'ぐっど', 'すばらしい', '素晴らしい', 'うま'] },
+    { id: 'yes', name: 'YES / はい', word: 'yes', soundName: 'ポジティブチャイム', fxName: 'グリーンチェックリング', icon: '✅', aliases: ['yes', 'はい', 'うん', 'イエス', 'いぇす', 'おけ', 'オケ', 'オーケー', 'そやね', 'そう', '了解', 'りょうかい', 'ok'] },
+    { id: 'no', name: 'NO / だめ', word: 'no', soundName: '警告ブザー', fxName: 'レッドクロスバツ', icon: '❌', aliases: ['no', 'だめ', 'ダメ', 'ちがう', '違う', '無理', 'むり', 'ノー', 'のー', 'あかん', 'いや', '否定'] },
+    { id: 'um', name: 'えーと / um..', word: 'um', soundName: '考え中ポワン音', fxName: 'クエスチョンバブル', icon: '💭', aliases: ['um', 'えーと', 'あの', 'うーん', 'えっと', 'うーむ', 'えー', 'あー'] },
+    { id: 'lol', name: '草 / 笑 / lol', word: 'lol', soundName: 'コミカルピロリ', fxName: '爆笑フェイスシャワー', icon: '🤣', aliases: ['lol', '草', 'くさ', '笑', 'わら', 'www', 'おもしろい', 'ウケる', 'うける', '爆笑', 'ワロタ', 'わろた'] },
+    { id: 'gg', name: 'GG / おつかれ', word: 'gg', soundName: 'ビクトリーホーン', fxName: 'トロフィー＆紙吹雪', icon: '🏆', aliases: ['gg', 'おつかれ', 'お疲れ', 'ナイスゲーム', '勝った', 'おつ', 'おつかれさま', '乙'] },
+    { id: 'clap', name: '拍手 / 888', word: 'clap', soundName: '歓声＆拍手クラップ', fxName: 'クラッカーシャワー', icon: '👏', aliases: ['clap', '888', '拍手', 'ぱちぱち', 'パチパチ', 'ブラボー', 'はくしゅ'] },
+    { id: 'wow', name: 'すごい / wow', word: 'wow', soundName: 'きらきらハープ音', fxName: 'キラキラビーム', icon: '✨', aliases: ['wow', 'すごい', 'スゴイ', 'うわー', 'すげえ', 'すげー', 'ヤバ', 'うわ', 'すげ'] },
+    { id: 'rip', name: 'RIP / やばい', word: 'rip', soundName: '哀愁のゴング', fxName: 'ゴースト＆ドクロ', icon: '💀', aliases: ['rip', 'あああ', 'オワタ', 'おわた', '死んだ', 'やられた', 'チーン', 'ちーん', '詰んだ'] },
+    { id: 'fire', name: '燃えてきた / ファイヤー', word: 'fire', soundName: 'バーニングフレイム', fxName: '猛火フレアバースト', icon: '🔥', aliases: ['fire', '燃えてきた', 'アツい', 'あつい', 'ファイヤー', '炎', '熱い', 'ほのお'] },
+    { id: 'hello', name: 'こんにちは / ハロー', word: 'hello', soundName: '爽やかベルチャイム', fxName: 'ウェーブハンド', icon: '👋', aliases: ['hello', 'こんにちは', 'こんにちわ', 'ハロー', 'はろー', 'よろしく', 'おは', 'おはよう', 'こん', 'やあ'] },
+    { id: 'bye', name: 'バイバイ / またね', word: 'bye', soundName: 'オルゴールアルペジオ', fxName: 'スパークルバイバイ', icon: '🌸', aliases: ['bye', 'バイバイ', 'ばいばい', 'またね', 'さようなら', 'おつ', 'じゃあね', 'また明日', 'さらば'] },
+    { id: 'ok', name: '了解 / OK', word: 'ok', soundName: 'スナッピーサイン音', fxName: 'グッドサムズアップ', icon: '👍', aliases: ['ok', 'オーケー', 'おーけー', '了解', 'りょうかい', 'おっけー', 'おk', 'オッケー', 'オッケ', 'りょ'] },
+    { id: 'wait', name: '待って / ちょっと', word: 'wait', soundName: '時計チクタク音', fxName: 'ストップハンド', icon: '⏳', aliases: ['wait', '待って', 'まて', 'ちょっと', 'ストップ', 'タイム', 'まって', 'ちょい'] },
+    { id: 'sorry', name: 'ごめん / sorry', word: 'sorry', soundName: 'しょんぼりコード', fxName: 'ぽろぽろ涙しずく', icon: '🙇', aliases: ['sorry', 'ごめん', 'ごめんなさい', 'すまん', 'すいません', 'すみません', '申し訳'] },
+    { id: 'thanks', name: 'ありがとう / 感謝', word: 'thanks', soundName: '感謝のグロッケン', fxName: 'ブーケフラワー', icon: '💐', aliases: ['thanks', 'ありがとう', 'ありがとうございます', '感謝', 'サンキュー', 'さんきゅー', 'あざす', 'ありがと', '有難う'] },
+    { id: 'danger', name: '危険 / あぶない', word: 'danger', soundName: '緊急サイレンアラート', fxName: 'デンジャーフラッシュ', icon: '🚨', aliases: ['danger', 'あぶない', '危ない', '危険', '警戒', '逃げて', 'デンジャー', 'ヤバイ'] },
+    { id: 'alert', name: '注目 / 見て', word: 'alert', soundName: 'ソナーピン音', fxName: 'びっくりエクスクラメーション', icon: '❗', aliases: ['alert', '注目', '見て', '聞いて', '重要', 'ここ', 'みろ', 'みて'] },
+    { id: 'question', name: 'なんで？ / 疑問', word: 'question', soundName: 'ひらめきティン音', fxName: '巨大はてなマーク', icon: '❓', aliases: ['question', 'なんで', 'どうして', 'なぜ', 'はてな', '何', 'なに', 'えっ'] },
+    { id: 'bomb', name: 'ドカン / 爆発', word: 'bomb', soundName: '重低音エクスプロージョン', fxName: 'メガブラスト爆炎', icon: '💥', aliases: ['bomb', '爆発', 'ばくはつ', 'ドカン', 'どかん', 'ボム', 'ぼむ', 'ドカーン', '自爆'] },
     { id: 'magic', name: '魔法 / マジック', word: 'magic', soundName: '神秘のクリスタル', fxName: '回転魔法陣グリフ', icon: '🔮', aliases: ['magic', '魔法', 'マジック', 'まほう', '呪文', 'ファンタジー'] },
-    { id: 'levelup', name: 'レベルアップ！', word: 'levelup', soundName: '8bitファンファーレ', fxName: 'レベルアップオーラ', icon: '🆙', aliases: ['levelup', 'レベルアップ', '上がった', 'up', '成長'] },
-    { id: 'coin', name: 'コイン / チャリン', word: 'coin', soundName: '8bitコインドロップ', fxName: 'ゴールドコイン噴水', icon: '🪙', aliases: ['coin', 'コイン', 'チャリン', '金', 'マネー', 'ボーナス'] },
+    { id: 'levelup', name: 'レベルアップ！', word: 'levelup', soundName: '8bitファンファーレ', fxName: 'レベルアップオーラ', icon: '🆙', aliases: ['levelup', 'レベルアップ', 'れべるあっぷ', '上がった', 'up', '成長', 'ランクアップ'] },
+    { id: 'coin', name: 'コイン / チャリン', word: 'coin', soundName: '8bitコインドロップ', fxName: 'ゴールドコイン噴水', icon: '🪙', aliases: ['coin', 'コイン', 'チャリン', '金', 'かね', 'マネー', 'ボーナス'] },
     { id: 'laser', name: 'ビーム / レーザー', word: 'laser', soundName: 'SFプラズマレーザー', fxName: 'サイバーネオンビーム', icon: '⚡', aliases: ['laser', 'ビーム', 'レーザー', '撃て', '発射', '光線'] },
-    { id: 'heart', name: 'すき / かわいい', word: 'heart', soundName: 'ドキドキパルス音', fxName: 'ピンクハートストーム', icon: '💖', aliases: ['heart', 'すき', '好き', 'かわいい', 'カワイイ', 'ハート', '尊い'] },
-    { id: 'thunder', name: '雷 / ショック', word: 'thunder', soundName: '轟音サンダークラッシュ', fxName: '稲妻エレクトリック', icon: '🌩️', aliases: ['thunder', '雷', 'サンダー', '電撃', '感電', 'ショック'] },
-    { id: 'speed', name: 'いそげ / ダッシュ', word: 'speed', soundName: 'ジェット加速音', fxName: 'ハイパースピード集中線', icon: '💨', aliases: ['speed', '急げ', 'いそげ', '走れ', 'ダッシュ', 'スピード', '速い'] },
+    { id: 'heart', name: 'すき / かわいい', word: 'heart', soundName: 'ドキドキパルス音', fxName: 'ピンクハートストーム', icon: '💖', aliases: ['heart', 'すき', '好き', 'かわいい', 'カワイイ', 'ハート', '尊い', '愛'] },
+    { id: 'thunder', name: '雷 / ショック', word: 'thunder', soundName: '轟音サンダークラッシュ', fxName: '稲妻エレクトリック', icon: '🌩️', aliases: ['thunder', '雷', 'かみなり', 'サンダー', '電撃', '感電', 'ショック'] },
+    { id: 'speed', name: 'いそげ / ダッシュ', word: 'speed', soundName: 'ジェット加速音', fxName: 'ハイパースピード集中線', icon: '💨', aliases: ['speed', '急げ', 'いそげ', '走れ', 'ダッシュ', 'スピード', '速い', 'はやく'] },
     { id: 'sleep', name: 'ねむい / おやすみ', word: 'sleep', soundName: 'やすらぎの夜想曲', fxName: 'Zzzふわふわクラウド', icon: '💤', aliases: ['sleep', 'ねむい', '眠い', 'おやすみ', '寝る', 'zzz', 'スヤスヤ'] },
-    { id: 'fight', name: 'がんばれ / ファイト', word: 'fight', soundName: '闘志のゴングドラム', fxName: 'バーニングフィスト', icon: '✊', aliases: ['fight', 'がんばれ', 'ファイト', '勝つぞ', '気合', 'やるぞ'] },
-    { id: 'party', name: '乾杯 / パーティー', word: 'party', soundName: 'パーティーホーン歓声', fxName: 'シャンパンシャワー', icon: '🎉', aliases: ['party', 'パーティー', '乾杯', 'かんぱい', '祝', 'おめでとう'] }
+    { id: 'fight', name: 'がんばれ / ファイト', word: 'fight', soundName: '闘志のゴングドラム', fxName: 'バーニングフィスト', icon: '✊', aliases: ['fight', 'がんばれ', 'ファイト', 'ふぁいと', '勝つぞ', '気合', 'やるぞ', '応援', '頑張れ'] },
+    { id: 'party', name: '乾杯 / パーティー', word: 'party', soundName: 'パーティーホーン歓声', fxName: 'シャンパンシャワー', icon: '🎉', aliases: ['party', 'パーティー', '乾杯', 'かんぱい', '祝', 'おめでとう', 'ぱーてぃー'] }
 ];
 
 // User Custom Triggers stored in localStorage & Firebase
@@ -6446,14 +6468,33 @@ try {
     if (saved) customTriggersList = JSON.parse(saved);
 } catch(e) {}
 
-let triggerCoolDownMap = {}; // Prevent spamming triggers within 1.5s per keyword
+let triggerCoolDownMap = {}; // Prevent spamming triggers within 1.2s per keyword
 
-// --- 🔊 High Quality Real-time Web Audio Synthesizer for 30 Triggers ---
+// Japanese text normalization helpers for robust voice keyword matching
+function toHiragana(str) {
+    if (!str) return '';
+    return str.replace(/[\u30a1-\u30f6]/g, match => {
+        const chr = match.charCodeAt(0) - 0x60;
+        return String.fromCharCode(chr);
+    });
+}
+
+function normalizeSpeechText(text) {
+    if (!text) return { raw: '', clean: '', hira: '' };
+    const raw = text.normalize('NFKC').toLowerCase().trim();
+    const clean = raw.replace(/[、。！？!?.,\s・〜~ー\-_/\\#@+*()「」『』]/g, '');
+    const hira = toHiragana(clean);
+    return { raw, clean, hira };
+}
+
+// --- 🔊 High Quality Real-time Web Audio Synthesizer for 30 Triggers (大音量＆高音質) ---
 function playSynthesizedTriggerSound(id, customAudioUrl = null) {
+    if (isDeafened) return;
+
     if (customAudioUrl) {
         try {
             const audio = new Audio(customAudioUrl);
-            audio.volume = 0.85;
+            audio.volume = 1.0;
             audio.play().catch(() => {});
             return;
         } catch(e) {}
@@ -6470,11 +6511,11 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
 
     const now = audioContext.currentTime;
     const master = audioContext.createGain();
-    master.gain.setValueAtTime(0.32, now);
+    master.gain.setValueAtTime(0.88, now); // 迫力の大音量
     master.connect(audioContext.destination);
 
     // Helpers
-    const tone = (freq, start, dur, type = 'sine', gainVal = 0.25) => {
+    const tone = (freq, start, dur, type = 'sine', gainVal = 0.5) => {
         const osc = audioContext.createOscillator();
         const g = audioContext.createGain();
         osc.type = type;
@@ -6488,11 +6529,11 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
         osc.stop(now + start + dur + 0.05);
     };
 
-    const chord = (freqs, start, dur, type = 'triangle', gainVal = 0.18) => {
+    const chord = (freqs, start, dur, type = 'triangle', gainVal = 0.45) => {
         freqs.forEach(f => tone(f, start, dur, type, gainVal / freqs.length));
     };
 
-    const noise = (start, dur, filterFreq = 1200, gainVal = 0.2) => {
+    const noise = (start, dur, filterFreq = 1200, gainVal = 0.45) => {
         const bufferSize = audioContext.sampleRate * dur;
         const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
         const data = buffer.getChannelData(0);
@@ -6513,15 +6554,15 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
 
     switch (id) {
         case 'nice': // Fanfare
-            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.07, 0.35, 'triangle', 0.28));
+            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.07, 0.38, 'triangle', 0.55));
             break;
         case 'yes': // Crisp Positive Bell
-            tone(880, 0, 0.15, 'sine', 0.25);
-            tone(1320, 0.08, 0.45, 'sine', 0.28);
+            tone(880, 0, 0.16, 'sine', 0.55);
+            tone(1320, 0.08, 0.45, 'sine', 0.6);
             break;
         case 'no': // Low Warning Buzzer
-            tone(180, 0, 0.25, 'sawtooth', 0.35);
-            tone(150, 0.15, 0.35, 'sawtooth', 0.35);
+            tone(180, 0, 0.25, 'sawtooth', 0.6);
+            tone(150, 0.15, 0.35, 'sawtooth', 0.6);
             break;
         case 'um': // Thinking Poing
             const oscUm = audioContext.createOscillator();
@@ -6529,57 +6570,57 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
             oscUm.type = 'sine';
             oscUm.frequency.setValueAtTime(320, now);
             oscUm.frequency.exponentialRampToValueAtTime(580, now + 0.22);
-            gUm.gain.setValueAtTime(0.28, now);
+            gUm.gain.setValueAtTime(0.55, now);
             gUm.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
             oscUm.connect(gUm); gUm.connect(master);
             oscUm.start(now); oscUm.stop(now + 0.36);
             break;
         case 'lol': // Laughing Pirori
-            [440, 587, 440, 659, 880].forEach((f, i) => tone(f, i * 0.06, 0.14, 'triangle', 0.25));
+            [440, 587, 440, 659, 880].forEach((f, i) => tone(f, i * 0.06, 0.15, 'triangle', 0.5));
             break;
         case 'gg': // Victory Fanfare
-            chord([523, 659, 783], 0, 0.2, 'triangle', 0.3);
-            chord([587, 740, 880], 0.18, 0.2, 'triangle', 0.3);
-            chord([659, 830, 987], 0.36, 0.55, 'triangle', 0.35);
+            chord([523, 659, 783], 0, 0.2, 'triangle', 0.55);
+            chord([587, 740, 880], 0.18, 0.2, 'triangle', 0.55);
+            chord([659, 830, 987], 0.36, 0.55, 'triangle', 0.65);
             break;
         case 'clap': // Applause Burst
-            for (let i = 0; i < 7; i++) {
-                noise(i * 0.045, 0.06, 1600 + Math.random() * 800, 0.22);
+            for (let i = 0; i < 8; i++) {
+                noise(i * 0.045, 0.065, 1600 + Math.random() * 800, 0.45);
             }
             break;
         case 'wow': // Harp arpeggio
-            [440, 554, 659, 880, 1108, 1318].forEach((f, i) => tone(f, i * 0.05, 0.4, 'sine', 0.22));
+            [440, 554, 659, 880, 1108, 1318].forEach((f, i) => tone(f, i * 0.05, 0.45, 'sine', 0.45));
             break;
         case 'rip': // Sad minor gong
-            chord([220, 261.63, 311.13], 0, 0.75, 'sawtooth', 0.28);
-            tone(110, 0.1, 0.9, 'sine', 0.35);
+            chord([220, 261.63, 311.13], 0, 0.75, 'sawtooth', 0.55);
+            tone(110, 0.1, 0.9, 'sine', 0.65);
             break;
         case 'fire': // Burning whoosh
-            noise(0, 0.5, 600, 0.35);
-            tone(120, 0, 0.45, 'triangle', 0.25);
+            noise(0, 0.5, 600, 0.65);
+            tone(120, 0, 0.45, 'triangle', 0.55);
             break;
         case 'hello': // Welcome chime
-            tone(587.33, 0, 0.3, 'sine', 0.22);
-            tone(880.00, 0.12, 0.45, 'sine', 0.25);
+            tone(587.33, 0, 0.3, 'sine', 0.5);
+            tone(880.00, 0.12, 0.45, 'sine', 0.55);
             break;
         case 'bye': // Music box goodbye
-            [1046, 880, 659, 523].forEach((f, i) => tone(f, i * 0.12, 0.45, 'triangle', 0.2));
+            [1046, 880, 659, 523].forEach((f, i) => tone(f, i * 0.12, 0.45, 'triangle', 0.45));
             break;
         case 'ok': // Snappy confirmation
-            tone(784, 0, 0.12, 'sine', 0.25);
-            tone(1046, 0.07, 0.25, 'sine', 0.28);
+            tone(784, 0, 0.12, 'sine', 0.5);
+            tone(1046, 0.07, 0.28, 'sine', 0.55);
             break;
         case 'wait': // Clock ticking
-            tone(1200, 0, 0.04, 'sine', 0.3);
-            tone(800, 0.2, 0.04, 'sine', 0.3);
-            tone(1200, 0.4, 0.04, 'sine', 0.3);
+            tone(1200, 0, 0.05, 'sine', 0.55);
+            tone(800, 0.2, 0.05, 'sine', 0.55);
+            tone(1200, 0.4, 0.05, 'sine', 0.55);
             break;
         case 'sorry': // Low sad chords
-            chord([330, 392, 493], 0, 0.4, 'sine', 0.25);
-            chord([293, 349, 440], 0.3, 0.6, 'sine', 0.25);
+            chord([330, 392, 493], 0, 0.4, 'sine', 0.5);
+            chord([293, 349, 440], 0.3, 0.6, 'sine', 0.5);
             break;
         case 'thanks': // Grateful glockenspiel
-            [659, 784, 987, 1318].forEach((f, i) => tone(f, i * 0.08, 0.5, 'sine', 0.22));
+            [659, 784, 987, 1318].forEach((f, i) => tone(f, i * 0.08, 0.5, 'sine', 0.48));
             break;
         case 'danger': // Warning Siren
             for (let i = 0; i < 2; i++) {
@@ -6588,32 +6629,32 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
                 oscS.frequency.setValueAtTime(600, now + i * 0.25);
                 oscS.frequency.linearRampToValueAtTime(1100, now + i * 0.25 + 0.12);
                 oscS.frequency.linearRampToValueAtTime(600, now + i * 0.25 + 0.24);
-                gS.gain.setValueAtTime(0.3, now + i * 0.25);
+                gS.gain.setValueAtTime(0.65, now + i * 0.25);
                 oscS.connect(gS); gS.connect(master);
                 oscS.start(now + i * 0.25); oscS.stop(now + i * 0.25 + 0.25);
             }
             break;
         case 'alert': // Sonar Ping
-            tone(1800, 0, 0.4, 'sine', 0.35);
-            tone(900, 0.05, 0.25, 'sine', 0.15);
+            tone(1800, 0, 0.4, 'sine', 0.65);
+            tone(900, 0.05, 0.25, 'sine', 0.45);
             break;
         case 'question': // Question Pop
-            tone(400, 0, 0.1, 'sine', 0.25);
-            tone(750, 0.1, 0.3, 'sine', 0.28);
+            tone(400, 0, 0.1, 'sine', 0.5);
+            tone(750, 0.1, 0.3, 'sine', 0.55);
             break;
         case 'bomb': // Deep Explosion
-            noise(0, 0.7, 300, 0.45);
-            tone(65, 0, 0.6, 'sine', 0.5);
+            noise(0, 0.8, 300, 0.8);
+            tone(65, 0, 0.7, 'sine', 0.8);
             break;
         case 'magic': // Mystic shimmer
-            [523, 659, 830, 1046, 1318, 1661].forEach((f, i) => tone(f, i * 0.06, 0.4, 'sine', 0.18));
+            [523, 659, 830, 1046, 1318, 1661].forEach((f, i) => tone(f, i * 0.06, 0.4, 'sine', 0.4));
             break;
         case 'levelup': // 8bit Fanfare
-            [440, 554, 659, 880, 1108].forEach((f, i) => tone(f, i * 0.08, 0.25, 'square', 0.16));
+            [440, 554, 659, 880, 1108].forEach((f, i) => tone(f, i * 0.08, 0.28, 'square', 0.45));
             break;
         case 'coin': // Retro Coin
-            tone(987.77, 0, 0.08, 'square', 0.2);
-            tone(1318.51, 0.08, 0.4, 'square', 0.25);
+            tone(987.77, 0, 0.08, 'square', 0.5);
+            tone(1318.51, 0.08, 0.4, 'square', 0.55);
             break;
         case 'laser': // Sci-Fi Laser
             const oscL = audioContext.createOscillator();
@@ -6621,18 +6662,18 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
             oscL.type = 'sawtooth';
             oscL.frequency.setValueAtTime(1500, now);
             oscL.frequency.exponentialRampToValueAtTime(80, now + 0.2);
-            gL.gain.setValueAtTime(0.3, now);
+            gL.gain.setValueAtTime(0.6, now);
             gL.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
             oscL.connect(gL); gL.connect(master);
             oscL.start(now); oscL.stop(now + 0.25);
             break;
         case 'heart': // Heartbeat double thump
-            tone(85, 0, 0.12, 'sine', 0.45);
-            tone(75, 0.18, 0.16, 'sine', 0.45);
+            tone(85, 0, 0.12, 'sine', 0.7);
+            tone(75, 0.18, 0.16, 'sine', 0.7);
             break;
         case 'thunder': // Thunder roll
-            noise(0, 0.9, 450, 0.4);
-            tone(50, 0.05, 0.8, 'sawtooth', 0.35);
+            noise(0, 0.9, 450, 0.75);
+            tone(50, 0.05, 0.8, 'sawtooth', 0.65);
             break;
         case 'speed': // Jet swoosh
             const oscW = audioContext.createOscillator();
@@ -6640,27 +6681,27 @@ function playSynthesizedTriggerSound(id, customAudioUrl = null) {
             oscW.frequency.setValueAtTime(200, now);
             oscW.frequency.exponentialRampToValueAtTime(1800, now + 0.25);
             gW.gain.setValueAtTime(0.01, now);
-            gW.gain.linearRampToValueAtTime(0.3, now + 0.15);
+            gW.gain.linearRampToValueAtTime(0.6, now + 0.15);
             gW.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
             oscW.connect(gW); gW.connect(master);
             oscW.start(now); oscW.stop(now + 0.36);
             break;
         case 'sleep': // Lullaby
-            [523, 440, 392, 330].forEach((f, i) => tone(f, i * 0.16, 0.6, 'sine', 0.18));
+            [523, 440, 392, 330].forEach((f, i) => tone(f, i * 0.16, 0.6, 'sine', 0.45));
             break;
         case 'fight': // Powerful Gong / Drum
-            tone(110, 0, 0.5, 'sine', 0.45);
-            noise(0, 0.2, 500, 0.3);
-            tone(160, 0.2, 0.4, 'triangle', 0.35);
+            tone(110, 0, 0.5, 'sine', 0.75);
+            noise(0, 0.2, 500, 0.65);
+            tone(160, 0.2, 0.4, 'triangle', 0.65);
             break;
         case 'party': // Party Horn
-            tone(440, 0, 0.35, 'sawtooth', 0.2);
-            tone(554, 0, 0.35, 'sawtooth', 0.2);
-            noise(0.1, 0.4, 2000, 0.25);
+            tone(440, 0, 0.35, 'sawtooth', 0.5);
+            tone(554, 0, 0.35, 'sawtooth', 0.5);
+            noise(0.1, 0.4, 2000, 0.55);
             break;
         default:
-            tone(660, 0, 0.15, 'sine', 0.25);
-            tone(880, 0.1, 0.3, 'sine', 0.25);
+            tone(660, 0, 0.15, 'sine', 0.5);
+            tone(880, 0.1, 0.3, 'sine', 0.5);
             break;
     }
 }
@@ -6739,21 +6780,28 @@ function getFxColor(id) {
 
 // --- 🎯 Process Speech for Keyword Triggers & Broadcast to Room ---
 function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
-    if (!spokenText) return;
-    const lower = spokenText.toLowerCase().trim();
+    if (!spokenText || !isVoiceTriggerEnabled) return;
 
-    // Check custom triggers first
+    const norm = normalizeSpeechText(spokenText);
+    const now = Date.now();
+    const effectiveSenderUid = senderUid || (currentUser ? currentUser.uid : 'self');
+    const effectiveSenderName = senderName || (currentUser ? currentUser.name : 'あなた');
+
+    // 1. Check custom triggers first
     for (let ct of customTriggersList) {
         if (!ct.word) continue;
-        const targetWord = ct.word.toLowerCase();
-        if (lower.includes(targetWord)) {
-            const now = Date.now();
-            if (triggerCoolDownMap[targetWord] && (now - triggerCoolDownMap[targetWord] < 2000)) return;
-            triggerCoolDownMap[targetWord] = now;
+        const ctNorm = normalizeSpeechText(ct.word);
+        const hit = (ctNorm.clean && norm.clean.includes(ctNorm.clean)) || 
+                    (ctNorm.hira && norm.hira.includes(ctNorm.hira)) || 
+                    norm.raw.includes(ctNorm.raw);
+        if (hit) {
+            const key = `custom_${ct.id || ct.word}`;
+            if (triggerCoolDownMap[key] && (now - triggerCoolDownMap[key] < 1200)) return;
+            triggerCoolDownMap[key] = now;
 
             // Trigger locally immediately for zero-latency feedback
             playSynthesizedTriggerSound(ct.soundId || 'nice', ct.customAudioUrl || null);
-            renderTriggerVisualEffect(ct.effectId || 'nice', ct.customImageUrl || null, senderName, ct.word);
+            renderTriggerVisualEffect(ct.effectId || 'nice', ct.customImageUrl || null, effectiveSenderName, ct.word);
 
             // Broadcast to room if in voice channel
             if (currentVoiceRoomId) {
@@ -6766,8 +6814,8 @@ function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
                     customAudioUrl: ct.customAudioUrl || null,
                     effectId: ct.effectId || 'nice',
                     customImageUrl: ct.customImageUrl || null,
-                    senderUid: senderUid,
-                    senderName: senderName,
+                    senderUid: effectiveSenderUid,
+                    senderName: effectiveSenderName,
                     timestamp: Date.now()
                 });
             }
@@ -6775,18 +6823,23 @@ function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
         }
     }
 
-    // Check 30 presets
+    // 2. Check 30 presets with comprehensive aliases & hiragana matching
     for (let preset of TRIGGER_PRESETS) {
-        const matches = [preset.word, ...(preset.aliases || [])];
-        const hit = matches.some(alias => lower.includes(alias.toLowerCase()));
+        const candidateWords = [preset.word, ...(preset.aliases || [])];
+        const hit = candidateWords.some(cand => {
+            const cNorm = normalizeSpeechText(cand);
+            return (cNorm.clean && norm.clean.includes(cNorm.clean)) || 
+                   (cNorm.hira && norm.hira.includes(cNorm.hira)) || 
+                   norm.raw.includes(cNorm.raw);
+        });
+
         if (hit) {
-            const now = Date.now();
-            if (triggerCoolDownMap[preset.id] && (now - triggerCoolDownMap[preset.id] < 2000)) return;
+            if (triggerCoolDownMap[preset.id] && (now - triggerCoolDownMap[preset.id] < 1200)) return;
             triggerCoolDownMap[preset.id] = now;
 
             // Trigger locally immediately for zero-latency feedback
             playSynthesizedTriggerSound(preset.id, null);
-            renderTriggerVisualEffect(preset.id, null, senderName, preset.word);
+            renderTriggerVisualEffect(preset.id, null, effectiveSenderName, preset.name);
 
             // Broadcast to room if in voice channel
             if (currentVoiceRoomId) {
@@ -6797,8 +6850,8 @@ function checkAndTriggerVoiceKeywords(spokenText, senderUid, senderName) {
                     word: preset.word,
                     soundId: preset.id,
                     effectId: preset.id,
-                    senderUid: senderUid,
-                    senderName: senderName,
+                    senderUid: effectiveSenderUid,
+                    senderName: effectiveSenderName,
                     timestamp: Date.now()
                 });
             }
