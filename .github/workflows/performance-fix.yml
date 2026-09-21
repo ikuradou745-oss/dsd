@@ -1,0 +1,61 @@
+name: Apply DSD performance fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-startup-performance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch startup performance issues
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          marker = '<!-- DSD_PERFORMANCE_FIX_2026_09 -->'
+          if marker in s:
+              print('Performance fix already applied.')
+              raise SystemExit(0)
+
+          # Prevent SpeechRecognition from continuously restarting while the app is merely open.
+          s = s.replace(
+              "if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed') {\n                setTimeout(() => {\n                    if (currentVoiceRoomId || isVoiceTriggerEnabled) {\n                        startVoiceSpeechRecognitionIfAvailable();\n                    }\n                }, 300);\n            }",
+              "if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed') {\n                setTimeout(() => {\n                    if (currentVoiceRoomId) {\n                        startVoiceSpeechRecognitionIfAvailable();\n                    }\n                }, 500);\n            }"
+          )
+
+          s = s.replace(
+              "if (currentVoiceRoomId || isVoiceTriggerEnabled || isSubtitlesEnabled) {\n                setTimeout(() => {\n                    startVoiceSpeechRecognitionIfAvailable();\n                }, 200);\n            }",
+              "if (currentVoiceRoomId) {\n                setTimeout(() => {\n                    startVoiceSpeechRecognitionIfAvailable();\n                }, 500);\n            }"
+          )
+
+          # The variable is referenced by the YouTube sync engine before being declared.
+          needle = "let lastSyncedYtState = null;"
+          if needle in s and "let lastSyncedVideoId = null;" not in s:
+              s = s.replace(needle, needle + "\n    let lastSyncedVideoId = null;")
+
+          # Add a visible marker so this one-shot workflow never rewrites the file twice.
+          s = s.replace('<body>', '<body>\n' + marker, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit fix
+        run: |
+          if git diff --quiet -- index.html; then
+            echo 'No changes needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'fix: stop speech recognition startup loop and stabilize YouTube state'
+          git push
