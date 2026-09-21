@@ -498,6 +498,77 @@
             object-fit: cover;
             display: block;
         }
+
+        /* VC Stamp Palette Styles */
+        .vc-stamp-tab-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            color: var(--text-muted);
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        .vc-stamp-tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .vc-stamp-tab-btn.active {
+            background: linear-gradient(135deg, #5865f2, #eb459e);
+            color: #fff;
+            border-color: transparent;
+            font-weight: 700;
+        }
+        .vc-stamp-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 10px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            user-select: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .vc-stamp-card:hover {
+            transform: translateY(-3px) scale(1.03);
+            border-color: #eb459e;
+            background: rgba(235, 69, 158, 0.14);
+            box-shadow: 0 6px 18px rgba(235, 69, 158, 0.25);
+        }
+        .vc-stamp-card:active {
+            transform: scale(0.94);
+        }
+        .vc-stamp-card .stamp-icon {
+            font-size: 1.8rem;
+            line-height: 1.1;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        .vc-stamp-card .stamp-name {
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+        .vc-stamp-card .stamp-fx-tag {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -609,6 +680,7 @@
                             </span>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <button id="openVcStampBtn" class="screenshare-btn" style="background:linear-gradient(135deg, #5865f2, #eb459e); color:white; border-color:#eb459e; font-weight:700; box-shadow:0 2px 10px rgba(235,69,158,0.35);" title="VC全体にスタンプFX（効果音＆アニメーション演出）を流す"><i class="fas fa-icons"></i> スタンプ</button>
                             <button id="openYoutubeVcBtn" class="screenshare-btn" style="background:linear-gradient(135deg, #ff0000, #c40000); color:white; border-color:#ff4444;" title="YouTube動画や音楽をVCメンバー全員と同時視聴・再生"><i class="fab fa-youtube"></i> YouTube同期再生</button>
                             <button id="inviteToVoiceBtn" style="background:#3c3f45; display:none;"><i class="fas fa-user-plus"></i> 招待</button>
                             <button id="openSoundboardBtn" style="background:#3c3f45;"><i class="fas fa-music"></i> 効果音</button>
@@ -761,6 +833,11 @@
                             <button id="barBrowserSuppBtn" class="voice-action-btn" title="🛡️ ブラウザ標準ノイズ除去 (Chromium/WebKit内蔵アルゴリズム)">
                                 <i class="fas fa-shield-virus" style="color:#57f287;"></i>
                                 <span class="btn-status-badge" id="barBrowserSuppBadge" style="background:rgba(35,165,89,0.25); color:#57f287;">AIノイズ</span>
+                            </button>
+                            <!-- VCスタンプ FX クイックアクセス -->
+                            <button id="barVcStampBtn" class="voice-action-btn" title="🎨 VCスタンプ: 全体にFX・効果音を流す" style="background:linear-gradient(135deg, rgba(88,101,242,0.35), rgba(235,69,158,0.35)); border-color:#eb459e;">
+                                <i class="fas fa-icons" style="color:#ff73fa;"></i>
+                                <span class="btn-status-badge" style="background:rgba(235,69,158,0.4); color:#fff;">スタンプ</span>
                             </button>
                             <!-- ワードトリガー FX クイックアクセス -->
                             <button id="barTriggersBtn" class="voice-action-btn" title="✨ ワードトリガー FX: 特定のワードを言うと音とエフェクトが発動">
@@ -1243,7 +1320,55 @@
         <button class="sound-btn" data-sound="coin">🪙 コイン</button>
         <button class="sound-btn" data-sound="bomb">💥 ドカン爆発</button>
     </div>
-    <button id="closeSoundboardBtn" class="btn-secondary" style="margin-top:16px; width:100%;">閉じる</button>
+    <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-color); display:flex; flex-direction:column; gap:8px;">
+        <button id="soundboardToVcStampBtn" style="background:linear-gradient(135deg, #5865f2, #eb459e); border-color:#eb459e; color:white; font-weight:700; width:100%;"><i class="fas fa-icons"></i> ド派手なVCスタンプ FX (全30種) を開く</button>
+        <button id="closeSoundboardBtn" class="btn-secondary" style="width:100%;">閉じる</button>
+    </div>
+</div>
+
+<!-- VC Stamp & FX Modal (通話メンバー全員に流す) -->
+<div id="vcStampModal" class="modal" style="width:540px; max-width:92vw;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h3 style="display:flex; align-items:center; gap:8px; margin:0; font-size:1.15rem; color:#fff;">
+            <span style="background:linear-gradient(135deg, #5865f2, #eb459e); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:800;">
+                <i class="fas fa-icons" style="-webkit-text-fill-color:#eb459e;"></i> VCスタンプ FX
+            </span>
+        </h3>
+        <span id="closeVcStampModalBtn" style="font-size:1.5rem; cursor:pointer; color:var(--text-muted); line-height:1;" title="閉じる">&times;</span>
+    </div>
+    <p class="info-text" style="margin-bottom:12px; font-size:0.82rem;">
+        選んだスタンプのエフェクトと効果音が、ボイスチャットの<strong>参加者全員の画面にリアルタイム</strong>で流れます！
+    </p>
+
+    <!-- Search & Feedback Toast -->
+    <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center;">
+        <div style="position:relative; flex:1;">
+            <i class="fas fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:0.85rem;"></i>
+            <input type="text" id="vcStampSearchInput" placeholder="スタンプ・FXを検索 (例: 草, ナイス, 爆発, GG)..." style="width:100%; padding:8px 12px 8px 34px; background:var(--bg-darker); border:1px solid var(--border-color); border-radius:12px; color:white; font-size:0.85rem;">
+        </div>
+        <div id="vcStampFeedbackToast" style="display:none; align-items:center; gap:6px; background:rgba(87,242,135,0.2); border:1px solid #57f287; color:#57f287; padding:5px 12px; border-radius:12px; font-size:0.75rem; font-weight:700; white-space:nowrap; animation:popModal 0.2s ease;">
+            <i class="fas fa-check-circle"></i> <span id="vcStampFeedbackText">送信完了！</span>
+        </div>
+    </div>
+
+    <!-- Category filter chips -->
+    <div id="vcStampCategoryChips" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px;">
+        <button class="vc-stamp-tab-btn active" data-cat="all">すべて (30+)</button>
+        <button class="vc-stamp-tab-btn" data-cat="reaction">リアクション</button>
+        <button class="vc-stamp-tab-btn" data-cat="battle">バトル・歓声</button>
+        <button class="vc-stamp-tab-btn" data-cat="emotion">エモーション</button>
+        <button class="vc-stamp-tab-btn" data-cat="custom">カスタム</button>
+    </div>
+
+    <!-- Stamps Grid -->
+    <div id="vcStampGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(112px, 1fr)); gap:8px; max-height:360px; overflow-y:auto; padding:4px 2px;">
+        <!-- Dynamically rendered -->
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:10px; border-top:1px solid var(--border-color);">
+        <span style="font-size:0.75rem; color:var(--text-muted);"><i class="fas fa-microphone"></i> マイクで合言葉を言っても自動で流れます</span>
+        <button id="closeVcStampBottomBtn" class="btn-secondary" style="padding:6px 14px; font-size:0.85rem;">閉じる</button>
+    </div>
 </div>
 
 <!-- Invite Friend to Voice Modal -->
@@ -6429,36 +6554,36 @@
 
 // 30 Presets Data Definition (音30種類 & エフェクト30種類)
 const TRIGGER_PRESETS = [
-    { id: 'nice', name: 'ナイス！', word: 'nice', soundName: '爽快ファンファーレ', fxName: 'ゴールドスターバースト', icon: '⭐', aliases: ['ナイス', 'ないす', 'いいね', 'イイネ', 'nice', 'good', 'グッド', 'ぐっど', 'すばらしい', '素晴らしい', 'うま'] },
-    { id: 'yes', name: 'YES / はい', word: 'yes', soundName: 'ポジティブチャイム', fxName: 'グリーンチェックリング', icon: '✅', aliases: ['yes', 'はい', 'うん', 'イエス', 'いぇす', 'おけ', 'オケ', 'オーケー', 'そやね', 'そう', '了解', 'りょうかい', 'ok'] },
-    { id: 'no', name: 'NO / だめ', word: 'no', soundName: '警告ブザー', fxName: 'レッドクロスバツ', icon: '❌', aliases: ['no', 'だめ', 'ダメ', 'ちがう', '違う', '無理', 'むり', 'ノー', 'のー', 'あかん', 'いや', '否定'] },
-    { id: 'um', name: 'えーと / um..', word: 'um', soundName: '考え中ポワン音', fxName: 'クエスチョンバブル', icon: '💭', aliases: ['um', 'えーと', 'あの', 'うーん', 'えっと', 'うーむ', 'えー', 'あー'] },
-    { id: 'lol', name: '草 / 笑 / lol', word: 'lol', soundName: 'コミカルピロリ', fxName: '爆笑フェイスシャワー', icon: '🤣', aliases: ['lol', '草', 'くさ', '笑', 'わら', 'www', 'おもしろい', 'ウケる', 'うける', '爆笑', 'ワロタ', 'わろた'] },
-    { id: 'gg', name: 'GG / おつかれ', word: 'gg', soundName: 'ビクトリーホーン', fxName: 'トロフィー＆紙吹雪', icon: '🏆', aliases: ['gg', 'おつかれ', 'お疲れ', 'ナイスゲーム', '勝った', 'おつ', 'おつかれさま', '乙'] },
-    { id: 'clap', name: '拍手 / 888', word: 'clap', soundName: '歓声＆拍手クラップ', fxName: 'クラッカーシャワー', icon: '👏', aliases: ['clap', '888', '拍手', 'ぱちぱち', 'パチパチ', 'ブラボー', 'はくしゅ'] },
-    { id: 'wow', name: 'すごい / wow', word: 'wow', soundName: 'きらきらハープ音', fxName: 'キラキラビーム', icon: '✨', aliases: ['wow', 'すごい', 'スゴイ', 'うわー', 'すげえ', 'すげー', 'ヤバ', 'うわ', 'すげ'] },
-    { id: 'rip', name: 'RIP / やばい', word: 'rip', soundName: '哀愁のゴング', fxName: 'ゴースト＆ドクロ', icon: '💀', aliases: ['rip', 'あああ', 'オワタ', 'おわた', '死んだ', 'やられた', 'チーン', 'ちーん', '詰んだ'] },
-    { id: 'fire', name: '燃えてきた / ファイヤー', word: 'fire', soundName: 'バーニングフレイム', fxName: '猛火フレアバースト', icon: '🔥', aliases: ['fire', '燃えてきた', 'アツい', 'あつい', 'ファイヤー', '炎', '熱い', 'ほのお'] },
-    { id: 'hello', name: 'こんにちは / ハロー', word: 'hello', soundName: '爽やかベルチャイム', fxName: 'ウェーブハンド', icon: '👋', aliases: ['hello', 'こんにちは', 'こんにちわ', 'ハロー', 'はろー', 'よろしく', 'おは', 'おはよう', 'こん', 'やあ'] },
-    { id: 'bye', name: 'バイバイ / またね', word: 'bye', soundName: 'オルゴールアルペジオ', fxName: 'スパークルバイバイ', icon: '🌸', aliases: ['bye', 'バイバイ', 'ばいばい', 'またね', 'さようなら', 'おつ', 'じゃあね', 'また明日', 'さらば'] },
-    { id: 'ok', name: '了解 / OK', word: 'ok', soundName: 'スナッピーサイン音', fxName: 'グッドサムズアップ', icon: '👍', aliases: ['ok', 'オーケー', 'おーけー', '了解', 'りょうかい', 'おっけー', 'おk', 'オッケー', 'オッケ', 'りょ'] },
-    { id: 'wait', name: '待って / ちょっと', word: 'wait', soundName: '時計チクタク音', fxName: 'ストップハンド', icon: '⏳', aliases: ['wait', '待って', 'まて', 'ちょっと', 'ストップ', 'タイム', 'まって', 'ちょい'] },
-    { id: 'sorry', name: 'ごめん / sorry', word: 'sorry', soundName: 'しょんぼりコード', fxName: 'ぽろぽろ涙しずく', icon: '🙇', aliases: ['sorry', 'ごめん', 'ごめんなさい', 'すまん', 'すいません', 'すみません', '申し訳'] },
-    { id: 'thanks', name: 'ありがとう / 感謝', word: 'thanks', soundName: '感謝のグロッケン', fxName: 'ブーケフラワー', icon: '💐', aliases: ['thanks', 'ありがとう', 'ありがとうございます', '感謝', 'サンキュー', 'さんきゅー', 'あざす', 'ありがと', '有難う'] },
-    { id: 'danger', name: '危険 / あぶない', word: 'danger', soundName: '緊急サイレンアラート', fxName: 'デンジャーフラッシュ', icon: '🚨', aliases: ['danger', 'あぶない', '危ない', '危険', '警戒', '逃げて', 'デンジャー', 'ヤバイ'] },
-    { id: 'alert', name: '注目 / 見て', word: 'alert', soundName: 'ソナーピン音', fxName: 'びっくりエクスクラメーション', icon: '❗', aliases: ['alert', '注目', '見て', '聞いて', '重要', 'ここ', 'みろ', 'みて'] },
-    { id: 'question', name: 'なんで？ / 疑問', word: 'question', soundName: 'ひらめきティン音', fxName: '巨大はてなマーク', icon: '❓', aliases: ['question', 'なんで', 'どうして', 'なぜ', 'はてな', '何', 'なに', 'えっ'] },
-    { id: 'bomb', name: 'ドカン / 爆発', word: 'bomb', soundName: '重低音エクスプロージョン', fxName: 'メガブラスト爆炎', icon: '💥', aliases: ['bomb', '爆発', 'ばくはつ', 'ドカン', 'どかん', 'ボム', 'ぼむ', 'ドカーン', '自爆'] },
-    { id: 'magic', name: '魔法 / マジック', word: 'magic', soundName: '神秘のクリスタル', fxName: '回転魔法陣グリフ', icon: '🔮', aliases: ['magic', '魔法', 'マジック', 'まほう', '呪文', 'ファンタジー'] },
-    { id: 'levelup', name: 'レベルアップ！', word: 'levelup', soundName: '8bitファンファーレ', fxName: 'レベルアップオーラ', icon: '🆙', aliases: ['levelup', 'レベルアップ', 'れべるあっぷ', '上がった', 'up', '成長', 'ランクアップ'] },
-    { id: 'coin', name: 'コイン / チャリン', word: 'coin', soundName: '8bitコインドロップ', fxName: 'ゴールドコイン噴水', icon: '🪙', aliases: ['coin', 'コイン', 'チャリン', '金', 'かね', 'マネー', 'ボーナス'] },
-    { id: 'laser', name: 'ビーム / レーザー', word: 'laser', soundName: 'SFプラズマレーザー', fxName: 'サイバーネオンビーム', icon: '⚡', aliases: ['laser', 'ビーム', 'レーザー', '撃て', '発射', '光線'] },
-    { id: 'heart', name: 'すき / かわいい', word: 'heart', soundName: 'ドキドキパルス音', fxName: 'ピンクハートストーム', icon: '💖', aliases: ['heart', 'すき', '好き', 'かわいい', 'カワイイ', 'ハート', '尊い', '愛'] },
-    { id: 'thunder', name: '雷 / ショック', word: 'thunder', soundName: '轟音サンダークラッシュ', fxName: '稲妻エレクトリック', icon: '🌩️', aliases: ['thunder', '雷', 'かみなり', 'サンダー', '電撃', '感電', 'ショック'] },
-    { id: 'speed', name: 'いそげ / ダッシュ', word: 'speed', soundName: 'ジェット加速音', fxName: 'ハイパースピード集中線', icon: '💨', aliases: ['speed', '急げ', 'いそげ', '走れ', 'ダッシュ', 'スピード', '速い', 'はやく'] },
-    { id: 'sleep', name: 'ねむい / おやすみ', word: 'sleep', soundName: 'やすらぎの夜想曲', fxName: 'Zzzふわふわクラウド', icon: '💤', aliases: ['sleep', 'ねむい', '眠い', 'おやすみ', '寝る', 'zzz', 'スヤスヤ'] },
-    { id: 'fight', name: 'がんばれ / ファイト', word: 'fight', soundName: '闘志のゴングドラム', fxName: 'バーニングフィスト', icon: '✊', aliases: ['fight', 'がんばれ', 'ファイト', 'ふぁいと', '勝つぞ', '気合', 'やるぞ', '応援', '頑張れ'] },
-    { id: 'party', name: '乾杯 / パーティー', word: 'party', soundName: 'パーティーホーン歓声', fxName: 'シャンパンシャワー', icon: '🎉', aliases: ['party', 'パーティー', '乾杯', 'かんぱい', '祝', 'おめでとう', 'ぱーてぃー'] }
+    { id: 'nice', name: 'ナイス！', word: 'nice', category: 'reaction', soundName: '爽快ファンファーレ', fxName: 'ゴールドスターバースト', icon: '⭐', aliases: ['ナイス', 'ないす', 'いいね', 'イイネ', 'nice', 'good', 'グッド', 'ぐっど', 'すばらしい', '素晴らしい', 'うま'] },
+    { id: 'yes', name: 'YES / はい', word: 'yes', category: 'reaction', soundName: 'ポジティブチャイム', fxName: 'グリーンチェックリング', icon: '✅', aliases: ['yes', 'はい', 'うん', 'イエス', 'いぇす', 'おけ', 'オケ', 'オーケー', 'そやね', 'そう', '了解', 'りょうかい', 'ok'] },
+    { id: 'no', name: 'NO / だめ', word: 'no', category: 'reaction', soundName: '警告ブザー', fxName: 'レッドクロスバツ', icon: '❌', aliases: ['no', 'だめ', 'ダメ', 'ちがう', '違う', '無理', 'むり', 'ノー', 'のー', 'あかん', 'いや', '否定'] },
+    { id: 'um', name: 'えーと / um..', word: 'um', category: 'reaction', soundName: '考え中ポワン音', fxName: 'クエスチョンバブル', icon: '💭', aliases: ['um', 'えーと', 'あの', 'うーん', 'えっと', 'うーむ', 'えー', 'あー'] },
+    { id: 'lol', name: '草 / 笑 / lol', word: 'lol', category: 'reaction', soundName: 'コミカルピロリ', fxName: '爆笑フェイスシャワー', icon: '🤣', aliases: ['lol', '草', 'くさ', '笑', 'わら', 'www', 'おもしろい', 'ウケる', 'うける', '爆笑', 'ワロタ', 'わろた'] },
+    { id: 'gg', name: 'GG / おつかれ', word: 'gg', category: 'battle', soundName: 'ビクトリーホーン', fxName: 'トロフィー＆紙吹雪', icon: '🏆', aliases: ['gg', 'おつかれ', 'お疲れ', 'ナイスゲーム', '勝った', 'おつ', 'おつかれさま', '乙'] },
+    { id: 'clap', name: '拍手 / 888', word: 'clap', category: 'battle', soundName: '歓声＆拍手クラップ', fxName: 'クラッカーシャワー', icon: '👏', aliases: ['clap', '888', '拍手', 'ぱちぱち', 'パチパチ', 'ブラボー', 'はくしゅ'] },
+    { id: 'wow', name: 'すごい / wow', word: 'wow', category: 'reaction', soundName: 'きらきらハープ音', fxName: 'キラキラビーム', icon: '✨', aliases: ['wow', 'すごい', 'スゴイ', 'うわー', 'すげえ', 'すげー', 'ヤバ', 'うわ', 'すげ'] },
+    { id: 'rip', name: 'RIP / やばい', word: 'rip', category: 'reaction', soundName: '哀愁のゴング', fxName: 'ゴースト＆ドクロ', icon: '💀', aliases: ['rip', 'あああ', 'オワタ', 'おわた', '死んだ', 'やられた', 'チーン', 'ちーん', '詰んだ'] },
+    { id: 'fire', name: '燃えてきた / ファイヤー', word: 'fire', category: 'battle', soundName: 'バーニングフレイム', fxName: '猛火フレアバースト', icon: '🔥', aliases: ['fire', '燃えてきた', 'アツい', 'あつい', 'ファイヤー', '炎', '熱い', 'ほのお'] },
+    { id: 'hello', name: 'こんにちは / ハロー', word: 'hello', category: 'emotion', soundName: '爽やかベルチャイム', fxName: 'ウェーブハンド', icon: '👋', aliases: ['hello', 'こんにちは', 'こんにちわ', 'ハロー', 'はろー', 'よろしく', 'おは', 'おはよう', 'こん', 'やあ'] },
+    { id: 'bye', name: 'バイバイ / またね', word: 'bye', category: 'emotion', soundName: 'オルゴールアルペジオ', fxName: 'スパークルバイバイ', icon: '🌸', aliases: ['bye', 'バイバイ', 'ばいばい', 'またね', 'さようなら', 'おつ', 'じゃあね', 'また明日', 'さらば'] },
+    { id: 'ok', name: '了解 / OK', word: 'ok', category: 'reaction', soundName: 'スナッピーサイン音', fxName: 'グッドサムズアップ', icon: '👍', aliases: ['ok', 'オーケー', 'おーけー', '了解', 'りょうかい', 'おっけー', 'おk', 'オッケー', 'オッケ', 'りょ'] },
+    { id: 'wait', name: '待って / ちょっと', word: 'wait', category: 'emotion', soundName: '時計チクタク音', fxName: 'ストップハンド', icon: '⏳', aliases: ['wait', '待って', 'まて', 'ちょっと', 'ストップ', 'タイム', 'まって', 'ちょい'] },
+    { id: 'sorry', name: 'ごめん / sorry', word: 'sorry', category: 'emotion', soundName: 'しょんぼりコード', fxName: 'ぽろぽろ涙しずく', icon: '🙇', aliases: ['sorry', 'ごめん', 'ごめんなさい', 'すまん', 'すいません', 'すみません', '申し訳'] },
+    { id: 'thanks', name: 'ありがとう / 感謝', word: 'thanks', category: 'reaction', soundName: '感謝のグロッケン', fxName: 'ブーケフラワー', icon: '💐', aliases: ['thanks', 'ありがとう', 'ありがとうございます', '感謝', 'サンキュー', 'さんきゅー', 'あざす', 'ありがと', '有難う'] },
+    { id: 'danger', name: '危険 / あぶない', word: 'danger', category: 'battle', soundName: '緊急サイレンアラート', fxName: 'デンジャーフラッシュ', icon: '🚨', aliases: ['danger', 'あぶない', '危ない', '危険', '警戒', '逃げて', 'デンジャー', 'ヤバイ'] },
+    { id: 'alert', name: '注目 / 見て', word: 'alert', category: 'reaction', soundName: 'ソナーピン音', fxName: 'びっくりエクスクラメーション', icon: '❗', aliases: ['alert', '注目', '見て', '聞いて', '重要', 'ここ', 'みろ', 'みて'] },
+    { id: 'question', name: 'なんで？ / 疑問', word: 'question', category: 'reaction', soundName: 'ひらめきティン音', fxName: '巨大はてなマーク', icon: '❓', aliases: ['question', 'なんで', 'どうして', 'なぜ', 'はてな', '何', 'なに', 'えっ'] },
+    { id: 'bomb', name: 'ドカン / 爆発', word: 'bomb', category: 'battle', soundName: '重低音エクスプロージョン', fxName: 'メガブラスト爆炎', icon: '💥', aliases: ['bomb', '爆発', 'ばくはつ', 'ドカン', 'どかん', 'ボム', 'ぼむ', 'ドカーン', '自爆'] },
+    { id: 'magic', name: '魔法 / マジック', word: 'magic', category: 'battle', soundName: '神秘のクリスタル', fxName: '回転魔法陣グリフ', icon: '🔮', aliases: ['magic', '魔法', 'マジック', 'まほう', '呪文', 'ファンタジー'] },
+    { id: 'levelup', name: 'レベルアップ！', word: 'levelup', category: 'battle', soundName: '8bitファンファーレ', fxName: 'レベルアップオーラ', icon: '🆙', aliases: ['levelup', 'レベルアップ', 'れべるあっぷ', '上がった', 'up', '成長', 'ランクアップ'] },
+    { id: 'coin', name: 'コイン / チャリン', word: 'coin', category: 'battle', soundName: '8bitコインドロップ', fxName: 'ゴールドコイン噴水', icon: '🪙', aliases: ['coin', 'コイン', 'チャリン', '金', 'かね', 'マネー', 'ボーナス'] },
+    { id: 'laser', name: 'ビーム / レーザー', word: 'laser', category: 'battle', soundName: 'SFプラズマレーザー', fxName: 'サイバーネオンビーム', icon: '⚡', aliases: ['laser', 'ビーム', 'レーザー', '撃て', '発射', '光線'] },
+    { id: 'heart', name: 'すき / かわいい', word: 'heart', category: 'emotion', soundName: 'ドキドキパルス音', fxName: 'ピンクハートストーム', icon: '💖', aliases: ['heart', 'すき', '好き', 'かわいい', 'カワイイ', 'ハート', '尊い', '愛'] },
+    { id: 'thunder', name: '雷 / ショック', word: 'thunder', category: 'battle', soundName: '轟音サンダークラッシュ', fxName: '稲妻エレクトリック', icon: '🌩️', aliases: ['thunder', '雷', 'かみなり', 'サンダー', '電撃', '感電', 'ショック'] },
+    { id: 'speed', name: 'いそげ / ダッシュ', word: 'speed', category: 'battle', soundName: 'ジェット加速音', fxName: 'ハイパースピード集中線', icon: '💨', aliases: ['speed', '急げ', 'いそげ', '走れ', 'ダッシュ', 'スピード', '速い', 'はやく'] },
+    { id: 'sleep', name: 'ねむい / おやすみ', word: 'sleep', category: 'emotion', soundName: 'やすらぎの夜想曲', fxName: 'Zzzふわふわクラウド', icon: '💤', aliases: ['sleep', 'ねむい', '眠い', 'おやすみ', '寝る', 'zzz', 'スヤスヤ'] },
+    { id: 'fight', name: 'がんばれ / ファイト', word: 'fight', category: 'battle', soundName: '闘志のゴングドラム', fxName: 'バーニングフィスト', icon: '✊', aliases: ['fight', 'がんばれ', 'ファイト', 'ふぁいと', '勝つぞ', '気合', 'やるぞ', '応援', '頑張れ'] },
+    { id: 'party', name: '乾杯 / パーティー', word: 'party', category: 'battle', soundName: 'パーティーホーン歓声', fxName: 'シャンパンシャワー', icon: '🎉', aliases: ['party', 'パーティー', '乾杯', 'かんぱい', '祝', 'おめでとう', 'ぱーてぃー'] }
 ];
 
 // User Custom Triggers stored in localStorage & Firebase
@@ -6885,6 +7010,229 @@ function listenToRoomTriggers(roomId) {
     });
 }
 
+// --- 🎨 VC Stamp Sender & FX Streamer (Send to All VC Peers) ---
+function sendVcStamp(presetId, customData = null) {
+    // 1. Ensure Web AudioContext is active
+    try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    } catch(e) {}
+
+    const myUid = (currentUser && currentUser.uid) ? currentUser.uid : 'self';
+    const myName = (currentUser && currentUser.name) ? currentUser.name : 'あなた';
+
+    let stampDisplayName = '';
+
+    if (customData) {
+        stampDisplayName = customData.name || customData.word;
+        // Immediate local playback with zero latency
+        playSynthesizedTriggerSound(customData.soundId || 'nice', customData.customAudioUrl || null);
+        renderTriggerVisualEffect(customData.effectId || 'nice', customData.customImageUrl || null, myName, stampDisplayName);
+
+        // Stream to all VC members if in a voice channel
+        if (currentVoiceRoomId) {
+            db.ref(`voiceRooms/${currentVoiceRoomId}/triggers`).push({
+                type: 'custom',
+                id: customData.id,
+                name: customData.name,
+                word: customData.word,
+                soundId: customData.soundId || 'nice',
+                customAudioUrl: customData.customAudioUrl || null,
+                effectId: customData.effectId || 'nice',
+                customImageUrl: customData.customImageUrl || null,
+                senderUid: myUid,
+                senderName: myName,
+                timestamp: Date.now()
+            });
+        }
+    } else {
+        const preset = TRIGGER_PRESETS.find(p => p.id === presetId);
+        if (!preset) return;
+        stampDisplayName = preset.name;
+
+        // Immediate local playback
+        playSynthesizedTriggerSound(preset.id, null);
+        renderTriggerVisualEffect(preset.id, null, myName, preset.name);
+
+        // Stream to all VC members if in a voice channel
+        if (currentVoiceRoomId) {
+            db.ref(`voiceRooms/${currentVoiceRoomId}/triggers`).push({
+                type: 'preset',
+                id: preset.id,
+                name: preset.name,
+                word: preset.word,
+                soundId: preset.id,
+                effectId: preset.id,
+                senderUid: myUid,
+                senderName: myName,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    // Modal feedback toast
+    const toast = document.getElementById('vcStampFeedbackToast');
+    const toastText = document.getElementById('vcStampFeedbackText');
+    if (toast && toastText) {
+        toastText.textContent = `${stampDisplayName} 送信！`;
+        toast.style.display = 'inline-flex';
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => {
+            toast.style.display = 'none';
+        }, 1600);
+    }
+}
+
+// --- 🎨 VC Stamp Modal Rendering & Interaction Setup ---
+let currentVcStampCategory = 'all';
+
+function renderVcStampGrid(filterTerm = '') {
+    const grid = document.getElementById('vcStampGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const term = (filterTerm || '').toLowerCase().trim();
+
+    // 1. Filter Presets
+    let matchedPresets = TRIGGER_PRESETS.filter(preset => {
+        if (currentVcStampCategory !== 'all' && currentVcStampCategory !== 'custom' && preset.category !== currentVcStampCategory) {
+            return false;
+        }
+        if (currentVcStampCategory === 'custom') return false;
+        if (!term) return true;
+        const searchPool = [preset.name, preset.word, preset.soundName, preset.fxName, ...(preset.aliases || [])].join(' ').toLowerCase();
+        return searchPool.includes(term);
+    });
+
+    // 2. Filter Custom Triggers
+    let matchedCustom = [];
+    if (currentVcStampCategory === 'all' || currentVcStampCategory === 'custom') {
+        matchedCustom = customTriggersList.filter(ct => {
+            if (!term) return true;
+            return (ct.name && ct.name.toLowerCase().includes(term)) || (ct.word && ct.word.toLowerCase().includes(term));
+        });
+    }
+
+    if (matchedPresets.length === 0 && matchedCustom.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column:1/-1; padding:32px 16px; text-align:center; color:var(--text-muted); font-size:0.85rem;">
+                <i class="fas fa-search" style="font-size:1.5rem; margin-bottom:8px; display:block; opacity:0.5;"></i>
+                「${escapeHtml(filterTerm)}」に一致するスタンプは見つかりませんでした
+            </div>
+        `;
+        return;
+    }
+
+    // Render presets
+    matchedPresets.forEach(preset => {
+        const card = document.createElement('div');
+        card.className = 'vc-stamp-card';
+        card.title = `VC全体に送信: ${preset.name} (${preset.soundName} / ${preset.fxName})`;
+        card.innerHTML = `
+            <div class="stamp-icon">${preset.icon}</div>
+            <div class="stamp-name">${escapeHtml(preset.name)}</div>
+            <div class="stamp-fx-tag">${escapeHtml(preset.soundName)}</div>
+        `;
+        card.onclick = () => {
+            sendVcStamp(preset.id);
+        };
+        grid.appendChild(card);
+    });
+
+    // Render custom triggers
+    matchedCustom.forEach(ct => {
+        const card = document.createElement('div');
+        card.className = 'vc-stamp-card';
+        card.style.borderColor = '#57f287';
+        card.title = `VC全体に送信: ${ct.name || ct.word} (カスタムスタンプ)`;
+        
+        let iconHtml = '✨';
+        if (ct.customImageUrl) {
+            iconHtml = `<img src="${ct.customImageUrl}" style="width:34px; height:34px; border-radius:8px; object-fit:cover;">`;
+        } else {
+            iconHtml = '🎨';
+        }
+
+        card.innerHTML = `
+            <div class="stamp-icon">${iconHtml}</div>
+            <div class="stamp-name" style="color:#57f287;">${escapeHtml(ct.name || ct.word)}</div>
+            <div class="stamp-fx-tag">カスタムFX</div>
+        `;
+        card.onclick = () => {
+            sendVcStamp(null, ct);
+        };
+        grid.appendChild(card);
+    });
+}
+
+function initVcStampModal() {
+    const modal = document.getElementById('vcStampModal');
+    const overlay = document.getElementById('overlay');
+    const openHeaderBtn = document.getElementById('openVcStampBtn');
+    const openBarBtn = document.getElementById('barVcStampBtn');
+    const soundboardLinkBtn = document.getElementById('soundboardToVcStampBtn');
+    const closeBtn = document.getElementById('closeVcStampModalBtn');
+    const closeBottomBtn = document.getElementById('closeVcStampBottomBtn');
+    const searchInput = document.getElementById('vcStampSearchInput');
+    const chipsContainer = document.getElementById('vcStampCategoryChips');
+
+    const openModal = () => {
+        if (!modal || !overlay) return;
+        modal.style.display = 'block';
+        overlay.style.display = 'block';
+        if (searchInput) searchInput.value = '';
+        renderVcStampGrid();
+        if (searchInput) searchInput.focus();
+    };
+
+    const closeModal = () => {
+        if (modal) modal.style.display = 'none';
+        if (overlay) overlay.style.display = 'none';
+    };
+
+    if (openHeaderBtn) openHeaderBtn.onclick = openModal;
+    if (openBarBtn) openBarBtn.onclick = openModal;
+    if (soundboardLinkBtn) {
+        soundboardLinkBtn.onclick = () => {
+            const sbModal = document.getElementById('soundboardModal');
+            if (sbModal) sbModal.style.display = 'none';
+            openModal();
+        };
+    }
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (closeBottomBtn) closeBottomBtn.onclick = closeModal;
+
+    if (searchInput) {
+        searchInput.oninput = (e) => {
+            renderVcStampGrid(e.target.value);
+        };
+    }
+
+    if (chipsContainer) {
+        const chipButtons = chipsContainer.querySelectorAll('.vc-stamp-tab-btn');
+        chipButtons.forEach(btn => {
+            btn.onclick = () => {
+                chipButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentVcStampCategory = btn.getAttribute('data-cat') || 'all';
+                renderVcStampGrid(searchInput ? searchInput.value : '');
+            };
+        });
+    }
+
+    // Click outside to close (overlay listener)
+    if (overlay) {
+        overlay.addEventListener('click', () => {
+            if (modal && modal.style.display === 'block') {
+                modal.style.display = 'none';
+            }
+        });
+    }
+
+    // Initial grid render
+    renderVcStampGrid();
+}
+
 // --- 📋 UI Renderer for Triggers Tab ---
 function renderTriggersView() {
     const presetGrid = document.getElementById('presetTriggersGrid');
@@ -7059,6 +7407,7 @@ function setupTriggersAndNewFeatures() {
     const searchInput = document.getElementById('triggerSearchInput');
 
     populateTriggerSelectOptions();
+    try { initVcStampModal(); } catch(e) { console.warn("initVcStampModal err:", e); }
 
     let pendingTriggerAudio = null;
     let pendingTriggerImage = null;
@@ -7232,6 +7581,7 @@ function setupTriggersAndNewFeatures() {
             customTriggersList.unshift(newTrigger);
             localStorage.setItem('forcord_custom_triggers', JSON.stringify(customTriggersList));
             renderTriggersView();
+            try { renderVcStampGrid(); } catch(e) {}
             closeModal();
             playTone(880, 0.12, 'sine', 0.2);
             alert(`自作トリガー「${word}」を登録しました！VC中に「${word}」と言うと発動します！`);
