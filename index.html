@@ -572,6 +572,7 @@
     </style>
 </head>
 <body>
+<!-- DSD_PERFORMANCE_FIX_2026_09 -->
 
 <!-- Lobby Screen -->
 <div id="lobbyScreen" class="lobby-container">
@@ -1492,6 +1493,7 @@
     let ytVcRoomRef = null;
     let ytVcLocalVolume = 70;
     let lastSyncedYtState = null;
+    let lastSyncedVideoId = null;
 
     window.onYouTubeIframeAPIReady = () => {
         isYtApiReady = true;
@@ -4037,19 +4039,19 @@
             isSpeechRecActive = false;
             if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed') {
                 setTimeout(() => {
-                    if (currentVoiceRoomId || isVoiceTriggerEnabled) {
+                    if (currentVoiceRoomId) {
                         startVoiceSpeechRecognitionIfAvailable();
                     }
-                }, 300);
+                }, 500);
             }
         };
 
         speechRecognition.onend = () => {
             isSpeechRecActive = false;
-            if (currentVoiceRoomId || isVoiceTriggerEnabled || isSubtitlesEnabled) {
+            if (currentVoiceRoomId) {
                 setTimeout(() => {
                     startVoiceSpeechRecognitionIfAvailable();
-                }, 200);
+                }, 500);
             }
         };
     }
