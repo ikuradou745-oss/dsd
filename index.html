@@ -964,17 +964,30 @@
 
 <script type="module">
     // --- Firebase Initialization ---
-    const firebaseConfig = { 
-        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "iikotowaruikoto-d5aa7.firebaseapp.com", 
-        databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", 
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "iikotowaruikoto-d5aa7", 
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "iikotowaruikoto-d5aa7.firebasestorage.app", 
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "455780219216", 
-        appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:455780219216:web:225461fcf24c1a46f69455", 
-        measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-YQD459DBSG" 
+    const getEnvVal = (val, fallback) => {
+        if (!val || typeof val !== 'string') return fallback;
+        const trimmed = val.trim();
+        if (!trimmed || trimmed === 'undefined' || trimmed === 'null' || trimmed.startsWith('YOUR_') || trimmed.startsWith('<')) return fallback;
+        return trimmed;
     };
-    firebase.initializeApp(firebaseConfig);
+    const rawDbUrl = getEnvVal(import.meta.env?.VITE_FIREBASE_DATABASE_URL, "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com");
+    const validDbUrl = /^https:\/\/[a-zA-Z0-9-]+(\.firebaseio\.com|\.[a-z0-9-]+\.firebasedatabase\.app)\/?$/.test(rawDbUrl)
+        ? rawDbUrl
+        : "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com";
+
+    const firebaseConfig = { 
+        apiKey: getEnvVal(import.meta.env?.VITE_FIREBASE_API_KEY, "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ"), 
+        authDomain: getEnvVal(import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN, "iikotowaruikoto-d5aa7.firebaseapp.com"), 
+        databaseURL: validDbUrl, 
+        projectId: getEnvVal(import.meta.env?.VITE_FIREBASE_PROJECT_ID, "iikotowaruikoto-d5aa7"), 
+        storageBucket: getEnvVal(import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET, "iikotowaruikoto-d5aa7.firebasestorage.app"), 
+        messagingSenderId: getEnvVal(import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID, "455780219216"), 
+        appId: getEnvVal(import.meta.env?.VITE_FIREBASE_APP_ID, "1:455780219216:web:225461fcf24c1a46f69455"), 
+        measurementId: getEnvVal(import.meta.env?.VITE_FIREBASE_MEASUREMENT_ID, "G-YQD459DBSG") 
+    };
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.database();
     const storage = firebase.storage();
 
