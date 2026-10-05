@@ -615,6 +615,17 @@
                         </div>
 
                         <div class="voice-controls-right" style="display:flex; align-items:center; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:6px; background:var(--bg-darker); padding:4px 8px; border-radius:12px; border:1px solid var(--border-color);" title="自分の声の送信音量 (マイクゲイン)">
+                                <span style="font-size:0.8rem; color:var(--text-muted);"><i class="fas fa-bullhorn"></i> 声量:</span>
+                                <select id="micSendVolQuickSelect" class="voice-quality-select" style="font-size:0.8rem; padding:4px 8px;">
+                                    <option value="50">50%</option>
+                                    <option value="100" selected>100% (標準)</option>
+                                    <option value="200">200% (2倍)</option>
+                                    <option value="300">300% (3倍)</option>
+                                    <option value="500">500% (5倍)</option>
+                                    <option value="1000">🔥 1000% (10倍爆音)</option>
+                                </select>
+                            </div>
                             <div style="display:flex; align-items:center; gap:6px; background:var(--bg-darker); padding:4px 8px; border-radius:12px; border:1px solid var(--border-color);" title="声の加工エフェクト">
                                 <span style="font-size:0.8rem; color:var(--text-muted);"><i class="fas fa-magic"></i> 声の加工:</span>
                                 <select id="voiceFxQuickSelect" class="voice-quality-select" style="font-size:0.8rem; padding:4px 8px;">
@@ -622,6 +633,7 @@
                                     <option value="reverb">✨ 響き (エコー残響)</option>
                                     <option value="breath">💓 喘ぎ・甘い声 (リアル息遣い・囁き)</option>
                                     <option value="alien">👽 宇宙人 (高音ピッチ)</option>
+                                    <option value="distortion">💥 音割れ (ハードクリッピング爆音)</option>
                                 </select>
                             </div>
                             <select id="audioBitrateSelect" class="voice-quality-select" title="WebRTC 音質レート">
@@ -764,6 +776,20 @@
                     <h3><i class="fas fa-microphone-alt"></i> 高性能マイク・音響設定 (WebRTC)</h3>
                     
                     <div style="margin-bottom:16px;">
+                        <label style="font-size:0.9rem; font-weight:600;">自分の声の送信音量 (マイクゲイン・最大1000%爆音対応): <span id="micSendVolDisplay">100%</span></label>
+                        <div class="volume-preset-group" id="micSendVolPresetGroup" style="margin-top:8px;">
+                            <button class="vol-preset-btn" data-vol="50">50%</button>
+                            <button class="vol-preset-btn active" data-vol="100">100% (標準)</button>
+                            <button class="vol-preset-btn" data-vol="200">200% (2倍)</button>
+                            <button class="vol-preset-btn" data-vol="300">300% (3倍)</button>
+                            <button class="vol-preset-btn" data-vol="500">500% (5倍)</button>
+                            <button class="vol-preset-btn" data-vol="1000" style="border-color:var(--danger); color:#ff6b81;">🔥 1000% (10倍爆音)</button>
+                        </div>
+                        <input type="range" id="micSendVolSlider" min="0" max="1000" step="10" value="100" style="margin-top:10px;">
+                        <div class="info-text">相手に届くあなたの声の音量を最大1000%（10倍ゲイン）まで超強力に増幅します。</div>
+                    </div>
+
+                    <div style="margin-bottom:16px;">
                         <label style="font-size:0.9rem; font-weight:600;">電話・ボイス通話の受信音量 (ブースト対応): <span id="masterVoiceVolDisplay">100%</span></label>
                         <div class="volume-preset-group" id="masterVolPresetGroup" style="margin-top:8px;">
                             <button class="vol-preset-btn" data-vol="50">50%</button>
@@ -771,10 +797,11 @@
                             <button class="vol-preset-btn" data-vol="200">200% (2倍)</button>
                             <button class="vol-preset-btn" data-vol="300">300% (3倍)</button>
                             <button class="vol-preset-btn" data-vol="400">400% (4倍)</button>
-                            <button class="vol-preset-btn" data-vol="500">500% (5倍超大音量)</button>
+                            <button class="vol-preset-btn" data-vol="500">500% (5倍)</button>
+                            <button class="vol-preset-btn" data-vol="1000" style="border-color:var(--danger); color:#ff6b81;">🔥 1000% (10倍超大音量)</button>
                         </div>
-                        <input type="range" id="masterVoiceVolSlider" min="0" max="500" step="5" value="100" style="margin-top:10px;">
-                        <div class="info-text">相手の声が小さいときでも、最大500%（5倍ゲイン）まで超強力に増幅して聞き取れます。</div>
+                        <input type="range" id="masterVoiceVolSlider" min="0" max="1000" step="10" value="100" style="margin-top:10px;">
+                        <div class="info-text">相手の声が小さいときでも、最大1000%（10倍ゲイン）まで超強力に増幅して聞き取れます。</div>
                     </div>
 
                     <div style="margin-bottom:16px;">
@@ -821,6 +848,10 @@
                         <button class="voice-fx-btn btn-secondary" data-fx="alien">
                             <div style="font-weight:700; font-size:0.95rem;">👽 宇宙人</div>
                             <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">声のピッチが高くなります</div>
+                        </button>
+                        <button class="voice-fx-btn btn-secondary" data-fx="distortion">
+                            <div style="font-weight:700; font-size:0.95rem;">💥 音割れ</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">プリゲイン過大増幅＋WaveShaperハードクリッピングで強烈な音割れボイスを作ります</div>
                         </button>
                     </div>
                 </div>
@@ -931,17 +962,17 @@
 <!-- Hidden audio element container for remote peer tracks -->
 <div id="remoteAudioContainer" style="display:none;"></div>
 
-<script>
+<script type="module">
     // --- Firebase Initialization ---
     const firebaseConfig = { 
-        apiKey: "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
-        authDomain: "iikotowaruikoto-d5aa7.firebaseapp.com", 
-        databaseURL: "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", 
-        projectId: "iikotowaruikoto-d5aa7", 
-        storageBucket: "iikotowaruikoto-d5aa7.firebasestorage.app", 
-        messagingSenderId: "455780219216", 
-        appId: "1:455780219216:web:225461fcf24c1a46f69455", 
-        measurementId: "G-YQD459DBSG" 
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDcds20u1-6-nk7710P4xddsa-m1wDL0TQ", 
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "iikotowaruikoto-d5aa7.firebaseapp.com", 
+        databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://iikotowaruikoto-d5aa7-default-rtdb.firebaseio.com", 
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "iikotowaruikoto-d5aa7", 
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "iikotowaruikoto-d5aa7.firebasestorage.app", 
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "455780219216", 
+        appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:455780219216:web:225461fcf24c1a46f69455", 
+        measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-YQD459DBSG" 
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -1099,8 +1130,9 @@
     let remoteVideoStreams = {}; // targetUid -> MediaStream (Screen share)
     let peerGainNodes = {}; // targetUid -> GainNode (for 0% - 500% amplification)
     let pendingCandidates = {}; // targetUid -> array of RTCIceCandidate
-    let userVolumes = {}; // targetUid -> volume factor (e.g. 0.5 = 50%, 1.0 = 100%, 5.0 = 500%)
-    let masterVoiceVolume = 1.0; // 0.0 to 5.0
+    let userVolumes = {}; // targetUid -> volume factor (e.g. 0.5 = 50%, 1.0 = 100%, 10.0 = 1000%)
+    let masterVoiceVolume = 1.0; // 0.0 to 10.0 (1000%)
+    let micSendVolume = 1.0; // 0.0 to 10.0 (1000%)
     let meterAnimationId = null;
     let signalingRef = null;
     let backgroundKeepAliveAudio = null;
@@ -1306,6 +1338,7 @@
 
             micSourceNode = audioContext.createMediaStreamSource(localAudioStream);
             micGainNode = audioContext.createGain();
+            micGainNode.gain.setValueAtTime(micSendVolume, audioContext.currentTime);
             micAnalyser = audioContext.createAnalyser();
             micAnalyser.fftSize = 256;
             micAnalyser.smoothingTimeConstant = 0.3;
@@ -1533,6 +1566,52 @@
             alienGain.connect(fxProcessedMasterGain);
 
             currentFxNodes.push(carrierOsc, modGain, highpass, bandpass, alienGain);
+
+        } else if (fxType === 'distortion') {
+            // --- 「音割れ」 (Ear-Rape / Hard-Clipping Overdrive Distortion Voice) ---
+            // 仕組み:
+            // 1. Pre-Gain (過大増幅): 入力信号を25倍にブーストして意図的にヘッドルームを突破させる
+            // 2. Mid-Boost Peaking Filter: 音割れの迫力・バリバリ感が最も際立つ中音域(1200Hz)を強調
+            // 3. WaveShaperNode (非線形ハードクリッピング): 振幅が閾値を超えた波形を矩形波状にスパッと潰し、強烈な高調波倍音歪み（音割れ）を発生させる
+            // 4. Post-Gain: 音割れ特有のガビガビ・バリバリ感を保ったまま大音量で出力する
+            const preDriveGain = audioContext.createGain();
+            preDriveGain.gain.setValueAtTime(28.0, audioContext.currentTime);
+
+            const midPunchFilter = audioContext.createBiquadFilter();
+            midPunchFilter.type = 'peaking';
+            midPunchFilter.frequency.setValueAtTime(1200, audioContext.currentTime);
+            midPunchFilter.Q.setValueAtTime(1.0, audioContext.currentTime);
+            midPunchFilter.gain.setValueAtTime(14.0, audioContext.currentTime);
+
+            const lowCutFilter = audioContext.createBiquadFilter();
+            lowCutFilter.type = 'highpass';
+            lowCutFilter.frequency.setValueAtTime(180, audioContext.currentTime);
+
+            const waveShaper = audioContext.createWaveShaper();
+            const samples = 44100;
+            const curve = new Float32Array(samples);
+            const k = 180; // 超強力なディストーション係数
+            for (let i = 0; i < samples; ++i) {
+                const x = (i * 2) / samples - 1;
+                // 非線形ハードクリッピング曲線 (tanh + 段階量子化で荒々しいデジタル＆アナログ複合音割れを生成)
+                const hardClip = Math.tanh(k * x);
+                curve[i] = Math.round(hardClip * 16) / 16;
+            }
+            waveShaper.curve = curve;
+            waveShaper.oversample = 'none'; // エイリアシングノイズを残すことで本物のマイク音割れ感を再現
+
+            const postClipGain = audioContext.createGain();
+            postClipGain.gain.setValueAtTime(1.8, audioContext.currentTime);
+
+            // Routing: micGainNode -> lowCutFilter -> midPunchFilter -> preDriveGain -> waveShaper -> postClipGain -> fxProcessedMasterGain
+            micGainNode.connect(lowCutFilter);
+            lowCutFilter.connect(midPunchFilter);
+            midPunchFilter.connect(preDriveGain);
+            preDriveGain.connect(waveShaper);
+            waveShaper.connect(postClipGain);
+            postClipGain.connect(fxProcessedMasterGain);
+
+            currentFxNodes.push(lowCutFilter, midPunchFilter, preDriveGain, waveShaper, postClipGain);
 
         } else {
             // --- 「ノーマル」 (Normal: 原音クリーン) ---
@@ -2900,7 +2979,23 @@
                     <span id="mic_status_${uid}">${data.muted ? '<i class="fas fa-microphone-slash" style="color:var(--danger)"></i> ミュート中' : '<i class="fas fa-microphone" style="color:var(--success)"></i> マイクON'}</span>
                     ${isMe ? `<span id="self_voice_indicator_${uid}" style="font-size:0.75rem; color:#57f287; display:${isSelfVoiceEnabled ? 'inline-block' : 'none'};"><i class="fas fa-headset"></i> 自分の声モニタ中</span>` : ''}
                 </div>
-                ${!isMe ? `
+                ${isMe ? `
+                <div class="voice-user-controls">
+                    <div class="voice-slider-row">
+                        <span><i class="fas fa-bullhorn"></i> 自分の声量</span>
+                        <span id="my_mic_vol_val" style="font-weight:700; color:var(--accent);">${Math.round(micSendVolume * 100)}%</span>
+                    </div>
+                    <div class="volume-preset-group" id="myCardMicVolPresets">
+                        <button class="vol-preset-btn ${Math.round(micSendVolume * 100) === 50 ? 'active' : ''}" data-myvol="50">50%</button>
+                        <button class="vol-preset-btn ${Math.round(micSendVolume * 100) === 100 ? 'active' : ''}" data-myvol="100">100%</button>
+                        <button class="vol-preset-btn ${Math.round(micSendVolume * 100) === 200 ? 'active' : ''}" data-myvol="200">200%</button>
+                        <button class="vol-preset-btn ${Math.round(micSendVolume * 100) === 300 ? 'active' : ''}" data-myvol="300">300%</button>
+                        <button class="vol-preset-btn ${Math.round(micSendVolume * 100) === 500 ? 'active' : ''}" data-myvol="500">500%</button>
+                        <button class="vol-preset-btn ${Math.round(micSendVolume * 100) === 1000 ? 'active' : ''}" data-myvol="1000">1000%</button>
+                    </div>
+                    <input type="range" id="myCardMicVolSlider" class="voice-volume-slider" min="0" max="1000" step="10" value="${Math.round(micSendVolume * 100)}" style="margin-top:8px;">
+                </div>
+                ` : `
                 <div class="voice-user-controls">
                     <div class="voice-slider-row">
                         <span><i class="fas fa-volume-up"></i> 音量</span>
@@ -2911,18 +3006,18 @@
                         <button class="vol-preset-btn ${volValue === 100 ? 'active' : ''}" data-vol="100">100%</button>
                         <button class="vol-preset-btn ${volValue === 200 ? 'active' : ''}" data-vol="200">200%</button>
                         <button class="vol-preset-btn ${volValue === 300 ? 'active' : ''}" data-vol="300">300%</button>
-                        <button class="vol-preset-btn ${volValue === 400 ? 'active' : ''}" data-vol="400">400%</button>
                         <button class="vol-preset-btn ${volValue === 500 ? 'active' : ''}" data-vol="500">500%</button>
+                        <button class="vol-preset-btn ${volValue === 1000 ? 'active' : ''}" data-vol="1000">1000%</button>
                     </div>
-                    <input type="range" class="voice-volume-slider" min="0" max="500" step="5" value="${volValue}" data-uid="${uid}" style="margin-top:8px;">
-                </div>` : ''}
+                    <input type="range" class="voice-volume-slider" min="0" max="1000" step="10" value="${volValue}" data-uid="${uid}" style="margin-top:8px;">
+                </div>`}
             `;
 
             grid.appendChild(card);
         });
 
         // Attach per-user volume slider & preset button listeners
-        document.querySelectorAll('.voice-volume-slider').forEach(slider => {
+        document.querySelectorAll('.voice-volume-slider[data-uid]').forEach(slider => {
             slider.oninput = (e) => {
                 const targetUid = slider.getAttribute('data-uid');
                 const val = parseInt(slider.value);
@@ -2960,6 +3055,20 @@
                 btn.classList.add('active');
                 
                 applyPeerVolume(targetUid);
+                playTone(600, 0.05, 'sine', 0.1);
+            };
+        });
+
+        // Attach current user's own mic send volume controls on their participant card
+        const myCardSlider = document.getElementById('myCardMicVolSlider');
+        if (myCardSlider) {
+            myCardSlider.oninput = (e) => {
+                setMicSendVolumePercent(parseInt(e.target.value));
+            };
+        }
+        document.querySelectorAll('#myCardMicVolPresets .vol-preset-btn').forEach(btn => {
+            btn.onclick = () => {
+                setMicSendVolumePercent(parseInt(btn.getAttribute('data-myvol')));
                 playTone(600, 0.05, 'sine', 0.1);
             };
         });
@@ -3486,8 +3595,76 @@
         }
     }
 
-    // --- Master Volume Setting & Presets ---
+    // --- Master Volume & Mic Send Volume Setting & Presets ---
+    function setMicSendVolumePercent(val) {
+        micSendVolume = val / 100;
+        if (micGainNode && audioContext) {
+            try {
+                micGainNode.gain.setValueAtTime(micSendVolume, audioContext.currentTime);
+            } catch (e) {}
+        }
+
+        // Sync Settings UI
+        const micSlider = document.getElementById('micSendVolSlider');
+        const micDisplay = document.getElementById('micSendVolDisplay');
+        const micPresetGroup = document.getElementById('micSendVolPresetGroup');
+        if (micSlider && parseInt(micSlider.value) !== val) micSlider.value = val;
+        if (micDisplay) micDisplay.innerText = `${val}%`;
+        if (micPresetGroup) {
+            micPresetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.getAttribute('data-vol')) === val);
+            });
+        }
+
+        // Sync Bottom Bar Quick Select
+        const quickSelect = document.getElementById('micSendVolQuickSelect');
+        if (quickSelect) {
+            const hasOption = Array.from(quickSelect.options).some(opt => parseInt(opt.value) === val);
+            if (hasOption) quickSelect.value = String(val);
+        }
+
+        // Sync My Participant Card UI
+        const myCardVal = document.getElementById('my_mic_vol_val');
+        const myCardSlider = document.getElementById('myCardMicVolSlider');
+        const myCardPresets = document.getElementById('myCardMicVolPresets');
+        if (myCardVal) myCardVal.innerText = `${val}%`;
+        if (myCardSlider && parseInt(myCardSlider.value) !== val) myCardSlider.value = val;
+        if (myCardPresets) {
+            myCardPresets.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.getAttribute('data-myvol')) === val);
+            });
+        }
+    }
+
     function setupMasterVolumeControls() {
+        // 1. Mic Send Volume (自分の声の送信音量: 最大1000%)
+        const micSlider = document.getElementById('micSendVolSlider');
+        const micPresetGroup = document.getElementById('micSendVolPresetGroup');
+        const micQuickSelect = document.getElementById('micSendVolQuickSelect');
+
+        if (micSlider) {
+            micSlider.oninput = (e) => {
+                setMicSendVolumePercent(parseInt(e.target.value));
+            };
+        }
+        if (micPresetGroup) {
+            micPresetGroup.querySelectorAll('.vol-preset-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const val = parseInt(btn.getAttribute('data-vol'));
+                    setMicSendVolumePercent(val);
+                    playTone(600, 0.05, 'sine', 0.1);
+                };
+            });
+        }
+        if (micQuickSelect) {
+            micQuickSelect.onchange = (e) => {
+                const val = parseInt(e.target.value);
+                setMicSendVolumePercent(val);
+                playTone(600, 0.05, 'sine', 0.1);
+            };
+        }
+
+        // 2. Master Incoming Voice Volume (相手の声の受信音量: 最大1000%)
         const slider = document.getElementById('masterVoiceVolSlider');
         const display = document.getElementById('masterVoiceVolDisplay');
         const presetGroup = document.getElementById('masterVolPresetGroup');
